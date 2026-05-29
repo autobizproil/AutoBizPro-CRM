@@ -31,6 +31,25 @@ class RolePermission extends Model
         'agent'       => ['leads','contacts'],
     ];
 
+    /**
+     * Resolve an effective permission: tenant-specific override first,
+     * falling back to the default matrix. Single source of truth for both
+     * the CheckPermission middleware and inline action-level checks.
+     */
+    public static function allows(int $tenantId, string $role, string $module, string $action): bool
+    {
+        $override = static::where('tenant_id', $tenantId)
+            ->where('role', $role)
+            ->where('module', $module)
+            ->first();
+
+        if ($override) {
+            return (bool) $override->{$action};
+        }
+
+        return static::defaultFor($role, $module, $action);
+    }
+
     public static function defaultFor(string $role, string $module, string $action): bool
     {
         return match ($role) {

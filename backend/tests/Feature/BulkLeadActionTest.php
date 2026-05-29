@@ -66,6 +66,19 @@ class BulkLeadActionTest extends TestCase
         $this->assertSame(0, Lead::count());
     }
 
+    public function test_manager_without_delete_permission_cannot_bulk_delete(): void
+    {
+        [$tenant, $admin, $sub] = $this->setupTenant('bulk-perm');
+        $manager = User::create(['tenant_id' => $tenant->id, 'name' => 'M', 'email' => 'm@bulk-perm.co', 'password' => Hash::make('x'), 'role' => 'manager']);
+        $lead = Lead::create(['tenant_id' => $tenant->id, 'name' => 'A']);
+
+        $resp = $this->actingAs($manager)->withHeaders(['X-Tenant' => $sub])
+            ->postJson('/api/leads/bulk', ['action' => 'delete', 'ids' => [$lead->id]]);
+
+        $resp->assertStatus(403);
+        $this->assertSame(1, Lead::count()); // not deleted
+    }
+
     public function test_bulk_cannot_touch_other_tenant_leads(): void
     {
         [$tenantA, $adminA, $subA] = $this->setupTenant('bulk-a');

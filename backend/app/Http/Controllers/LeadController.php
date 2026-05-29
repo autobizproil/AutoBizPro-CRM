@@ -46,6 +46,13 @@ class LeadController extends Controller
             $request->validate(['value' => ['required', \Illuminate\Validation\Rule::exists('pipeline_stages', 'id')->where('tenant_id', $tenantId)]]);
         } elseif ($data['action'] === 'assign') {
             $request->validate(['value' => ['required', \Illuminate\Validation\Rule::exists('users', 'id')->where('tenant_id', $tenantId)]]);
+        } elseif ($data['action'] === 'delete') {
+            // Bulk delete must require delete permission, not just update
+            // (route guards can_update; deletion is a higher privilege)
+            abort_unless(
+                \App\Models\RolePermission::allows($tenantId, $request->user()->role, 'leads', 'can_delete'),
+                403
+            );
         }
 
         $affected = $this->service->bulk(
