@@ -34,6 +34,9 @@ class SettingsController extends Controller
 
     public function updatePermissions(Request $request): JsonResponse
     {
+        // Permission management is admin-only — prevents privilege escalation
+        abort_unless($request->user()->role === 'admin', 403);
+
         $data = $request->validate([
             'permissions'           => 'required|array',
             'permissions.*.role'    => 'required|in:admin,manager,agent',

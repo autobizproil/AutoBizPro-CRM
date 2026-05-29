@@ -35,16 +35,21 @@ class ContactController extends Controller
 
     public function show(Contact $contact): JsonResponse
     {
+        abort_unless($contact->tenant_id === app('current_tenant_id'), 403);
         return response()->json(['success' => true, 'data' => $contact->load('activities')]);
     }
 
     public function update(Request $request, Contact $contact): JsonResponse
     {
+        abort_unless($contact->tenant_id === app('current_tenant_id'), 403);
+
         $data = $request->validate([
             'name'          => 'sometimes|required|string|max:255',
             'phone'         => 'nullable|string|max:30',
             'email'         => 'nullable|email|max:255',
             'company'       => 'nullable|string|max:255',
+            'role'          => 'nullable|string|max:100',
+            'notes'         => 'nullable|string',
             'tags'          => 'nullable|array',
             'custom_fields' => 'nullable|array',
         ]);
@@ -55,6 +60,7 @@ class ContactController extends Controller
 
     public function destroy(Contact $contact): JsonResponse
     {
+        abort_unless($contact->tenant_id === app('current_tenant_id'), 403);
         $contact->delete();
         return response()->json(['success' => true, 'data' => null]);
     }

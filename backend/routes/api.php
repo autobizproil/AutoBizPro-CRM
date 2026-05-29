@@ -55,14 +55,15 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         ->middleware('permission:contacts,can_delete');
 
     // Pipeline
-    Route::get('/pipelines', [PipelineController::class, 'index']);
-    Route::post('/pipelines', [PipelineController::class, 'store'])
+    Route::get('/pipeline', [PipelineController::class, 'index'])
+        ->middleware('permission:leads,can_read');
+    Route::post('/pipeline', [PipelineController::class, 'store'])
         ->middleware('permission:leads,can_create');
-    Route::put('/pipelines/reorder', [PipelineController::class, 'reorder'])
+    Route::put('/pipeline/reorder', [PipelineController::class, 'reorder'])
         ->middleware('permission:leads,can_update');
-    Route::put('/pipelines/{pipeline}', [PipelineController::class, 'update'])
+    Route::put('/pipeline/{pipeline}', [PipelineController::class, 'update'])
         ->middleware('permission:leads,can_update');
-    Route::delete('/pipelines/{pipeline}', [PipelineController::class, 'destroy'])
+    Route::delete('/pipeline/{pipeline}', [PipelineController::class, 'destroy'])
         ->middleware('permission:leads,can_delete');
 
     // Automations

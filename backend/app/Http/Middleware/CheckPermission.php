@@ -30,7 +30,7 @@ class CheckPermission
         $cacheKey = "perm_{$user->tenant_id}_{$user->role}";
         $overrides = \Illuminate\Support\Facades\Cache::store('array')->rememberForever(
             $cacheKey,
-            fn () => RolePermission::where('role', $user->role)->get()->keyBy('module')
+            fn () => RolePermission::where('tenant_id', $user->tenant_id)->where('role', $user->role)->get()->keyBy('module')
         );
 
         if ($overrides->has($module)) {
