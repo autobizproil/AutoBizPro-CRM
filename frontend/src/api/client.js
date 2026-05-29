@@ -23,11 +23,16 @@ export async function initCsrf() {
   await axios.get('/sanctum/csrf-cookie', { withCredentials: true })
 }
 
-// Redirect to login on 401
+// Redirect to login on 401 — but NOT for the auth-probe endpoints
+// (/auth/me returns 401 when logged out by design; AuthContext handles it).
+// Hard-redirecting on those caused an infinite reload loop.
 client.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const url = err.config?.url ?? ''
+    const isAuthProbe = url.includes('/auth/me') || url.includes('/auth/login')
+    const onLoginPage = window.location.pathname === '/login'
+    if (err.response?.status === 401 && !isAuthProbe && !onLoginPage) {
       window.location.href = '/login'
     }
     return Promise.reject(err)
