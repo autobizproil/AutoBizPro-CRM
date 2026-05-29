@@ -72,3 +72,11 @@ export function useAddLeadActivity() {
     },
   })
 }
+
+export function useBulkLeadAction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ action, ids, value }) => leadsApi.bulk(action, ids, value).then(r => r.data.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+  })
+}
