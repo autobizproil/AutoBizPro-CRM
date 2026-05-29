@@ -4,7 +4,9 @@ import { leadsApi } from '../api/leads'
 export function useLeads(filters = {}) {
   return useQuery({
     queryKey: ['leads', filters],
-    queryFn: () => leadsApi.list(filters).then(r => r.data),
+    // API envelope is { success, data: <paginator> }; return the paginator
+    // so the component reads data.data (array) and data.total.
+    queryFn: () => leadsApi.list(filters).then(r => r.data.data),
     keepPreviousData: true,
   })
 }
