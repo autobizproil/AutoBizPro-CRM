@@ -110,6 +110,16 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::delete('/users/{user}', [UserController::class, 'destroy'])
         ->middleware('permission:users,can_delete');
 
+    // WhatsApp templates
+    Route::get('/whatsapp-templates', [\App\Http\Controllers\WhatsappTemplateController::class, 'index'])
+        ->middleware('permission:leads,can_read');
+    Route::post('/whatsapp-templates', [\App\Http\Controllers\WhatsappTemplateController::class, 'store'])
+        ->middleware('permission:leads,can_update');
+    Route::put('/whatsapp-templates/{whatsapp_template}', [\App\Http\Controllers\WhatsappTemplateController::class, 'update'])
+        ->middleware('permission:leads,can_update');
+    Route::delete('/whatsapp-templates/{whatsapp_template}', [\App\Http\Controllers\WhatsappTemplateController::class, 'destroy'])
+        ->middleware('permission:leads,can_update');
+
     // Settings
     Route::get('/settings/tenant', [SettingsController::class, 'getTenant']);
     Route::put('/settings/tenant', [SettingsController::class, 'updateTenant'])
