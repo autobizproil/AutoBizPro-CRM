@@ -26,6 +26,20 @@ class SettingsController extends Controller
         return response()->json(['success' => true, 'data' => app('current_tenant')->fresh()]);
     }
 
+    public function getLabels(): JsonResponse
+    {
+        $svc = app(\App\Services\SettingsService::class);
+        return response()->json(['success' => true, 'data' => $svc->labels()]);
+    }
+
+    public function updateLabels(Request $request): JsonResponse
+    {
+        $data = $request->validate(['labels' => 'required|array']);
+        $svc = app(\App\Services\SettingsService::class);
+        $svc->set('labels', $data['labels']);
+        return response()->json(['success' => true, 'data' => $svc->labels()]);
+    }
+
     public function getPermissions(): JsonResponse
     {
         $permissions = RolePermission::all()->groupBy('role');

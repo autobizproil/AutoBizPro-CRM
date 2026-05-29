@@ -42,6 +42,14 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::post('/leads/{lead}/activities', [LeadController::class, 'storeActivity'])
         ->middleware('permission:leads,can_create');
 
+    // Import (CSV → leads)
+    Route::post('/import/upload', [\App\Http\Controllers\ImportController::class, 'upload'])
+        ->middleware('permission:leads,can_create');
+    Route::post('/import/start', [\App\Http\Controllers\ImportController::class, 'start'])
+        ->middleware('permission:leads,can_create');
+    Route::get('/import/{import}', [\App\Http\Controllers\ImportController::class, 'status'])
+        ->middleware('permission:leads,can_read');
+
     // Contacts
     Route::get('/contacts', [ContactController::class, 'index'])
         ->middleware('permission:contacts,can_read');
@@ -106,6 +114,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         ->middleware('permission:users,can_update');
     Route::get('/settings/permissions', [SettingsController::class, 'getPermissions']);
     Route::put('/settings/permissions', [SettingsController::class, 'updatePermissions'])
+        ->middleware('permission:users,can_update');
+    Route::get('/settings/labels', [SettingsController::class, 'getLabels']);
+    Route::put('/settings/labels', [SettingsController::class, 'updateLabels'])
         ->middleware('permission:users,can_update');
 
     // Dashboard
