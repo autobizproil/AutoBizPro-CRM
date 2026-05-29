@@ -41,22 +41,30 @@ class ImportController extends Controller
 
     public function start(Request $request): JsonResponse
     {
-        $data = $request->validate([
+        $request->validate([
             'import_id'          => 'required|integer',
             'field_mapping'      => 'required|array',
             'field_mapping.name' => 'required|string',
         ]);
 
         // Scope strictly to the current tenant + uploader
-        $job = ImportJob::where('id', $data['import_id'])
+        $job = ImportJob::where('id', $request->integer('import_id'))
             ->where('tenant_id', app('current_tenant_id'))
             ->where('user_id', $request->user()->id)
             ->where('status', 'uploaded')
             ->firstOrFail();
 
+        // Whitelist mapping keys to known lead fields (validate() would strip
+        // un-ruled sub-keys, so take the full input then filter explicitly)
+        $allowed = ['name', 'phone', 'email', 'source', 'notes'];
+        $mapping = array_intersect_key(
+            $request->input('field_mapping', []),
+            array_flip($allowed)
+        );
+
         $job->update([
             'status'        => 'pending',
-            'field_mapping' => $data['field_mapping'],
+            'field_mapping' => $mapping,
         ]);
 
         ProcessImportJob::dispatch($job->id);
