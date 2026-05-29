@@ -50,11 +50,16 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+        }
+
         return response()->json([
             'success' => true,
             'data'    => [
-                'user'        => $request->user(),
-                'permissions' => $this->getPermissions($request->user()),
+                'user'        => $user,
+                'permissions' => $this->getPermissions($user),
             ],
         ]);
     }
