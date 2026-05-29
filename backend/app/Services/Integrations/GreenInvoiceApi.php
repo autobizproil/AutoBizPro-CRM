@@ -72,8 +72,7 @@ class GreenInvoiceApi
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => $post_data,
             CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
+            // TLS verification left at secure libcurl defaults (VERIFYPEER=true)
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_CONNECTTIMEOUT => 10,
         ]);
@@ -149,8 +148,6 @@ class GreenInvoiceApi
                 'Content-Type: application/json',
                 'Accept: application/json',
             ],
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_CONNECTTIMEOUT => 10,
         ]);
@@ -211,8 +208,6 @@ class GreenInvoiceApi
             CURLOPT_URL            => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $this->token, 'Accept: application/pdf'],
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => 0,
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_BINARYTRANSFER => true,
