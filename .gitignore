@@ -1,0 +1,27 @@
+# Backend (Laravel)
+backend/vendor/
+backend/node_modules/
+backend/.env
+backend/storage/*.key
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/logs/*.log
+backend/storage/app/imports/*
+backend/bootstrap/cache/*.php
+backend/.phpunit.result.cache
+backend/check_user.php
+backend/check_tables.php
+backend/test_lead.php
+backend/create_demo.php
+backend/seed_stages.php
+
+# Frontend (React/Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
