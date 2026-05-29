@@ -13,13 +13,20 @@ class Lead extends Model
     use HasTenantScope, SoftDeletes;
 
     protected $fillable = [
-        'tenant_id', 'name', 'phone', 'email', 'status',
+        'tenant_id', 'name', 'phone', 'phone_normalized', 'email', 'status',
         'pipeline_stage_id', 'assigned_to', 'source', 'notes', 'custom_fields',
     ];
 
     protected $casts = [
         'custom_fields' => 'array', // Future: migrate to EAV table for advanced querying/filtering
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (Lead $lead) {
+            $lead->phone_normalized = \App\Services\PhoneNormalizer::normalize($lead->phone);
+        });
+    }
 
     public function stage(): BelongsTo
     {
