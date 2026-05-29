@@ -16,7 +16,7 @@ function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="flex items-center justify-center h-screen">טוען...</div>
   if (!user)   return <Navigate to="/login" replace />
-  return children
+  return <LabelsProvider>{children}</LabelsProvider>
 }
 
 function AppRoutes() {
@@ -46,9 +46,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <LabelsProvider>
-          <AppRoutes />
-        </LabelsProvider>
+        <AppRoutes />
       </AuthProvider>
     </BrowserRouter>
   )
