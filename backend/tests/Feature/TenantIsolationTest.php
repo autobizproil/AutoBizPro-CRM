@@ -42,7 +42,7 @@ class TenantIsolationTest extends TestCase
         app()->forgetInstance('current_tenant_id');
 
         $response = $this->actingAs($userA)
-            ->withHeaders(['HOST' => 'acme.crm.test'])
+            ->withHeaders(['X-Tenant' => 'acme'])
             ->getJson('/api/leads');
 
         $response->assertOk();
@@ -60,7 +60,7 @@ class TenantIsolationTest extends TestCase
         app()->forgetInstance('current_tenant_id');
 
         $response = $this->actingAs($userA)
-            ->withHeaders(['HOST' => 'acme2.crm.test'])
+            ->withHeaders(['X-Tenant' => 'acme2'])
             ->getJson('/api/contacts');
 
         $response->assertOk();
@@ -75,7 +75,7 @@ class TenantIsolationTest extends TestCase
 
         // userA authenticates but hits tenantB subdomain
         $response = $this->actingAs($userA)
-            ->withHeaders(['HOST' => 'beta3.crm.test'])
+            ->withHeaders(['X-Tenant' => 'beta3'])
             ->getJson('/api/leads');
 
         $response->assertStatus(403);
