@@ -24,7 +24,8 @@ class ProcessImportJob implements ShouldQueue
 
         $job->update(['status' => 'processing']);
 
-        $csv = Reader::createFromPath($job->storage_path, 'r');
+        $path = \Illuminate\Support\Facades\Storage::path($job->storage_path);
+        $csv = Reader::createFromPath($path, 'r');
         $csv->setHeaderOffset(0);
         $mapping = $job->field_mapping;
 

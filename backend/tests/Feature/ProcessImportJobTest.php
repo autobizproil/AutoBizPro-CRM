@@ -20,12 +20,12 @@ class ProcessImportJobTest extends TestCase
         $user = User::create(['tenant_id'=>$tenant->id,'name'=>'A','email'=>'a@a.co','password'=>Hash::make('x'),'role'=>'admin']);
 
         $csv = "שם,טלפון\nדני,0501111111\nרון,0502222222\nדני,0501111111\n";
-        $path = tempnam(sys_get_temp_dir(), 'csv');
-        file_put_contents($path, $csv);
+        $key = 'imports/test_' . uniqid() . '.csv';
+        \Illuminate\Support\Facades\Storage::put($key, $csv);
 
         $job = ImportJob::create([
             'tenant_id'=>$tenant->id,'user_id'=>$user->id,
-            'filename'=>'test.csv','storage_path'=>$path,'status'=>'pending',
+            'filename'=>'test.csv','storage_path'=>$key,'status'=>'pending',
             'field_mapping'=>['name'=>'שם','phone'=>'טלפון'],
         ]);
 

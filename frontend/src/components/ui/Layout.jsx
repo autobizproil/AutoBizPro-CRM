@@ -6,6 +6,7 @@ const nav = [
   { to: '/leads',       icon: '👥', label: 'לידים'      },
   { to: '/contacts',    icon: '📋', label: 'אנשי קשר'  },
   { to: '/pipeline',    icon: '🔀', label: 'פייפליין'   },
+  { to: '/import',      icon: '📥', label: 'ייבוא'      },
   { to: '/automations', icon: '⚡', label: 'אוטומציות' },
   { to: '/forms',       icon: '📝', label: 'טפסים'      },
   { to: '/settings',    icon: '⚙️',  label: 'הגדרות'    },
