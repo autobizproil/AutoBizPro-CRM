@@ -11,10 +11,10 @@ const FIELDS = [
 
 const AUTO = {
   name:   ['שם', 'name', 'שם מלא', 'full name', 'שם פרטי'],
-  phone:  ['טלפון', 'phone', 'נייד', 'mobile', 'טלפון נייד'],
+  phone:  ['טלפון', 'phone', 'נייד', 'mobile', 'טלפון נייד', 'סלולרי'],
   email:  ['אימייל', 'email', 'מייל', 'דוא"ל', 'e-mail'],
-  source: ['מקור', 'source', 'ערוץ'],
-  notes:  ['הערות', 'notes', 'הערה', 'comments'],
+  source: ['מקור', 'source', 'ערוץ', 'מקור הגעה', 'מקור ליד', 'מאיפה'],
+  notes:  ['הערות', 'notes', 'הערה', 'comments', 'תיאור'],
 }
 
 export default function ImportPage() {
@@ -37,7 +37,11 @@ export default function ImportPage() {
       setUp(res)
       const m = {}
       FIELDS.forEach(f => {
-        const hit = res.headers.find(h => (AUTO[f.key] ?? []).some(a => h.trim().toLowerCase() === a.toLowerCase()))
+        // Partial match: a header like "מקור ההגעה" should map to source
+        const hit = res.headers.find(h => {
+          const hl = h.trim().toLowerCase()
+          return (AUTO[f.key] ?? []).some(a => hl === a.toLowerCase() || hl.includes(a.toLowerCase()))
+        })
         if (hit) m[f.key] = hit
       })
       setMapping(m)
