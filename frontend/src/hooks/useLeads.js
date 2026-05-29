@@ -82,3 +82,11 @@ export function useBulkLeadAction() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
   })
 }
+
+export function useDeleteAllLeads() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => leadsApi.deleteAll().then(r => r.data.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] }),
+  })
+}

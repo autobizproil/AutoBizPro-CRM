@@ -79,6 +79,39 @@ class BulkLeadActionTest extends TestCase
         $this->assertSame(1, Lead::count()); // not deleted
     }
 
+    public function test_delete_all_clears_only_current_tenant(): void
+    {
+        [$tenant, $admin, $sub] = $this->setupTenant('clr');
+        Lead::create(['tenant_id' => $tenant->id, 'name' => 'A']);
+        Lead::create(['tenant_id' => $tenant->id, 'name' => 'B']);
+        $other = Tenant::create(['name' => 'O', 'subdomain' => 'clr-o', 'status' => 'active']);
+        Lead::create(['tenant_id' => $other->id, 'name' => 'Foreign']);
+
+        $resp = $this->actingAs($admin)->withHeaders(['X-Tenant' => $sub])
+            ->deleteJson('/api/leads/all/clear');
+
+        $resp->assertOk();
+        $this->assertSame(2, $resp->json('data.deleted'));
+        app()->instance('current_tenant_id', $tenant->id);
+        $this->assertSame(0, Lead::count());
+        app()->instance('current_tenant_id', $other->id);
+        $this->assertSame(1, Lead::count()); // foreign untouched
+    }
+
+    public function test_delete_all_requires_delete_permission(): void
+    {
+        [$tenant, $admin, $sub] = $this->setupTenant('clr2');
+        $manager = User::create(['tenant_id' => $tenant->id, 'name' => 'M', 'email' => 'm@clr2.co', 'password' => Hash::make('x'), 'role' => 'manager']);
+        Lead::create(['tenant_id' => $tenant->id, 'name' => 'A']);
+
+        $resp = $this->actingAs($manager)->withHeaders(['X-Tenant' => $sub])
+            ->deleteJson('/api/leads/all/clear');
+
+        $resp->assertStatus(403);
+        app()->instance('current_tenant_id', $tenant->id);
+        $this->assertSame(1, Lead::count());
+    }
+
     public function test_bulk_cannot_touch_other_tenant_leads(): void
     {
         [$tenantA, $adminA, $subA] = $this->setupTenant('bulk-a');

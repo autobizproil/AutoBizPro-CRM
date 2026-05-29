@@ -31,6 +31,21 @@ class LeadController extends Controller
         return response()->json(['success' => true, 'data' => $lead], 201);
     }
 
+    public function deleteAll(Request $request): JsonResponse
+    {
+        $tenantId = app('current_tenant_id');
+        // Destructive, tenant-wide — require delete permission explicitly
+        abort_unless(
+            \App\Models\RolePermission::allows($tenantId, $request->user()->role, 'leads', 'can_delete'),
+            403
+        );
+
+        // Global tenant scope keeps this to the current tenant only
+        $count = Lead::count();
+        Lead::query()->delete(); // soft delete
+        return response()->json(['success' => true, 'data' => ['deleted' => $count]]);
+    }
+
     public function bulk(Request $request): JsonResponse
     {
         $tenantId = app('current_tenant_id');

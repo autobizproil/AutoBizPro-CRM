@@ -31,6 +31,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         ->middleware('permission:leads,can_create');
     Route::post('/leads/bulk', [LeadController::class, 'bulk'])
         ->middleware('permission:leads,can_update');
+    Route::delete('/leads/all/clear', [LeadController::class, 'deleteAll'])
+        ->middleware('permission:leads,can_delete');
     Route::get('/leads/{lead}', [LeadController::class, 'show'])
         ->middleware('permission:leads,can_read');
     Route::put('/leads/{lead}', [LeadController::class, 'update'])

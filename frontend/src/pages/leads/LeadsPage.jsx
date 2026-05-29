@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLeads, useCreateLead, useChangeLeadStage, useBulkLeadAction } from '../../hooks/useLeads'
+import { useLeads, useCreateLead, useChangeLeadStage, useBulkLeadAction, useDeleteAllLeads } from '../../hooks/useLeads'
 import { useQuery } from '@tanstack/react-query'
 import { pipelineApi } from '../../api/pipeline'
 import { useAuth } from '../../context/AuthContext'
@@ -31,9 +31,16 @@ export default function LeadsPage() {
     queryFn: () => pipelineApi.stages().then(r => r.data.data),
   })
 
+  const deleteAll = useDeleteAllLeads()
   const leads = data?.data ?? []
   const total = data?.total ?? 0
   const canEdit = can('leads', 'can_update')
+
+  const handleDeleteAll = async () => {
+    const ok = window.prompt(`פעולה בלתי הפיכה! ימחקו כל ${total} ה${t('leads')}.\nהקלד "מחק" לאישור:`)
+    if (ok !== 'מחק') return
+    await deleteAll.mutateAsync()
+  }
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 
@@ -68,12 +75,20 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-bold text-gray-900">{t('leads')}</h1>
           <p className="text-sm text-gray-500 mt-0.5">{total} {t('leads')} במערכת</p>
         </div>
-        {can('leads', 'can_create') && (
-          <button onClick={() => setModal(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
-            <span className="text-lg leading-none">+</span> {t('lead')} חדש
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {can('leads', 'can_delete') && total > 0 && (
+            <button onClick={handleDeleteAll} disabled={deleteAll.isPending}
+              className="bg-white border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+              {deleteAll.isPending ? 'מוחק...' : `🗑 מחק הכל`}
+            </button>
+          )}
+          {can('leads', 'can_create') && (
+            <button onClick={() => setModal(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
+              <span className="text-lg leading-none">+</span> {t('lead')} חדש
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
