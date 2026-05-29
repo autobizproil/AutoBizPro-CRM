@@ -9,4 +9,5 @@ export const leadsApi = {
   changeStage:   (id, stageId) => client.put(`/leads/${id}/stage`, { stage_id: stageId }),
   getActivities: (id)     => client.get(`/leads/${id}/activities`),
   addActivity:   (id, data) => client.post(`/leads/${id}/activities`, data),
+  bulk:          (action, ids, value) => client.post('/leads/bulk', { action, ids, value }),
 }

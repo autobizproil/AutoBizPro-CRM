@@ -62,4 +62,26 @@ class LeadService
         $this->automation->fire('lead_stage_changed', $lead->fresh());
         return $lead->fresh(['stage']);
     }
+
+    /**
+     * Apply an action to many leads at once. The tenant global scope on Lead
+     * guarantees only the current tenant's leads are ever touched. Agents are
+     * further restricted to leads assigned to them.
+     *
+     * @param  array<int>  $ids
+     */
+    public function bulk(string $action, array $ids, $value, int $userId, string $role): int
+    {
+        $query = Lead::whereIn('id', $ids);
+        if ($role === 'agent') {
+            $query->where('assigned_to', $userId);
+        }
+
+        return match ($action) {
+            'change_stage' => $query->update(['pipeline_stage_id' => (int) $value]),
+            'assign'       => $query->update(['assigned_to' => (int) $value]),
+            'delete'       => $query->delete(), // soft delete
+            default        => 0,
+        };
+    }
 }

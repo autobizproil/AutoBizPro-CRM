@@ -31,6 +31,34 @@ class LeadController extends Controller
         return response()->json(['success' => true, 'data' => $lead], 201);
     }
 
+    public function bulk(Request $request): JsonResponse
+    {
+        $tenantId = app('current_tenant_id');
+        $data = $request->validate([
+            'action' => 'required|in:change_stage,assign,delete',
+            'ids'    => 'required|array|min:1',
+            'ids.*'  => 'integer',
+            'value'  => 'nullable|integer',
+        ]);
+
+        // Validate the target value against the current tenant where relevant
+        if ($data['action'] === 'change_stage') {
+            $request->validate(['value' => ['required', \Illuminate\Validation\Rule::exists('pipeline_stages', 'id')->where('tenant_id', $tenantId)]]);
+        } elseif ($data['action'] === 'assign') {
+            $request->validate(['value' => ['required', \Illuminate\Validation\Rule::exists('users', 'id')->where('tenant_id', $tenantId)]]);
+        }
+
+        $affected = $this->service->bulk(
+            $data['action'],
+            $data['ids'],
+            $data['value'] ?? null,
+            $request->user()->id,
+            $request->user()->role,
+        );
+
+        return response()->json(['success' => true, 'data' => ['affected' => $affected]]);
+    }
+
     public function show(Request $request, Lead $lead): JsonResponse
     {
         $this->authorizeLead($request, $lead);
