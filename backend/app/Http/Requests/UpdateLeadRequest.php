@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateLeadRequest extends FormRequest
 {
@@ -10,13 +11,15 @@ class UpdateLeadRequest extends FormRequest
 
     public function rules(): array
     {
+        $tenantId = app('current_tenant_id');
+
         return [
             'name'              => 'sometimes|required|string|max:255',
             'phone'             => 'nullable|string|max:30',
             'email'             => 'nullable|email|max:255',
             'status'            => 'nullable|string|max:50',
-            'pipeline_stage_id' => 'nullable|integer|exists:pipeline_stages,id',
-            'assigned_to'       => 'nullable|integer|exists:users,id',
+            'pipeline_stage_id' => ['nullable', 'integer', Rule::exists('pipeline_stages', 'id')->where('tenant_id', $tenantId)],
+            'assigned_to'       => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
             'source'            => 'nullable|string|max:100',
             'notes'             => 'nullable|string',
             'custom_fields'     => 'nullable|array',

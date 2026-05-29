@@ -5,7 +5,7 @@ import { leadsApi } from '../api/leads'
 export function usePipeline() {
   return useQuery({
     queryKey: ['pipeline'],
-    queryFn:  () => pipelineApi.list().then(r => r.data.data),
+    queryFn:  () => pipelineApi.stages().then(r => r.data.data),
   })
 }
 

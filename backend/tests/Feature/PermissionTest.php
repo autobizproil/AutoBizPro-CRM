@@ -32,7 +32,7 @@ class PermissionTest extends TestCase
         $lead = Lead::create(['tenant_id' => $tenant->id, 'name' => 'Test Lead', 'assigned_to' => $agent->id]);
 
         $response = $this->actingAs($agent)
-            ->withHeaders(['HOST' => 'test-agent.crm.test'])
+            ->withHeaders(['X-Tenant' => 'test-agent'])
             ->deleteJson("/api/leads/{$lead->id}");
 
         $response->assertStatus(403);
@@ -43,7 +43,7 @@ class PermissionTest extends TestCase
         [$tenant, $manager] = $this->makeUser('manager');
 
         $response = $this->actingAs($manager)
-            ->withHeaders(['HOST' => 'test-manager.crm.test'])
+            ->withHeaders(['X-Tenant' => 'test-manager'])
             ->postJson('/api/automations', [
                 'name'         => 'Test Auto',
                 'trigger_type' => 'lead_created',
@@ -58,7 +58,7 @@ class PermissionTest extends TestCase
         [$tenant, $admin] = $this->makeUser('admin');
 
         $response = $this->actingAs($admin)
-            ->withHeaders(['HOST' => 'test-admin.crm.test'])
+            ->withHeaders(['X-Tenant' => 'test-admin'])
             ->postJson('/api/leads', ['name' => 'New Lead']);
 
         $response->assertStatus(201);

@@ -26,6 +26,20 @@ class SettingsController extends Controller
         return response()->json(['success' => true, 'data' => app('current_tenant')->fresh()]);
     }
 
+    public function getLabels(): JsonResponse
+    {
+        $svc = app(\App\Services\SettingsService::class);
+        return response()->json(['success' => true, 'data' => $svc->labels()]);
+    }
+
+    public function updateLabels(Request $request): JsonResponse
+    {
+        $data = $request->validate(['labels' => 'required|array']);
+        $svc = app(\App\Services\SettingsService::class);
+        $svc->set('labels', $data['labels']);
+        return response()->json(['success' => true, 'data' => $svc->labels()]);
+    }
+
     public function getPermissions(): JsonResponse
     {
         $permissions = RolePermission::all()->groupBy('role');
@@ -34,6 +48,9 @@ class SettingsController extends Controller
 
     public function updatePermissions(Request $request): JsonResponse
     {
+        // Permission management is admin-only — prevents privilege escalation
+        abort_unless($request->user()->role === 'admin', 403);
+
         $data = $request->validate([
             'permissions'           => 'required|array',
             'permissions.*.role'    => 'required|in:admin,manager,agent',

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { LabelsProvider } from './context/LabelsContext'
 import LoginPage from './pages/auth/LoginPage'
 import Layout from './components/ui/Layout'
 import DashboardPage from './pages/dashboard/DashboardPage'
@@ -9,6 +10,7 @@ import ContactsPage from './pages/contacts/ContactsPage'
 import AutomationsPage from './pages/automations/AutomationsPage'
 import FormsPage from './pages/forms/FormsPage'
 import SettingsPage from './pages/settings/SettingsPage'
+import ImportPage from './pages/import/ImportPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -31,6 +33,7 @@ function AppRoutes() {
         <Route path="leads"       element={<LeadsPage />} />
         <Route path="pipeline"    element={<PipelinePage />} />
         <Route path="contacts"    element={<ContactsPage />} />
+        <Route path="import"      element={<ImportPage />} />
         <Route path="automations" element={<AutomationsPage />} />
         <Route path="forms"       element={<FormsPage />} />
         <Route path="settings"    element={<SettingsPage />} />
@@ -43,7 +46,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <LabelsProvider>
+          <AppRoutes />
+        </LabelsProvider>
       </AuthProvider>
     </BrowserRouter>
   )

@@ -8,9 +8,16 @@ use Illuminate\Http\Request;
 
 class PipelineController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $stages = PipelineStage::with(['leads' => fn ($q) => $q->with('assignedUser')])
+        $user = $request->user();
+
+        $stages = PipelineStage::with(['leads' => function ($q) use ($user) {
+            $q->with('assignedUser');
+            if ($user->role === 'agent') {
+                $q->where('assigned_to', $user->id);
+            }
+        }])
             ->orderBy('position')
             ->get();
 

@@ -31,37 +31,58 @@ class LeadController extends Controller
         return response()->json(['success' => true, 'data' => $lead], 201);
     }
 
-    public function show(Lead $lead): JsonResponse
+    public function show(Request $request, Lead $lead): JsonResponse
     {
+        $this->authorizeLead($request, $lead);
         return response()->json(['success' => true, 'data' => $lead->load(['stage', 'assignedUser'])]);
     }
 
     public function update(UpdateLeadRequest $request, Lead $lead): JsonResponse
     {
+        $this->authorizeLead($request, $lead);
         $lead = $this->service->update($lead, $request->validated());
         return response()->json(['success' => true, 'data' => $lead]);
     }
 
-    public function destroy(Lead $lead): JsonResponse
+    public function destroy(Request $request, Lead $lead): JsonResponse
     {
+        $this->authorizeLead($request, $lead);
         $lead->delete(); // soft delete
         return response()->json(['success' => true, 'data' => null]);
     }
 
     public function changeStage(Request $request, Lead $lead): JsonResponse
     {
-        $request->validate(['stage_id' => 'required|integer|exists:pipeline_stages,id']);
+        $this->authorizeLead($request, $lead);
+        $request->validate([
+            'stage_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('pipeline_stages', 'id')->where('tenant_id', app('current_tenant_id'))],
+        ]);
         $lead = $this->service->changeStage($lead, $request->stage_id);
         return response()->json(['success' => true, 'data' => $lead]);
     }
 
-    public function activities(Lead $lead): JsonResponse
+    public function activities(Request $request, Lead $lead): JsonResponse
     {
+        $this->authorizeLead($request, $lead);
         return response()->json(['success' => true, 'data' => $lead->activities]);
+    }
+
+    /**
+     * Tenant binding is enforced by the global scope; here we enforce the
+     * agent-ownership rule — agents may only touch leads assigned to them.
+     */
+    private function authorizeLead(Request $request, Lead $lead): void
+    {
+        $user = $request->user();
+        if ($user->role === 'agent') {
+            abort_unless($lead->assigned_to === $user->id, 403);
+        }
     }
 
     public function storeActivity(Request $request, Lead $lead): JsonResponse
     {
+        $this->authorizeLead($request, $lead);
+
         $data = $request->validate([
             'type' => 'required|in:call,note,email,meeting,task',
             'body' => 'required|string',
