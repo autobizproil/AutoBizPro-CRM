@@ -112,6 +112,16 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::delete('/users/{user}', [UserController::class, 'destroy'])
         ->middleware('permission:users,can_delete');
 
+    // Integrations
+    Route::get('/integrations/settings', [\App\Http\Controllers\IntegrationsController::class, 'getSettings'])
+        ->middleware('permission:users,can_update');
+    Route::put('/integrations/settings', [\App\Http\Controllers\IntegrationsController::class, 'saveSettings'])
+        ->middleware('permission:users,can_update');
+    Route::post('/integrations/greeninvoice/test', [\App\Http\Controllers\IntegrationsController::class, 'greenInvoiceTest'])
+        ->middleware('permission:users,can_update');
+    Route::post('/integrations/greeninvoice/lead/{lead}', [\App\Http\Controllers\IntegrationsController::class, 'greenInvoiceCreate'])
+        ->middleware('permission:leads,can_update');
+
     // WhatsApp templates
     Route::get('/whatsapp-templates', [\App\Http\Controllers\WhatsappTemplateController::class, 'index'])
         ->middleware('permission:leads,can_read');

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { useLead, useLeadActivities, useUpdateLead, useAddLeadActivity } from '../../hooks/useLeads'
 import { useWhatsappTemplates } from '../../hooks/useWhatsapp'
 import { renderTemplate, waLink } from '../../api/whatsapp'
+import { integrationsApi, GI_DOC_TYPES } from '../../api/integrations'
 
 const ACTIVITY_TYPES = {
   call:         { label: 'שיחה',  icon: '📞', color: '#3b82f6' },
@@ -33,9 +35,21 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
   const [activityType, setAT] = useState('call')
   const [activityBody, setAB] = useState('')
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showInvoice, setShowInvoice] = useState(false)
+  const [invType, setInvType] = useState(400)
+  const [invItems, setInvItems] = useState([{ description: '', price: '', quantity: 1 }])
+  const [invTaxId, setInvTaxId] = useState('')
+
+  const createInvoice = useMutation({
+    mutationFn: (payload) => integrationsApi.greenInvoiceCreate(leadId, payload).then(r => r.data),
+  })
 
   // Reset local edit state when switching leads
-  useEffect(() => { setEdit({}); setAB(''); setShowTemplates(false) }, [leadId])
+  useEffect(() => {
+    setEdit({}); setAB(''); setShowTemplates(false)
+    setShowInvoice(false); setInvItems([{ description: '', price: '', quantity: 1 }]); setInvTaxId('')
+    createInvoice.reset()
+  }, [leadId])
 
   if (!leadId) return null
 
@@ -61,6 +75,21 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
     // log it
     addActivity.mutate({ leadId, data: { type: 'whatsapp', body: msg || 'נשלחה הודעת וואטסאפ' } })
     setShowTemplates(false)
+  }
+
+  const invTotal = invItems.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0)
+  const setItem = (i, key) => (e) => setInvItems(items => items.map((it, idx) => idx === i ? { ...it, [key]: e.target.value } : it))
+  const addItem = () => setInvItems(items => [...items, { description: '', price: '', quantity: 1 }])
+  const removeItem = (i) => setInvItems(items => items.filter((_, idx) => idx !== i))
+
+  const submitInvoice = async (e) => {
+    e.preventDefault()
+    const items = invItems
+      .filter(it => it.description.trim() && Number(it.price) > 0)
+      .map(it => ({ description: it.description, price: Number(it.price), quantity: Number(it.quantity) || 1 }))
+    if (!items.length) return
+    const res = await createInvoice.mutateAsync({ type: invType, items, tax_id: invTaxId || undefined })
+    if (res?.success && res.data?.url) window.open(res.data.url, '_blank')
   }
 
   return (
@@ -119,6 +148,12 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     </div>
                   )}
                 </div>
+              )}
+              {canEdit && (
+                <button onClick={() => setShowInvoice(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 py-2 rounded-lg text-sm font-medium transition-colors">
+                  🧾 חשבונית
+                </button>
               )}
             </div>
 
@@ -193,6 +228,72 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
           </>
         )}
       </div>
+
+      {/* Green Invoice modal */}
+      {showInvoice && lead && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowInvoice(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900">🧾 הפקת מסמך — {lead.name}</h2>
+              <button onClick={() => setShowInvoice(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+            <form onSubmit={submitInvoice} className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
+              {createInvoice.isError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">
+                  {createInvoice.error?.response?.data?.message ?? 'שגיאה בהפקת המסמך — בדוק חיבור Green Invoice בהגדרות'}
+                </div>
+              )}
+              {createInvoice.data?.success && (
+                <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-3 py-2 rounded-lg">
+                  ✓ הופק מסמך #{createInvoice.data.data.document_id}
+                  {createInvoice.data.data.url && <> — <a href={createInvoice.data.data.url} target="_blank" rel="noreferrer" className="underline">הורד PDF</a></>}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">סוג מסמך</label>
+                  <select value={invType} onChange={e => setInvType(Number(e.target.value))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    {GI_DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ח.פ / ת.ז (אופציונלי)</label>
+                  <input value={invTaxId} onChange={e => setInvTaxId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="—" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">פריטים</label>
+                <div className="space-y-2">
+                  {invItems.map((it, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input value={it.description} onChange={setItem(i, 'description')} placeholder="תיאור"
+                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                      <input value={it.price} onChange={setItem(i, 'price')} type="number" step="0.01" placeholder="מחיר"
+                        className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                      <input value={it.quantity} onChange={setItem(i, 'quantity')} type="number" placeholder="כמות"
+                        className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                      {invItems.length > 1 && (
+                        <button type="button" onClick={() => removeItem(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addItem} className="mt-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium">+ הוסף פריט</button>
+              </div>
+              <div className="text-left text-sm font-semibold text-gray-700">סה"כ: ₪{invTotal.toLocaleString('he-IL')}</div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={createInvoice.isPending || invTotal <= 0}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
+                  {createInvoice.isPending ? 'מפיק...' : 'הפק מסמך'}
+                </button>
+                <button type="button" onClick={() => setShowInvoice(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">סגור</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   )
 }
