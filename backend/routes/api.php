@@ -29,6 +29,10 @@ Route::post('/forms/{slug}/submit', [FormController::class, 'submit'])
 // Public GREEN-API webhook — resolves tenant from URL, no auth/session.
 Route::post('/integrations/whatsapp/webhook/{tenant}', [IntegrationsController::class, 'whatsappWebhook']);
 
+// Public Paycall PBX webhook — Paycall POSTs call metadata here, no auth/session.
+Route::post('/integrations/paycall/webhook/{tenant}', [IntegrationsController::class, 'paycallWebhook'])
+    ->middleware('throttle:60,1');
+
 // Public Cardcom result webhook — GET or POST from Cardcom after payment, no auth.
 Route::any('/integrations/cardcom/result/{tenant}', [IntegrationsController::class, 'cardcomResult']);
 

@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Services\Integrations\CardcomService;
 use App\Services\Integrations\GreenApiService;
 use App\Services\Integrations\GreenInvoiceApi;
+use App\Services\Integrations\PaycallService;
 use App\Services\Integrations\YeshInvoiceService;
 use App\Services\PhoneNormalizer;
 use App\Services\SettingsService;
@@ -29,6 +30,9 @@ class IntegrationsController extends Controller
         'cardcom_api_password',
         'yesh_user_key',
         'yesh_secret_key',
+        'paycall_enabled',
+        'paycall_did',
+        'paycall_secret',
     ];
 
     /** Substring match -> value masked in responses, masked echoes ignored on save. */
@@ -528,5 +532,50 @@ class IntegrationsController extends Controller
         }
 
         return response()->json(['success' => true, 'paid' => $paid]);
+    }
+
+    // =====================================================================
+    //  Paycall PBX — ported from Taskey paycall webhook handler
+    // =====================================================================
+
+    /**
+     * Public Paycall webhook — Paycall POSTs call metadata here after each
+     * call. No auth required; tenant resolved from URL segment.
+     *
+     * Route: POST /api/integrations/paycall/webhook/{tenant}
+     *
+     * Silently ignores calls when paycall_enabled !== '1' so Paycall never
+     * gets a failure response that could cause retry storms.
+     *
+     * Optional secret verification: if paycall_secret setting is non-empty
+     * we compare it against the X-Paycall-Secret request header.
+     */
+    public function paycallWebhook(Request $request, string $tenant): JsonResponse
+    {
+        $tenantModel = Tenant::where('subdomain', $tenant)->first();
+        if (!$tenantModel) {
+            return response()->json(['success' => false], 404);
+        }
+        app()->instance('current_tenant_id', $tenantModel->id);
+
+        $paycall = app(PaycallService::class);
+
+        if (!$paycall->isEnabled()) {
+            return response()->json(['success' => true]);
+        }
+
+        // Optional secret verification
+        $secret = app(SettingsService::class)->get('paycall_secret');
+        if ($secret) {
+            $provided = $request->header('X-Paycall-Secret', '');
+            if (!hash_equals($secret, $provided)) {
+                Log::warning('Paycall webhook: invalid secret', ['tenant' => $tenant]);
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+            }
+        }
+
+        $result = $paycall->processWebhook($request->all());
+
+        return response()->json(['success' => true, 'data' => $result]);
     }
 }

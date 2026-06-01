@@ -10,6 +10,7 @@ export const integrationsApi = {
   yeshInvoiceCreate: (leadId, payload) => client.post(`/integrations/yeshinvoice/lead/${leadId}`, payload),
   pdfCreateToken: (leadId) => client.post(`/pdf/token/lead/${leadId}`),
   pdfGenerateDoc: (leadId, payload) => client.post(`/pdf/generate/lead/${leadId}`, payload),
+  paycallTest: (tenantSubdomain) => client.post('/integrations/paycall/test', { subdomain: tenantSubdomain }),
 }
 
 export const GI_DOC_TYPES = [
