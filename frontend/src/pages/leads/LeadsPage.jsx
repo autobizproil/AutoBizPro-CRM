@@ -29,7 +29,7 @@ const ALL_COLS = [
   { key: 'created_at',  label: 'תאריך יצירה',   always: false },
 ]
 
-const DEFAULT_VISIBLE = { name: true, phone: true, email: true, stage: true, status: true, source: true, assigned_to: true, created_at: true }
+const DEFAULT_VISIBLE = { name: true, phone: true, email: true, stage: false, status: true, source: true, assigned_to: true, created_at: true }
 
 const SAVED_VIEWS = [
   { id: 'all',         label: 'כל הלידים',    filter: {} },
@@ -39,8 +39,13 @@ const SAVED_VIEWS = [
   { id: 'closed_lost', label: 'לא רלוונטי',   filter: { status: 'closed_lost' } },
 ]
 
+const COLS_VERSION = 'v2'
 function loadCols() {
-  try { return JSON.parse(localStorage.getItem('crm_leads_cols') || 'null') ?? DEFAULT_VISIBLE } catch { return DEFAULT_VISIBLE }
+  try {
+    const saved = JSON.parse(localStorage.getItem('crm_leads_cols') || 'null')
+    if (!saved || saved._v !== COLS_VERSION) return { ...DEFAULT_VISIBLE, _v: COLS_VERSION }
+    return saved
+  } catch { return { ...DEFAULT_VISIBLE, _v: COLS_VERSION } }
 }
 
 export default function LeadsPage() {
