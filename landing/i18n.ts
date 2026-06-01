@@ -1,6 +1,11 @@
-// landing/i18n.ts
+import { notFound } from 'next/navigation'
 import { getRequestConfig } from 'next-intl/server'
 
-export default getRequestConfig(async ({ locale }) => ({
-  messages: (await import(`./messages/${locale}.json`)).default,
-}))
+const LOCALES = ['he', 'en'] as const
+
+export default getRequestConfig(async ({ locale }) => {
+  if (!LOCALES.includes(locale as (typeof LOCALES)[number])) notFound()
+  return {
+    messages: (await import(`./messages/${locale}.json`)).default,
+  }
+})
