@@ -11,6 +11,8 @@ use App\Http\Controllers\LeadController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\ClientController;
+use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,6 +37,15 @@ Route::post('/integrations/paycall/webhook/{tenant}', [IntegrationsController::c
 
 // Public Cardcom result webhook — GET or POST from Cardcom after payment, no auth.
 Route::any('/integrations/cardcom/result/{tenant}', [IntegrationsController::class, 'cardcomResult']);
+
+// Facebook Lead Ads — GET for hub.challenge, POST for leadgen events
+Route::get('/integrations/facebook/webhook/{tenant}',  [IntegrationsController::class, 'facebookWebhookVerify']);
+Route::post('/integrations/facebook/webhook/{tenant}', [IntegrationsController::class, 'facebookWebhook'])
+    ->middleware('throttle:120,1');
+
+// Voicenter PBX webhook
+Route::post('/integrations/voicenter/webhook/{tenant}', [IntegrationsController::class, 'voicenterWebhook'])
+    ->middleware('throttle:120,1');
 
 // ── PDF / Digital Signature — Public routes ───────────────────────────────
 // Ported from Taskey webapi/sign_document_v2.php + signature_form_to_pdf.php
@@ -173,6 +184,28 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         ->middleware('permission:users,can_update');
     Route::post('/integrations/yeshinvoice/lead/{lead}', [IntegrationsController::class, 'yeshInvoiceCreate'])
         ->middleware('permission:leads,can_update');
+
+    // Google Sheets export (protected — requires auth)
+    Route::post('/integrations/google/sheets/export', [IntegrationsController::class, 'googleSheetsExport'])
+        ->middleware('permission:leads,can_read');
+
+    // Clients
+    Route::get('/clients',                [ClientController::class, 'index'])  ->middleware('permission:leads,can_read');
+    Route::post('/clients',               [ClientController::class, 'store'])  ->middleware('permission:leads,can_create');
+    Route::post('/clients/convert-lead',  [ClientController::class, 'convertLead'])->middleware('permission:leads,can_create');
+    Route::get('/clients/{client}',       [ClientController::class, 'show'])   ->middleware('permission:leads,can_read');
+    Route::put('/clients/{client}',       [ClientController::class, 'update']) ->middleware('permission:leads,can_update');
+    Route::delete('/clients/{client}',    [ClientController::class, 'destroy'])->middleware('permission:leads,can_delete');
+
+    // Custom field definitions
+    Route::get('/custom-fields',                              [CustomFieldController::class, 'index'])
+        ->middleware('permission:leads,can_read');
+    Route::post('/custom-fields',                             [CustomFieldController::class, 'store'])
+        ->middleware('permission:users,can_update');
+    Route::put('/custom-fields/{customFieldDefinition}',      [CustomFieldController::class, 'update'])
+        ->middleware('permission:users,can_update');
+    Route::delete('/custom-fields/{customFieldDefinition}',   [CustomFieldController::class, 'destroy'])
+        ->middleware('permission:users,can_update');
 
     // WhatsApp templates
     Route::get('/whatsapp-templates', [\App\Http\Controllers\WhatsappTemplateController::class, 'index'])

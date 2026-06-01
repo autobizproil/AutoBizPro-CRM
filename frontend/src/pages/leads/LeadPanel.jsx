@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLead, useLeadActivities, useUpdateLead, useAddLeadActivity } from '../../hooks/useLeads'
 import { useWhatsappTemplates } from '../../hooks/useWhatsapp'
 import { renderTemplate, waLink } from '../../api/whatsapp'
 import { integrationsApi, GI_DOC_TYPES } from '../../api/integrations'
+import { customFieldsApi } from '../../api/customFields'
+import { clientsApi } from '../../api/clients'
+import { useToast } from '../../context/ToastContext'
 
 const ACTIVITY_TYPES = {
   call:         { label: 'שיחה',  icon: '📞', color: '#3b82f6' },
@@ -31,8 +34,16 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
   const addActivity                 = useAddLeadActivity()
   const { data: templates = [] }    = useWhatsappTemplates()
   const qc                          = useQueryClient()
+  const toast                       = useToast()
 
   const [edit, setEdit]       = useState({})
+  const [cfValues, setCfValues] = useState({})
+
+  const { data: cfData } = useQuery({
+    queryKey: ['custom-fields'],
+    queryFn:  () => customFieldsApi.list().then(r => r.data.data),
+    staleTime: 1000 * 60 * 5,
+  })
   const [activityType, setAT] = useState('call')
   const [activityBody, setAB] = useState('')
   const [showTemplates, setShowTemplates] = useState(false)
@@ -93,6 +104,10 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
     yeshCreateInvoice.reset()
     pdfCreateToken.reset()
   }, [leadId])
+
+  useEffect(() => {
+    if (lead?.custom_fields) setCfValues(lead.custom_fields)
+  }, [lead?.custom_fields])
 
   if (!leadId) return null
 
@@ -182,7 +197,10 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold flex-shrink-0"
                   style={{ backgroundColor: lead.stage?.color ?? '#2398c2' }}>
-                  {lead.name?.[0] ?? '?'}
+                  {lead.name?.trim()
+                    ? lead.name.trim()[0].toUpperCase()
+                    : <svg className="w-5 h-5 opacity-80" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
+                  }
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-bold text-gray-900 dark:text-gray-100 text-lg truncate">{lead.name}</h2>
@@ -246,6 +264,14 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   ✍️ חתימה
                 </button>
               )}
+              {canEdit && (
+                <button
+                  onClick={() => clientsApi.convertLead(lead.id).then(() => toast.success('הליד הומר ללקוח!')).catch(() => toast.error('שגיאה בהמרה'))}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-[#2398c2]/10 hover:bg-[#2398c2]/20 text-[#2398c2] py-2 rounded-lg text-sm font-medium transition-colors"
+                  title="המר ללקוח">
+                  🏢 לקוח
+                </button>
+              )}
             </div>
 
             {/* Scrollable body */}
@@ -267,6 +293,20 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   <textarea value={field('notes')} onChange={setField('notes')} onBlur={() => commit('notes')} disabled={!canEdit} rows={2}
                     className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm resize-none disabled:opacity-60" placeholder="הוסף הערה..." />
                 </div>
+
+                {/* Custom fields */}
+                {(cfData?.custom ?? []).map(cf => (
+                  <CustomFieldInput
+                    key={cf.id}
+                    field={cf}
+                    value={cfValues[cf.name] ?? ''}
+                    disabled={!canEdit}
+                    onChange={val => setCfValues(prev => ({ ...prev, [cf.name]: val }))}
+                    onBlur={() => {
+                      updateLead.mutate({ id: lead.id, data: { custom_fields: { ...(lead.custom_fields ?? {}), ...cfValues, [cf.name]: cfValues[cf.name] ?? '' } } })
+                    }}
+                  />
+                ))}
               </div>
 
               {/* Activity composer */}
@@ -323,9 +363,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
       {/* Green Invoice modal */}
       {showInvoice && lead && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowInvoice(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">🧾 הפקת מסמך — {lead.name}</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">🧾 הפקת מסמך — {lead.name}</h2>
               <button onClick={() => setShowInvoice(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={submitInvoice} className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
@@ -342,29 +382,29 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">סוג מסמך</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סוג מסמך</label>
                   <select value={invType} onChange={e => setInvType(Number(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
                     {GI_DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ח.פ / ת.ז (אופציונלי)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ח.פ / ת.ז (אופציונלי)</label>
                   <input value={invTaxId} onChange={e => setInvTaxId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="—" />
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="—" />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">פריטים</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">פריטים</label>
                 <div className="space-y-2">
                   {invItems.map((it, i) => (
                     <div key={i} className="flex gap-2 items-center">
                       <input value={it.description} onChange={setItem(i, 'description')} placeholder="תיאור"
-                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                        className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
                       <input value={it.price} onChange={setItem(i, 'price')} type="number" step="0.01" placeholder="מחיר"
-                        className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                        className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
                       <input value={it.quantity} onChange={setItem(i, 'quantity')} type="number" placeholder="כמות"
-                        className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                        className="w-16 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
                       {invItems.length > 1 && (
                         <button type="button" onClick={() => removeItem(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
                       )}
@@ -379,7 +419,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
                   {createInvoice.isPending ? 'מפיק...' : 'הפק מסמך'}
                 </button>
-                <button type="button" onClick={() => setShowInvoice(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">סגור</button>
+                <button type="button" onClick={() => setShowInvoice(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm dark:text-gray-300">סגור</button>
               </div>
             </form>
           </div>
@@ -389,9 +429,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
       {/* Cardcom payment modal */}
       {showCardcom && lead && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowCardcom(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">💳 שליחת עמוד תשלום — {lead.name}</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">💳 שליחת עמוד תשלום — {lead.name}</h2>
               <button onClick={() => setShowCardcom(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={submitCardcom} className="px-6 py-4 space-y-4">
@@ -406,25 +446,25 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">סכום לתשלום (₪)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סכום לתשלום (₪)</label>
                 <input
                   type="number"
                   min="1"
                   step="0.01"
                   value={cardcomAmount}
                   onChange={e => setCardcomAmount(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="הכנס סכום..."
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">תיאור</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">תיאור</label>
                 <input
                   type="text"
                   value={cardcomDesc}
                   onChange={e => setCardcomDesc(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="תיאור העסקה..."
                 />
               </div>
@@ -433,7 +473,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
                   {cardcomCreatePage.isPending ? 'יוצר...' : 'צור עמוד תשלום'}
                 </button>
-                <button type="button" onClick={() => setShowCardcom(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">סגור</button>
+                <button type="button" onClick={() => setShowCardcom(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm dark:text-gray-300">סגור</button>
               </div>
             </form>
           </div>
@@ -443,9 +483,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
       {/* Yesh Invoice modal */}
       {showYesh && lead && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowYesh(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">🧾 Yesh Invoice — {lead.name}</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">🧾 Yesh Invoice — {lead.name}</h2>
               <button onClick={() => setShowYesh(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={submitYesh} className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
@@ -464,29 +504,29 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">סוג מסמך</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סוג מסמך</label>
                   <select value={yeshType} onChange={e => setYeshType(Number(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
                     {GI_DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ח.פ / ת.ז (אופציונלי)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ח.פ / ת.ז (אופציונלי)</label>
                   <input value={yeshTaxId} onChange={e => setYeshTaxId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="—" />
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="—" />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">פריטים</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">פריטים</label>
                 <div className="space-y-2">
                   {yeshItems.map((it, i) => (
                     <div key={i} className="flex gap-2 items-center">
                       <input value={it.description} onChange={setYeshItem(i, 'description')} placeholder="תיאור"
-                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                        className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
                       <input value={it.price} onChange={setYeshItem(i, 'price')} type="number" step="0.01" placeholder="מחיר"
-                        className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                        className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
                       <input value={it.quantity} onChange={setYeshItem(i, 'quantity')} type="number" placeholder="כמות"
-                        className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                        className="w-16 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
                       {yeshItems.length > 1 && (
                         <button type="button" onClick={() => removeYeshItem(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
                       )}
@@ -501,7 +541,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
                   {yeshCreateInvoice.isPending ? 'מפיק...' : 'הפק מסמך'}
                 </button>
-                <button type="button" onClick={() => setShowYesh(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">סגור</button>
+                <button type="button" onClick={() => setShowYesh(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm dark:text-gray-300">סגור</button>
               </div>
             </form>
           </div>
@@ -511,9 +551,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
       {/* PDF Signature modal */}
       {showPdf && lead && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowPdf(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">✍️ חתימה דיגיטלית — {lead.name}</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">✍️ חתימה דיגיטלית — {lead.name}</h2>
               <button onClick={() => setShowPdf(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             <div className="px-6 py-4 space-y-4">
@@ -531,18 +571,18 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     ✓ קישור לחתימה נוצר בהצלחה
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">קישור לחתימה</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">קישור לחתימה</label>
                     <div className="flex gap-2">
                       <input
                         readOnly
                         value={pdfSignUrl}
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700 select-all"
+                        className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 select-all"
                         onClick={e => e.target.select()}
                       />
                       <button
                         type="button"
                         onClick={() => navigator.clipboard.writeText(pdfSignUrl)}
-                        className="border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+                        className="border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
                       >
                         העתק קישור
                       </button>
@@ -557,7 +597,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   </button>
                 </>
               )}
-              <button type="button" onClick={() => setShowPdf(false)} className="w-full px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">סגור</button>
+              <button type="button" onClick={() => setShowPdf(false)} className="w-full px-4 py-2 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm dark:text-gray-300">סגור</button>
             </div>
           </div>
         </div>
@@ -580,8 +620,43 @@ function EditableDetail({ label, value, onChange, onBlur, disabled, type = 'text
     <div className="flex items-center justify-between gap-2">
       <span className="text-xs text-gray-500 flex-shrink-0">{label}</span>
       <input type={type} value={value} onChange={onChange} onBlur={onBlur} disabled={disabled}
-        className="text-sm text-gray-800 text-left border border-transparent hover:border-gray-200 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60"
+        className="text-sm text-gray-800 dark:text-gray-200 text-left border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60 bg-transparent"
         placeholder="—" />
+    </div>
+  )
+}
+
+function CustomFieldInput({ field, value, onChange, onBlur, disabled }) {
+  const INPUT_CLS = 'text-sm text-gray-800 dark:text-gray-200 text-left border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60 bg-transparent'
+
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">{field.label}</span>
+      {field.field_type === 'select' ? (
+        <select value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur} disabled={disabled}
+          className={INPUT_CLS + ' bg-white dark:bg-gray-700'}>
+          <option value="">—</option>
+          {(field.options ?? []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      ) : field.field_type === 'checkbox' ? (
+        <input type="checkbox" checked={!!value} disabled={disabled}
+          onChange={e => { onChange(e.target.checked); onBlur() }}
+          className="rounded border-gray-300 accent-[#2398c2]" />
+      ) : field.field_type === 'textarea' ? (
+        <textarea value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur} disabled={disabled} rows={2}
+          className="text-sm text-gray-800 dark:text-gray-200 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 resize-none focus:outline-none disabled:opacity-60 bg-transparent"
+          placeholder="—" />
+      ) : (
+        <input
+          type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : field.field_type === 'url' ? 'url' : 'text'}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onBlur={onBlur}
+          disabled={disabled}
+          className={INPUT_CLS}
+          placeholder="—"
+        />
+      )}
     </div>
   )
 }

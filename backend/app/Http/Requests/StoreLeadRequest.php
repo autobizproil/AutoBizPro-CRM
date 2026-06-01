@@ -17,7 +17,7 @@ class StoreLeadRequest extends FormRequest
             'name'               => 'required|string|max:255',
             'phone'              => 'nullable|string|max:30',
             'email'              => 'nullable|email|max:255',
-            'status'             => 'nullable|string|max:50',
+            'status'             => 'nullable|in:NEW_LEAD,DISCOVERY_CALL,PROPOSAL_SENT,CONTRACT_PENDING,WON,LOST',
             'pipeline_stage_id'  => ['nullable', 'integer', Rule::exists('pipeline_stages', 'id')->where('tenant_id', $tenantId)],
             'assigned_to'        => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
             'source'             => 'nullable|string|max:100',

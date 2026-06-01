@@ -11,6 +11,7 @@ export const integrationsApi = {
   pdfCreateToken: (leadId) => client.post(`/pdf/token/lead/${leadId}`),
   pdfGenerateDoc: (leadId, payload) => client.post(`/pdf/generate/lead/${leadId}`, payload),
   paycallTest: (tenantSubdomain) => client.post('/integrations/paycall/test', { subdomain: tenantSubdomain }),
+  googleSheetsExport: () => client.post('/integrations/google/sheets/export'),
 }
 
 export const GI_DOC_TYPES = [

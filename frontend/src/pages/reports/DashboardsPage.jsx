@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import WidgetCard from './WidgetCard'
 import AddWidgetModal from './AddWidgetModal'
 import { dashboardApi } from '../../api/dashboard'
+import { useToast } from '../../context/ToastContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -114,7 +115,7 @@ function BoardItem({ board, isActive, onClick, onRename }) {
       className={`w-full text-right px-4 py-2.5 text-sm transition-colors ${
         isActive
           ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium'
-          : 'text-gray-600 hover:bg-gray-50'
+          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
       }`}
     >
       {board.name}
@@ -125,6 +126,7 @@ function BoardItem({ board, isActive, onClick, onRename }) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function DashboardsPage() {
+  const toast                       = useToast()
   const [boards, setBoards]         = useState(loadBoards)
   const [activeBoardId, setActive]  = useState(() => loadBoards()[0]?.id ?? 'default')
   const [showAddWidget, setShowAdd] = useState(false)
@@ -185,7 +187,7 @@ export default function DashboardsPage() {
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
       })
-      .catch(() => alert('שגיאה בייצוא הנתונים'))
+      .catch(() => toast.error('שגיאה בייצוא הנתונים'))
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -201,32 +203,32 @@ export default function DashboardsPage() {
 
         {/* Top bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">{activeBoard?.name ?? 'לוח בקרה'}</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{activeBoard?.name ?? 'לוח בקרה'}</h2>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Date range */}
-            <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
-              <label className="text-xs text-gray-500 whitespace-nowrap">מתאריך</label>
+            <div className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 shadow-sm">
+              <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">מתאריך</label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={e => setDateFrom(e.target.value)}
-                className="text-xs text-gray-700 outline-none bg-transparent"
+                className="text-xs text-gray-700 dark:text-gray-300 outline-none bg-transparent"
               />
             </div>
-            <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
-              <label className="text-xs text-gray-500 whitespace-nowrap">עד תאריך</label>
+            <div className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 shadow-sm">
+              <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">עד תאריך</label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={e => setDateTo(e.target.value)}
-                className="text-xs text-gray-700 outline-none bg-transparent"
+                className="text-xs text-gray-700 dark:text-gray-300 outline-none bg-transparent"
               />
             </div>
             {/* Export */}
             <button
               onClick={handleExport}
-              className="flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-medium px-3 py-2 rounded-xl shadow-sm transition-colors"
+              className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium px-3 py-2 rounded-xl shadow-sm transition-colors"
             >
               <span>📥</span>
               ייצוא CSV
@@ -279,8 +281,8 @@ export default function DashboardsPage() {
       </div>
 
       {/* ── Right sidebar ── */}
-      <aside className="w-52 border-r border-gray-200 bg-white flex flex-col flex-shrink-0">
-        <div className="px-4 py-3 border-b border-gray-100 text-sm font-semibold text-gray-700">
+      <aside className="w-52 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col flex-shrink-0">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200">
           לוחות בקרה
         </div>
 
@@ -296,7 +298,7 @@ export default function DashboardsPage() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-gray-100">
+        <div className="p-3 border-t border-gray-100 dark:border-gray-700">
           <button
             onClick={addBoard}
             className="w-full text-sm text-[#2398c2] hover:text-[#1d7fa3] text-right py-1 transition-colors"

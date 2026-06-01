@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 export default function LoginPage() {
-  const [email, setEmail]     = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError]     = useState('')
-  const [loading, setLoading] = useState(false)
-  const { login }             = useAuth()
-  const navigate              = useNavigate()
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const { login }               = useAuth()
+  const navigate                = useNavigate()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -25,41 +25,41 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center" dir="rtl">
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 w-full max-w-sm">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center" dir="rtl">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 w-full max-w-sm">
         <div className="flex flex-col items-center gap-1 mb-6">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-9 h-9 rounded-xl bg-[#2398c2] flex items-center justify-center text-white font-bold text-base">A</div>
-            <span className="font-bold text-gray-900 text-xl">AutoBizPro</span>
+            <span className="font-bold text-gray-900 dark:text-gray-100 text-xl">AutoBizPro</span>
           </div>
-          <p className="text-sm text-gray-400 tracking-wide">מערכת CRM מתקדמת</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 tracking-wide">מערכת CRM מתקדמת</p>
         </div>
-        <h1 className="text-xl font-semibold text-gray-800 mb-6 text-center">כניסה למערכת</h1>
+        <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-6 text-center">כניסה למערכת</h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">אימייל</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">אימייל</label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">סיסמה</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סיסמה</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               required
             />
           </div>

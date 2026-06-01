@@ -6,9 +6,12 @@ use App\Models\Activity;
 use App\Models\Lead;
 use App\Models\Tenant;
 use App\Services\Integrations\CardcomService;
+use App\Services\Integrations\FacebookLeadAdsService;
+use App\Services\Integrations\GoogleSheetsService;
 use App\Services\Integrations\GreenApiService;
 use App\Services\Integrations\GreenInvoiceApi;
 use App\Services\Integrations\PaycallService;
+use App\Services\Integrations\VoicenterService;
 use App\Services\Integrations\YeshInvoiceService;
 use App\Services\PhoneNormalizer;
 use App\Services\SettingsService;
@@ -33,6 +36,20 @@ class IntegrationsController extends Controller
         'paycall_enabled',
         'paycall_did',
         'paycall_secret',
+        // Facebook Lead Ads
+        'facebook_app_id',
+        'facebook_app_secret',
+        'facebook_page_id',
+        'facebook_verify_token',
+        // Voicenter
+        'voicenter_account_id',
+        'voicenter_api_token',
+        'voicenter_webhook_secret',
+        // Google Sheets
+        'google_sheets_id',
+        'google_service_account_json',
+        // Outgoing webhook (Make/n8n/Zapier)
+        'outgoing_webhook_url',
     ];
 
     /** Substring match -> value masked in responses, masked echoes ignored on save. */
@@ -577,5 +594,74 @@ class IntegrationsController extends Controller
         $result = $paycall->processWebhook($request->all());
 
         return response()->json(['success' => true, 'data' => $result]);
+    }
+
+    // =====================================================================
+    //  Facebook Lead Ads
+    // =====================================================================
+
+    /** GET — Facebook hub.challenge verification */
+    public function facebookWebhookVerify(Request $request, string $tenant): mixed
+    {
+        $tenantModel = Tenant::where('subdomain', $tenant)->first();
+        if (!$tenantModel) return response('Not found', 404);
+        app()->instance('current_tenant_id', $tenantModel->id);
+
+        $svc       = new FacebookLeadAdsService(app(SettingsService::class));
+        $challenge = $svc->verifyWebhook($request->query());
+
+        return $challenge !== false
+            ? response($challenge, 200)->header('Content-Type', 'text/plain')
+            : response('Forbidden', 403);
+    }
+
+    /** POST — Facebook leadgen event */
+    public function facebookWebhook(Request $request, string $tenant): JsonResponse
+    {
+        $tenantModel = Tenant::where('subdomain', $tenant)->first();
+        if (!$tenantModel) return response()->json(['success' => false], 404);
+        app()->instance('current_tenant_id', $tenantModel->id);
+
+        $svc = new FacebookLeadAdsService(app(SettingsService::class));
+
+        $sig = $request->header('X-Hub-Signature-256', '');
+        if ($sig && !$svc->verifySignature($request->getContent(), $sig)) {
+            return response()->json(['success' => false, 'message' => 'invalid signature'], 403);
+        }
+
+        $svc->processWebhook($request->all(), $tenantModel->id);
+        return response()->json(['success' => true]);
+    }
+
+    // =====================================================================
+    //  Voicenter
+    // =====================================================================
+
+    public function voicenterWebhook(Request $request, string $tenant): JsonResponse
+    {
+        $tenantModel = Tenant::where('subdomain', $tenant)->first();
+        if (!$tenantModel) return response()->json(['success' => false], 404);
+        app()->instance('current_tenant_id', $tenantModel->id);
+
+        $svc = new VoicenterService(app(SettingsService::class), app(PhoneNormalizer::class));
+        $svc->processWebhook($request->all(), $tenantModel->id);
+        return response()->json(['success' => true]);
+    }
+
+    // =====================================================================
+    //  Google Sheets
+    // =====================================================================
+
+    public function googleSheetsExport(Request $request): JsonResponse
+    {
+        $tenantId = app('current_tenant_id');
+        $svc      = new GoogleSheetsService(app(SettingsService::class));
+
+        try {
+            $result = $svc->exportLeads($tenantId);
+            return response()->json(['success' => true, 'data' => $result]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
     }
 }

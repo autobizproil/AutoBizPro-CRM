@@ -138,56 +138,61 @@ function Empty() {
 
 // ── Chart renderers ───────────────────────────────────────────────────────────
 
+const TICK  = '#9ca3af'
+const GRID  = '#374151'
+const TT_STYLE = { borderRadius: '8px', border: '1px solid #374151', background: '#1f2937', color: '#f9fafb', fontSize: 11 }
+
 function ChartBar({ data, color, preview }) {
   if (!data?.length) return <Empty />
   const h = preview ? 160 : 220
-
-  // For leads_by_agent: multi-bar (total, open, closed)
   const hasMultiBars = data[0]?.open !== undefined && data[0]?.closed !== undefined
   const nameKey = Object.keys(data[0] ?? {}).find(k =>
     ['name', 'agent_name', 'source', 'stage'].includes(k)
   ) ?? 'name'
 
   return (
-    <ResponsiveContainer width="100%" height={h}>
-      <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis dataKey={nameKey} tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
-        <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 11 }} />
-        {hasMultiBars ? (
-          <>
-            <Bar dataKey="total" name="סה״כ" fill="#2398c2" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="open"  name="פתוחים" fill="#10b981" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="closed" name="סגורים" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-            <Legend formatter={v => <span style={{ fontSize: 11, color: '#374151' }}>{v}</span>} />
-          </>
-        ) : (
-          <Bar dataKey="total" fill={color ?? '#2398c2'} radius={[4, 4, 0, 0]} />
-        )}
-      </BarChart>
-    </ResponsiveContainer>
+    <div dir="ltr">
+      <ResponsiveContainer width="100%" height={h}>
+        <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID} strokeOpacity={0.4} />
+          <XAxis dataKey={nameKey} tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
+          <Tooltip contentStyle={TT_STYLE} />
+          {hasMultiBars ? (
+            <>
+              <Bar dataKey="total"  name="סה״כ"    fill="#2398c2" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="open"   name="פתוחים"  fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="closed" name="סגורים"  fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              <Legend formatter={v => <span style={{ fontSize: 11, color: TICK }}>{v}</span>} />
+            </>
+          ) : (
+            <Bar dataKey="total" fill={color ?? '#2398c2'} radius={[4, 4, 0, 0]} />
+          )}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
 
 function ChartBarH({ data, color, preview }) {
   if (!data?.length) return <Empty />
   const h = preview ? 160 : 240
-  // For activities, prefer typeLabel for display
   const nameKey = Object.keys(data[0] ?? {}).find(k =>
     ['typeLabel', 'name', 'agent_name', 'source', 'stage'].includes(k)
   ) ?? 'name'
 
   return (
-    <ResponsiveContainer width="100%" height={h}>
-      <BarChart layout="vertical" data={data} margin={{ top: 4, right: 32, left: 8, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-        <XAxis type="number" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
-        <YAxis type="category" dataKey={nameKey} tick={{ fontSize: 11, fill: '#374151' }} axisLine={false} tickLine={false} width={65} />
-        <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 11 }} />
-        <Bar dataKey="total" fill={color ?? '#8b5cf6'} radius={[0, 4, 4, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
+    <div dir="ltr">
+      <ResponsiveContainer width="100%" height={h}>
+        <BarChart layout="vertical" data={data} margin={{ top: 4, right: 32, left: 8, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID} strokeOpacity={0.4} horizontal={false} />
+          <XAxis type="number" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
+          <YAxis type="category" dataKey={nameKey} tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} width={70} />
+          <Tooltip contentStyle={TT_STYLE} />
+          <Bar dataKey="total" fill={color ?? '#8b5cf6'} radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
 
@@ -200,51 +205,45 @@ function ChartPie({ data, preview }) {
   ) ?? 'source'
 
   return (
-    <ResponsiveContainer width="100%" height={h}>
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="total"
-          nameKey={nameKey}
-          cx="50%"
-          cy="50%"
-          outerRadius={preview ? 60 : 85}
-          labelLine={false}
-          label={makePieLabel(total)}
-        >
-          {data.map((_, i) => (
-            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 11 }} />
-        {!preview && (
-          <Legend formatter={v => <span style={{ fontSize: 11, color: '#374151' }}>{v}</span>} />
-        )}
-      </PieChart>
-    </ResponsiveContainer>
+    <div dir="ltr">
+      <ResponsiveContainer width="100%" height={h}>
+        <PieChart>
+          <Pie data={data} dataKey="total" nameKey={nameKey} cx="50%" cy="50%"
+            outerRadius={preview ? 60 : 85} labelLine={false} label={makePieLabel(total)}>
+            {data.map((_, i) => (
+              <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip contentStyle={TT_STYLE} />
+          {!preview && (
+            <Legend formatter={v => <span style={{ fontSize: 11, color: TICK }}>{v}</span>} />
+          )}
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
 
 function ChartLine({ data, color, preview }) {
   if (!data?.length) return <Empty />
   const h = preview ? 160 : 220
-
-  // Format date as DD/MM
   const formatted = data.map(d => ({
     ...d,
     date: d.date ? d.date.slice(5).replace('-', '/') : d.date,
   }))
 
   return (
-    <ResponsiveContainer width="100%" height={h}>
-      <LineChart data={formatted} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
-        <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 11 }} />
-        <Line type="monotone" dataKey="total" stroke={color ?? '#2398c2'} strokeWidth={2} dot={false} />
-      </LineChart>
-    </ResponsiveContainer>
+    <div dir="ltr">
+      <ResponsiveContainer width="100%" height={h}>
+        <LineChart data={formatted} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={GRID} strokeOpacity={0.4} />
+          <XAxis dataKey="date" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
+          <Tooltip contentStyle={TT_STYLE} />
+          <Line type="monotone" dataKey="total" stroke={color ?? '#2398c2'} strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
 
@@ -294,7 +293,7 @@ function KpiCard({ widget, onDelete, data, isLoading }) {
 
   return (
     <div
-      className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex-1 min-w-[140px] relative"
+      className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 flex-1 min-w-[140px] relative"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -311,7 +310,7 @@ function KpiCard({ widget, onDelete, data, isLoading }) {
         <Skeleton />
       ) : (
         <>
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">{widget.title}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">{widget.title}</p>
           <p className="text-3xl font-bold tabular-nums" style={{ color: widget.color ?? '#2398c2' }}>
             {typeof value === 'number' ? value.toLocaleString() : value}
           </p>
@@ -328,14 +327,14 @@ function ChartWidgetCard({ widget, onDelete, data, isLoading }) {
 
   return (
     <div
-      className={`bg-white rounded-xl border border-gray-200 shadow-sm p-4 relative ${
+      className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4 relative ${
         widget.dataSource === 'timeline' ? 'lg:col-span-2' : ''
       }`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700">{widget.title}</h3>
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{widget.title}</h3>
         {hovered && onDelete && (
           <button
             onClick={onDelete}

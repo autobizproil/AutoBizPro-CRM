@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Automation;
 use App\Models\AutomationLog;
+use App\Models\Client;
 use App\Models\Lead;
 use App\Models\PipelineStage;
 use App\Models\User;
@@ -13,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 // Queue driver: database (Phase 1). Migrate to Redis before scaling to production load.
@@ -72,6 +74,11 @@ class RunAutomationJob implements ShouldQueue
     {
         $context = $entity->toArray();
 
+        // Interpolate placeholders in text fields
+        if (isset($action['message'])) $action['message'] = $this->interpolate($action['message'], $context);
+        if (isset($action['body']))    $action['body']    = $this->interpolate($action['body'],    $context);
+        if (isset($action['subject'])) $action['subject'] = $this->interpolate($action['subject'], $context);
+
         match ($action['type']) {
             'send_email'    => $notifications->sendEmail($this->tenantId, $action, $context),
             'send_whatsapp' => $notifications->sendWhatsapp($this->tenantId, $action, $context),
@@ -85,9 +92,11 @@ class RunAutomationJob implements ShouldQueue
                 'entity_type' => strtolower(class_basename($entity)),
                 'entity_id'   => $entity->id,
                 'type'        => $action['activity_type'] ?? 'note',
-                'body'        => $action['title'] ?? 'אוטומציה',
+                'body'        => $this->interpolate($action['title'] ?? 'אוטומציה', $context),
                 'user_id'     => null,
             ]),
+            'convert_to_client' => $this->convertToClient($entity),
+            'webhook'       => $this->callWebhook($action['url'] ?? '', $context),
             default => Log::warning("Unknown automation action: {$action['type']}"),
         };
     }
@@ -98,5 +107,55 @@ class RunAutomationJob implements ShouldQueue
         if (! in_array($tag, $tags)) {
             $entity->update(['tags' => array_merge($tags, [$tag])]);
         }
+    }
+
+    private function convertToClient($entity): void
+    {
+        if (! ($entity instanceof Lead)) return;
+
+        $exists = Client::withoutGlobalScope('tenant')
+            ->where('tenant_id', $this->tenantId)
+            ->where('source_lead_id', $entity->id)
+            ->exists();
+
+        if (! $exists) {
+            Client::create([
+                'tenant_id'      => $this->tenantId,
+                'name'           => $entity->name,
+                'phone'          => $entity->phone,
+                'email'          => $entity->email,
+                'source'         => $entity->source,
+                'notes'          => $entity->notes,
+                'assigned_to'    => $entity->assigned_to,
+                'source_lead_id' => $entity->id,
+                'custom_fields'  => $entity->custom_fields,
+            ]);
+        }
+    }
+
+    private function callWebhook(string $url, array $context): void
+    {
+        if (empty($url)) return;
+        try {
+            Http::timeout(10)->post($url, [
+                'automation_id' => $this->automationId,
+                'tenant_id'     => $this->tenantId,
+                'entity'        => $context,
+                'timestamp'     => now()->toIso8601String(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("Automation webhook failed: {$url} — " . $e->getMessage());
+        }
+    }
+
+    /** Replace {name}, {phone}, {email}, {source} placeholders in text */
+    private function interpolate(string $text, array $context): string
+    {
+        foreach ($context as $key => $value) {
+            if (is_scalar($value)) {
+                $text = str_replace('{' . $key . '}', (string) $value, $text);
+            }
+        }
+        return $text;
     }
 }

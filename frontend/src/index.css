@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind v4: class-based dark mode (replaces tailwind.config darkMode:'class') */
+@variant dark (&:is(.dark, .dark *));
+
 :root {
   --brand-blue: #2398c2;
   --brand-green: #b1e239;
@@ -31,6 +34,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', 'Inter', -apple-system, sans-serif;
+}
+
 /* Consistent focus ring using brand blue */
 *:focus-visible {
   outline: 2px solid #2398c2;
@@ -41,3 +48,10 @@ body {
 button, a, input, select, textarea {
   transition: all 0.15s ease;
 }
+
+/* Toast slide-up animation */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+.animate-slide-up { animation: slide-up 0.2s ease-out; }

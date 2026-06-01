@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { PreferencesProvider } from './context/PreferencesContext'
+import { ToastProvider } from './context/ToastContext'
 import { LabelsProvider } from './context/LabelsContext'
 import LoginPage from './pages/auth/LoginPage'
 import Layout from './components/ui/Layout'
@@ -16,6 +17,7 @@ import ReportsPage from './pages/reports/ReportsPage'
 import LandingPagesPage from './pages/landing-pages/LandingPagesPage'
 import LandingPageEditor from './pages/landing-pages/LandingPageEditor'
 import LandingPagePublicPage from './pages/landing-pages/LandingPagePublicPage'
+import ClientsPage from './pages/clients/ClientsPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -38,6 +40,7 @@ function AppRoutes() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard"   element={<DashboardPage />} />
         <Route path="leads"       element={<LeadsPage />} />
+        <Route path="clients"     element={<ClientsPage />} />
         <Route path="pipeline"    element={<PipelinePage />} />
         <Route path="contacts"    element={<ContactsPage />} />
         <Route path="import"      element={<ImportPage />} />
@@ -57,9 +60,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <PreferencesProvider>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </ToastProvider>
       </PreferencesProvider>
     </BrowserRouter>
   )

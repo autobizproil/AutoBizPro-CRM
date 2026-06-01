@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useCallback } from 'react'
 import client from '../../api/client'
 import { integrationsApi } from '../../api/integrations'
+import { customFieldsApi, FIELD_TYPE_LABELS } from '../../api/customFields'
 import { useAuth } from '../../context/AuthContext'
 import { usePreferences } from '../../context/PreferencesContext'
 import { translations } from '../../i18n/translations'
@@ -13,17 +14,18 @@ function ToggleSwitch({ checked, onChange, disabled = false }) {
   return (
     <button
       type="button"
+      dir="ltr"
       role="switch"
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 ${
-        checked ? 'bg-[#2398c2]' : 'bg-gray-200'
+        checked ? 'bg-[#2398c2]' : 'bg-gray-200 dark:bg-gray-600'
       }`}
     >
       <span
         className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${
-          checked ? '-translate-x-5' : 'translate-x-0'
+          checked ? 'translate-x-5' : 'translate-x-0'
         }`}
       />
     </button>
@@ -38,7 +40,7 @@ const TABS = [
   { id: 'connections', label: 'חיבורים למערכות' },
   { id: 'users',       label: 'משתמשים' },
   { id: 'permissions', label: 'הרשאות' },
-  { id: 'labels',      label: 'לייבלים' },
+  { id: 'labels',      label: 'שדות' },
   { id: 'preferences', label: 'העדפות' },
 ]
 
@@ -47,7 +49,7 @@ const TABS = [
 // ---------------------------------------------------------------------------
 function Card({ children, className = '' }) {
   return (
-    <div className={`bg-white rounded-xl border border-gray-200 p-6 ${className}`}>
+    <div className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
       {children}
     </div>
   )
@@ -72,20 +74,20 @@ function SaveRow({ isPending, isSuccess, isError, errorMsg, onTest, testPending,
             type="button"
             onClick={onTest}
             disabled={testPending}
-            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors duration-150"
+            className="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors duration-150"
           >
             {testPending ? 'בודק...' : 'בדוק חיבור'}
           </button>
         )}
-        {isSuccess && <span className="text-green-600 text-sm">&#10003; נשמר</span>}
+        {isSuccess && <span className="text-green-600 dark:text-green-400 text-sm">✓ נשמר</span>}
       </div>
       {isError && (
-        <div className="text-sm px-3 py-2 rounded-lg bg-red-50 text-red-700 border border-red-200">
+        <div className="text-sm px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700">
           {errorMsg ?? 'שגיאה בשמירה'}
         </div>
       )}
       {testData && (
-        <div className={`text-sm px-3 py-2 rounded-lg ${testData.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+        <div className={`text-sm px-3 py-2 rounded-lg ${testData.success ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700'}`}>
           {testData.message}
         </div>
       )}
@@ -127,14 +129,14 @@ function GeneralTab({ tenantData, can, qc }) {
       {/* Business info display */}
       {tenantData && (
         <Card>
-          <h3 className="font-semibold text-gray-800 mb-4">פרטי עסק</h3>
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">פרטי עסק</h3>
           <div className="space-y-3">
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-1">שם עסק</p>
-              <p className="text-sm text-gray-800">{tenantData.name ?? '—'}</p>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">שם עסק</p>
+              <p className="text-sm text-gray-800 dark:text-gray-100">{tenantData.name ?? '—'}</p>
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-1">Subdomain</p>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Subdomain</p>
               <p className="text-sm text-gray-800 font-mono">{tenantData.subdomain ?? '—'}</p>
             </div>
           </div>
@@ -144,14 +146,14 @@ function GeneralTab({ tenantData, can, qc }) {
       {/* WhatsApp */}
       <Card>
         <h3 className="font-semibold text-gray-800 mb-1">WhatsApp (GREEN-API)</h3>
-        <p className="text-xs text-gray-500 mb-4">הגדר ספק WhatsApp לשליחת הודעות אוטומטיות.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הגדר ספק WhatsApp לשליחת הודעות אוטומטיות.</p>
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ספק</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ספק</label>
             <select
               value={whatsappProvider}
               onChange={e => setWhatsappProvider(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
             >
               <option value="">בחר ספק...</option>
               <option value="360dialog">360dialog</option>
@@ -161,12 +163,12 @@ function GeneralTab({ tenantData, can, qc }) {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Key</label>
             <input
               type="password"
               value={whatsappApiKey}
               onChange={e => setWhatsappApiKey(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               placeholder="הכנס API key..."
             />
           </div>
@@ -289,23 +291,23 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
       {/* Green Invoice */}
       <Card>
         <h3 className="font-semibold text-gray-800 mb-1">&#x1F9FE; Green Invoice (חשבוניות)</h3>
-        <p className="text-xs text-gray-500 mb-4">הזן את מפתחות ה-API מ-Green Invoice &#x2192; הגדרות &#x2192; API. לאחר מכן ניתן להפיק חשבוניות ישירות מכרטיס ליד.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הזן את מפתחות ה-API מ-Green Invoice &#x2192; הגדרות &#x2192; API. לאחר מכן ניתן להפיק חשבוניות ישירות מכרטיס ליד.</p>
         <form onSubmit={(e) => { e.preventDefault(); saveInteg.mutate() }} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">API Key ID</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Key ID</label>
             <input value={giId} onChange={e => setGiId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               placeholder="key id..." />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">API Secret</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Secret</label>
             <input type="password" value={giSecret} onChange={e => setGiSecret(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               placeholder="secret..." />
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none">
             <input type="checkbox" checked={giSandbox} onChange={e => setGiSandbox(e.target.checked)}
-              className="rounded border-gray-300 text-[#2398c2] focus:ring-[#2398c2]/30" />
+              className="rounded border-gray-300 accent-[#2398c2] focus:ring-[#2398c2]/30" />
             מצב Sandbox (בדיקות)
           </label>
           {can('users', 'can_update') && (
@@ -326,24 +328,24 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
       {/* Cardcom */}
       <Card>
         <h3 className="font-semibold text-gray-800 mb-1">&#x1F4B3; Cardcom (סליקה)</h3>
-        <p className="text-xs text-gray-500 mb-4">הזן את פרטי ה-API של Cardcom כדי לאפשר שליחת עמודי תשלום ישירות מכרטיס ליד.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הזן את פרטי ה-API של Cardcom כדי לאפשר שליחת עמודי תשלום ישירות מכרטיס ליד.</p>
         <form onSubmit={(e) => { e.preventDefault(); saveCardcom.mutate() }} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">מספר טרמינל</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">מספר טרמינל</label>
             <input value={cardcomTerminal} onChange={e => setCardcomTerminal(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               placeholder="מספר טרמינל..." />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">שם משתמש API</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">שם משתמש API</label>
             <input value={cardcomApiName} onChange={e => setCardcomApiName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               placeholder="שם משתמש..." />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">סיסמת API</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סיסמת API</label>
             <input type="password" value={cardcomApiPassword} onChange={e => setCardcomApiPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               placeholder="סיסמה..." />
           </div>
           {can('users', 'can_update') && (
@@ -360,18 +362,18 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
       {/* Yesh Invoice */}
       <Card>
         <h3 className="font-semibold text-gray-800 mb-1">&#x1F9FE; Yesh Invoice (חשבוניות)</h3>
-        <p className="text-xs text-gray-500 mb-4">הזן את מפתחות ה-API של Yesh Invoice להפקת חשבוניות ישירות מכרטיס ליד.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הזן את מפתחות ה-API של Yesh Invoice להפקת חשבוניות ישירות מכרטיס ליד.</p>
         <form onSubmit={(e) => { e.preventDefault(); saveYesh.mutate() }} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">מפתח משתמש</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">מפתח משתמש</label>
             <input value={yeshUserKey} onChange={e => setYeshUserKey(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               placeholder="user key..." />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">מפתח סודי</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">מפתח סודי</label>
             <input type="password" value={yeshSecretKey} onChange={e => setYeshSecretKey(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               placeholder="secret key..." />
           </div>
           {can('users', 'can_update') && (
@@ -401,26 +403,26 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
             />
           </div>
         </div>
-        <p className="text-xs text-gray-500 mb-4">חבר את מרכזיית PayCall לקבלת שיחות נכנסות ויצירת לידים אוטומטית.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">חבר את מרכזיית PayCall לקבלת שיחות נכנסות ויצירת לידים אוטומטית.</p>
 
         <form onSubmit={(e) => { e.preventDefault(); savePaycall.mutate() }} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">DID (מספר נכנסי)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">DID (מספר נכנסי)</label>
             <input
               value={paycallDid}
               onChange={e => setPaycallDid(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               placeholder="03-XXXXXXX"
               dir="ltr"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">סוד Webhook (אופציונלי)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סוד Webhook (אופציונלי)</label>
             <input
               type="password"
               value={paycallSecret}
               onChange={e => setPaycallSecret(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               placeholder="secret..."
             />
           </div>
@@ -436,27 +438,283 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
 
           {/* Webhook URL display */}
           <div className="pt-2 border-t border-gray-100">
-            <p className="text-xs font-medium text-gray-500 mb-2">Webhook URL (העתק לתוך הגדרות PayCall):</p>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Webhook URL (העתק לתוך הגדרות PayCall):</p>
             <div className="flex items-center gap-2">
               <input
                 readOnly
                 value={webhookUrl}
                 dir="ltr"
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600 bg-gray-50 font-mono focus:outline-none select-all"
+                className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 font-mono focus:outline-none select-all"
                 onClick={e => e.target.select()}
               />
               <button
                 type="button"
                 onClick={handleCopyWebhook}
-                className="shrink-0 border border-gray-300 text-gray-600 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors duration-150"
+                className="shrink-0 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
               >
-                {webhookCopied ? '&#x2713; הועתק' : 'העתק'}
+                {webhookCopied ? '✓ הועתק' : 'העתק'}
               </button>
             </div>
           </div>
         </form>
       </Card>
+
+      {/* Facebook Lead Ads */}
+      <FacebookCard integ={integ} qc={qc} can={can} tenantSubdomain={tenantSubdomain} />
+
+      {/* Voicenter */}
+      <VoicenterCard integ={integ} qc={qc} can={can} tenantSubdomain={tenantSubdomain} />
+
+      {/* Google Sheets */}
+      <GoogleSheetsCard integ={integ} qc={qc} can={can} />
+
+      {/* Outgoing Webhook */}
+      <OutgoingWebhookCard integ={integ} qc={qc} can={can} />
     </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Facebook Lead Ads card
+// ──────────────────────────────────────────────────────────────────────────────
+function FacebookCard({ integ, qc, can, tenantSubdomain }) {
+  const [appId, setAppId]           = useState('')
+  const [appSecret, setAppSecret]   = useState('')
+  const [pageId, setPageId]         = useState('')
+  const [verifyToken, setVerify]    = useState('')
+  const [copied, setCopied]         = useState(false)
+
+  useEffect(() => {
+    if (integ) {
+      setAppId(integ.facebook_app_id ?? '')
+      setAppSecret(integ.facebook_app_secret ?? '')
+      setPageId(integ.facebook_page_id ?? '')
+      setVerify(integ.facebook_verify_token ?? '')
+    }
+  }, [integ])
+
+  const save = useMutation({
+    mutationFn: () => integrationsApi.saveSettings({
+      facebook_app_id: appId, facebook_app_secret: appSecret,
+      facebook_page_id: pageId, facebook_verify_token: verifyToken,
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['integrations-settings'] }),
+  })
+
+  const webhookUrl = `${window.location.origin}/api/integrations/facebook/webhook/${tenantSubdomain ?? ''}`
+
+  const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
+
+  return (
+    <Card>
+      <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">📘 Facebook Lead Ads</h3>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">קבל לידים ממודעות פייסבוק אוטומטית. צור אפליקציית Meta, הגדר webhook ב-Meta Business Suite.</p>
+      <form onSubmit={e => { e.preventDefault(); save.mutate() }} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">App ID</label>
+            <input value={appId} onChange={e => setAppId(e.target.value)} placeholder="123456789..." className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">App Secret</label>
+            <input type="password" value={appSecret} onChange={e => setAppSecret(e.target.value)} placeholder="secret..." className={INPUT} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Page ID</label>
+            <input value={pageId} onChange={e => setPageId(e.target.value)} placeholder="page id..." className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Verify Token</label>
+            <input value={verifyToken} onChange={e => setVerify(e.target.value)} placeholder="my_verify_token" className={INPUT} />
+          </div>
+        </div>
+        <div className="pt-1 border-t border-gray-100 dark:border-gray-700">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Webhook URL (הכנס ב-Meta Business Suite):</p>
+          <div className="flex gap-2">
+            <input readOnly value={webhookUrl} dir="ltr" className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 font-mono" onClick={e => e.target.select()} />
+            <button type="button" onClick={() => { navigator.clipboard.writeText(webhookUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+              className="shrink-0 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-700">
+              {copied ? '✓ הועתק' : 'העתק'}
+            </button>
+          </div>
+        </div>
+        {can('users', 'can_update') && (
+          <SaveRow isPending={save.isPending} isSuccess={save.isSuccess} isError={save.isError} errorMsg={save.error?.response?.data?.message} />
+        )}
+      </form>
+    </Card>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Voicenter card
+// ──────────────────────────────────────────────────────────────────────────────
+function VoicenterCard({ integ, qc, can, tenantSubdomain }) {
+  const [accountId, setAccountId]   = useState('')
+  const [apiToken, setApiToken]     = useState('')
+  const [webhookSecret, setSecret]  = useState('')
+  const [copied, setCopied]         = useState(false)
+
+  useEffect(() => {
+    if (integ) {
+      setAccountId(integ.voicenter_account_id ?? '')
+      setApiToken(integ.voicenter_api_token ?? '')
+      setSecret(integ.voicenter_webhook_secret ?? '')
+    }
+  }, [integ])
+
+  const save = useMutation({
+    mutationFn: () => integrationsApi.saveSettings({
+      voicenter_account_id: accountId, voicenter_api_token: apiToken, voicenter_webhook_secret: webhookSecret,
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['integrations-settings'] }),
+  })
+
+  const webhookUrl = `${window.location.origin}/api/integrations/voicenter/webhook/${tenantSubdomain ?? ''}`
+
+  const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
+
+  return (
+    <Card>
+      <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">📞 Voicenter — מרכזייה</h3>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">חבר מרכזיית Voicenter לקבלת שיחות נכנסות/יוצאות ויצירת לידים ופעילויות אוטומטית.</p>
+      <form onSubmit={e => { e.preventDefault(); save.mutate() }} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Account ID</label>
+            <input value={accountId} onChange={e => setAccountId(e.target.value)} placeholder="account id..." className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Token</label>
+            <input type="password" value={apiToken} onChange={e => setApiToken(e.target.value)} placeholder="token..." className={INPUT} />
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Webhook Secret (אופציונלי)</label>
+          <input type="password" value={webhookSecret} onChange={e => setSecret(e.target.value)} placeholder="secret..." className={INPUT} />
+        </div>
+        <div className="pt-1 border-t border-gray-100 dark:border-gray-700">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Webhook URL (הכנס בהגדרות Voicenter):</p>
+          <div className="flex gap-2">
+            <input readOnly value={webhookUrl} dir="ltr" className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 font-mono" onClick={e => e.target.select()} />
+            <button type="button" onClick={() => { navigator.clipboard.writeText(webhookUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+              className="shrink-0 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-700">
+              {copied ? '✓ הועתק' : 'העתק'}
+            </button>
+          </div>
+        </div>
+        {can('users', 'can_update') && (
+          <SaveRow isPending={save.isPending} isSuccess={save.isSuccess} isError={save.isError} errorMsg={save.error?.response?.data?.message} />
+        )}
+      </form>
+    </Card>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Google Sheets card
+// ──────────────────────────────────────────────────────────────────────────────
+function GoogleSheetsCard({ integ, qc, can }) {
+  const [sheetsId, setSheetsId]   = useState('')
+  const [saJson, setSaJson]       = useState('')
+  const [exportResult, setResult] = useState(null)
+
+  useEffect(() => {
+    if (integ) {
+      setSheetsId(integ.google_sheets_id ?? '')
+      setSaJson(integ.google_service_account_json ? '****' : '')
+    }
+  }, [integ])
+
+  const save = useMutation({
+    mutationFn: () => integrationsApi.saveSettings({
+      google_sheets_id: sheetsId,
+      ...(saJson && !saJson.startsWith('****') ? { google_service_account_json: saJson } : {}),
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['integrations-settings'] }),
+  })
+
+  const exportMut = useMutation({
+    mutationFn: () => integrationsApi.googleSheetsExport().then(r => r.data),
+    onSuccess: (data) => setResult(data),
+  })
+
+  const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
+
+  return (
+    <Card>
+      <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">📊 Google Sheets — ייצוא לידים</h3>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">ייצא את כל הלידים לגיליון Google Sheets דרך Service Account. הגדר ב-Google Cloud Console.</p>
+      <form onSubmit={e => { e.preventDefault(); save.mutate() }} className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sheet ID</label>
+          <input value={sheetsId} onChange={e => setSheetsId(e.target.value)} placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" dir="ltr" className={INPUT} />
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">מתוך URL: docs.google.com/spreadsheets/d/<b>SHEET_ID</b>/edit</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Service Account JSON</label>
+          <textarea value={saJson} onChange={e => setSaJson(e.target.value)} rows={3} placeholder={`{"type":"service_account","client_email":"...","private_key":"..."}`} dir="ltr"
+            className={INPUT + ' resize-none font-mono text-xs'} />
+        </div>
+        {can('users', 'can_update') && (
+          <div className="flex gap-2 items-center flex-wrap">
+            <SaveRow isPending={save.isPending} isSuccess={save.isSuccess} isError={save.isError} errorMsg={save.error?.response?.data?.message} />
+            <button type="button" onClick={() => exportMut.mutate()} disabled={exportMut.isPending || !sheetsId}
+              className="bg-[#b1e239] hover:bg-[#9ecf30] text-gray-900 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-40">
+              {exportMut.isPending ? 'מייצא...' : '📤 ייצא עכשיו'}
+            </button>
+          </div>
+        )}
+        {exportResult && (
+          <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 text-sm px-3 py-2 rounded-lg">
+            ✓ יוצאו {exportResult.appended} לידים לגיליון
+          </div>
+        )}
+        {exportMut.isError && (
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg">
+            {exportMut.error?.response?.data?.message ?? 'שגיאה בייצוא'}
+          </div>
+        )}
+      </form>
+    </Card>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Outgoing Webhook card (Make / n8n / Zapier)
+// ──────────────────────────────────────────────────────────────────────────────
+function OutgoingWebhookCard({ integ, qc, can }) {
+  const [url, setUrl] = useState('')
+
+  useEffect(() => {
+    if (integ) setUrl(integ.outgoing_webhook_url ?? '')
+  }, [integ])
+
+  const save = useMutation({
+    mutationFn: () => integrationsApi.saveSettings({ outgoing_webhook_url: url }),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['integrations-settings'] }),
+  })
+
+  const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
+
+  return (
+    <Card>
+      <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">🔗 Webhook יוצא (Make / n8n / Zapier)</h3>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">שלח אוטומטית POST עם פרטי הליד בכל יצירה / עדכון / שינוי סטטוס. הדבק את ה-URL מ-Make/n8n.</p>
+      <form onSubmit={e => { e.preventDefault(); save.mutate() }} className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Webhook URL</label>
+          <input value={url} onChange={e => setUrl(e.target.value)} dir="ltr"
+            placeholder="https://hook.eu1.make.com/xxxxxxxx" className={INPUT} />
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">אירועים: lead_created · lead_updated · status_changed · stage_changed</p>
+        </div>
+        {can('users', 'can_update') && (
+          <SaveRow isPending={save.isPending} isSuccess={save.isSuccess} isError={save.isError} errorMsg={save.error?.response?.data?.message} />
+        )}
+      </form>
+    </Card>
   )
 }
 
@@ -468,13 +726,13 @@ function UsersTab() {
     <div className="max-w-lg">
       <Card>
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+          <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
             <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </div>
-          <p className="text-sm font-medium text-gray-700 mb-1">ניהול משתמשים</p>
-          <p className="text-xs text-gray-400">בקרוב</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ניהול משתמשים</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">בקרוב</p>
         </div>
       </Card>
     </div>
@@ -489,13 +747,13 @@ function PermissionsTab() {
     <div className="max-w-lg">
       <Card>
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+          <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
             <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           </div>
-          <p className="text-sm font-medium text-gray-700 mb-1">ניהול הרשאות</p>
-          <p className="text-xs text-gray-400">בקרוב</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ניהול הרשאות</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">בקרוב</p>
         </div>
       </Card>
     </div>
@@ -505,20 +763,239 @@ function PermissionsTab() {
 // ---------------------------------------------------------------------------
 // Tab: לייבלים (Labels) — placeholder
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Tab: לייבלים → replaced by full custom fields manager (שדות מותאמים)
+// ---------------------------------------------------------------------------
+const FIELD_TYPES_CREATABLE = [
+  'text', 'textarea', 'number', 'select', 'date', 'checkbox', 'url', 'phone', 'email',
+]
+
+const TYPE_ICON = {
+  text: 'Aa', textarea: '¶', number: '#', select: '☰', date: '📅',
+  checkbox: '☑', url: '🔗', phone: '📞', email: '@', datetime: '🕐', lookup: '🔍',
+}
+
 function LabelsTab() {
+  const qc = useQueryClient()
+  const { can } = useAuth()
+  const [showModal, setShowModal] = useState(false)
+  const [draft, setDraft] = useState({ label: '', field_type: 'text', options: '', required: false })
+  const [optionInput, setOptionInput] = useState('')
+  const [createError, setCreateError] = useState('')
+
+  const { data, isLoading, error: listError } = useQuery({
+    queryKey: ['custom-fields'],
+    queryFn:  () => customFieldsApi.list().then(r => r.data.data),
+  })
+
+  const createField = useMutation({
+    mutationFn: (d) => customFieldsApi.create(d),
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: ['custom-fields'] })
+      setShowModal(false)
+      resetDraft()
+      setCreateError('')
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.message
+        ?? Object.values(err.response?.data?.errors ?? {})[0]?.[0]
+        ?? err.message
+        ?? 'שגיאה בשמירה'
+      setCreateError(msg)
+    },
+  })
+
+  const deleteField = useMutation({
+    mutationFn: (id) => customFieldsApi.destroy(id),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['custom-fields'] }),
+  })
+
+  function resetDraft() {
+    setDraft({ label: '', field_type: 'text', options: '', required: false })
+    setOptionInput('')
+    setCreateError('')
+  }
+
+  const parsedOptions = draft.options
+    ? draft.options.split('\n').map(s => s.trim()).filter(Boolean)
+    : []
+
+  function handleCreate(e) {
+    e.preventDefault()
+    const payload = {
+      label:      draft.label.trim(),
+      field_type: draft.field_type,
+      required:   draft.required,
+      ...(draft.field_type === 'select' ? { options: parsedOptions } : {}),
+    }
+    if (!payload.label) return
+    createField.mutate(payload)
+  }
+
+  const systemFields = data?.system ?? []
+  const customFields = data?.custom ?? []
+
+  const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
+
+  if (listError) return (
+    <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm px-4 py-3 rounded-xl max-w-xl">
+      שגיאה בטעינת השדות: {listError.response?.data?.message ?? listError.message}
+      <br /><span className="text-xs opacity-70">ייתכן שהמיגרציה לא רצה — הרץ: <code>php artisan migrate</code></span>
+    </div>
+  )
+
   return (
-    <div className="max-w-lg">
-      <Card>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-          </div>
-          <p className="text-sm font-medium text-gray-700 mb-1">ניהול לייבלים</p>
-          <p className="text-xs text-gray-400">בקרוב</p>
+    <div className="max-w-3xl">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">הגדרת שדות — לידים</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">שדות מערכת הם קבועים. שדות מותאמים ניתנים להוספה ומחיקה.</p>
         </div>
-      </Card>
+        {can('users', 'can_update') && (
+          <button onClick={() => { resetDraft(); setShowModal(true) }}
+            className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm">
+            <span className="text-lg leading-none">+</span> הוסף שדה
+          </button>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-right">
+              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">שם שדה</th>
+              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">שם מערכת</th>
+              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">סוג שדה</th>
+              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">אפשרויות</th>
+              <th className="px-4 py-3 w-10"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            {/* System fields */}
+            {systemFields.map(f => (
+              <tr key={f.name} className="bg-gray-50/50 dark:bg-gray-700/20">
+                <td className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <span className="w-6 text-center text-xs text-gray-400">{TYPE_ICON[f.field_type] ?? '—'}</span>
+                  {f.label}
+                </td>
+                <td className="px-4 py-3 font-mono text-xs text-gray-400 dark:text-gray-500">{f.name}</td>
+                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</td>
+                <td className="px-4 py-3 text-gray-400 text-xs">—</td>
+                <td className="px-4 py-3">
+                  <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded font-mono">מערכת</span>
+                </td>
+              </tr>
+            ))}
+            {/* Custom fields */}
+            {isLoading && !systemFields.length && (
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">טוען...</td></tr>
+            )}
+            {customFields.map(f => (
+              <tr key={f.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                  <span className="w-6 text-center text-xs text-[#2398c2]">{TYPE_ICON[f.field_type] ?? 'Aa'}</span>
+                  {f.label}
+                </td>
+                <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">{f.name}</td>
+                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</td>
+                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">
+                  {f.options?.length ? f.options.join(', ') : '—'}
+                </td>
+                <td className="px-4 py-3">
+                  {can('users', 'can_update') && (
+                    <button
+                      onClick={() => { if (confirm(`למחוק את השדה "${f.label}"? הנתונים ילכו לאיבוד.`)) deleteField.mutate(f.id) }}
+                      className="text-gray-300 dark:text-gray-600 hover:text-red-500 text-lg leading-none"
+                    >×</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!isLoading && customFields.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-sm">
+                אין שדות מותאמים — לחץ "הוסף שדה" להתחלה
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Create modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowModal(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">הוסף שדה מותאם</h2>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
+            </div>
+            <form onSubmit={handleCreate} className="px-6 py-4 space-y-4">
+              {createError && (
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg">
+                  {createError}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">שם השדה (תצוגה) <span className="text-red-500">*</span></label>
+                <input required value={draft.label} onChange={e => setDraft(d => ({ ...d, label: e.target.value }))}
+                  placeholder="לדוגמה: תקציב, שם חברה, מספר רישיון..."
+                  className={INPUT} />
+                {draft.label && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 font-mono">
+                    שם מערכת: <span className="text-[#2398c2]">{
+                      draft.label.trim().toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g,'') || 'cf_xxxxx'
+                    }</span>
+                    <span className="text-gray-300 dark:text-gray-600 mr-1">(נוצר אוטומטית)</span>
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סוג שדה</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {FIELD_TYPES_CREATABLE.map(t => (
+                    <button key={t} type="button"
+                      onClick={() => setDraft(d => ({ ...d, field_type: t }))}
+                      className={`py-2 px-2 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                        draft.field_type === t
+                          ? 'border-[#2398c2] bg-[#2398c2]/10 text-[#2398c2]'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}>
+                      <span className="opacity-60">{TYPE_ICON[t]}</span>
+                      {FIELD_TYPE_LABELS[t]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {draft.field_type === 'select' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">אפשרויות (שורה אחת לאפשרות)</label>
+                  <textarea value={draft.options}
+                    onChange={e => setDraft(d => ({ ...d, options: e.target.value }))}
+                    rows={4} placeholder={"אפשרות א\nאפשרות ב\nאפשרות ג"}
+                    className={INPUT + ' resize-none'} />
+                  {parsedOptions.length > 0 && (
+                    <p className="text-xs text-gray-400 mt-1">{parsedOptions.length} אפשרויות</p>
+                  )}
+                </div>
+              )}
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                <input type="checkbox" checked={draft.required} onChange={e => setDraft(d => ({ ...d, required: e.target.checked }))}
+                  className="rounded border-gray-300 accent-[#2398c2]" />
+                שדה חובה
+              </label>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={createField.isPending || !draft.label.trim()}
+                  className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
+                  {createField.isPending ? 'שומר...' : 'צור שדה'}
+                </button>
+                <button type="button" onClick={() => setShowModal(false)}
+                  className="px-4 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm">ביטול</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -624,10 +1101,10 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold text-gray-900 mb-6">הגדרות</h2>
+      <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-6">הגדרות</h2>
 
       {/* Tab bar */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
         <nav className="flex gap-1 -mb-px overflow-x-auto">
           {TABS.map((tab) => (
             <button
@@ -637,7 +1114,7 @@ export default function SettingsPage() {
               className={`shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors duration-150 focus:outline-none ${
                 activeTab === tab.id
                   ? 'border-[#2398c2] text-[#2398c2]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300'
               }`}
             >
               {tab.label}

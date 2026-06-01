@@ -20,7 +20,7 @@ class AutomationEngine
 
         foreach ($automations as $automation) {
             if ($this->conditionsPass($automation->conditions ?? [], $entity)) {
-                RunAutomationJob::dispatch($automation->id, get_class($entity), $entity->id, $tenantId);
+                RunAutomationJob::dispatchAfterResponse($automation->id, get_class($entity), $entity->id, $tenantId);
             }
         }
     }

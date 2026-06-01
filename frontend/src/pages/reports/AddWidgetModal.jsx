@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import WidgetCard from './WidgetCard'
+import { useToast } from '../../context/ToastContext'
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 
@@ -37,6 +38,7 @@ const TYPE_DEFAULT_SOURCE = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AddWidgetModal({ onSave, onClose }) {
+  const toast = useToast()
   const [type, setType]         = useState('bar')
   const [title, setTitle]       = useState('')
   const [dataSource, setSource] = useState(TYPE_DEFAULT_SOURCE['bar'])
@@ -57,7 +59,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
 
   function handleSave() {
     if (!title.trim()) {
-      alert('נא להזין כותרת')
+      toast.warn('נא להזין כותרת')
       return
     }
     onSave({ type, title: title.trim(), dataSource, color })
@@ -69,19 +71,19 @@ export default function AddWidgetModal({ onSave, onClose }) {
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col max-h-[90vh] overflow-hidden"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col max-h-[90vh] overflow-hidden"
         dir="rtl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-          <h2 className="text-lg font-bold text-gray-800">הוסף Widget</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">הוסף Widget</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">
             &times;
           </button>
         </div>
 
         {/* Chart type tabs */}
-        <div className="flex gap-2 px-6 py-4 border-b border-gray-100 overflow-x-auto flex-shrink-0">
+        <div className="flex gap-2 px-6 py-4 border-b border-gray-100 dark:border-gray-700 overflow-x-auto flex-shrink-0">
           {CHART_TYPES.map(ct => (
             <button
               key={ct.id}
@@ -89,7 +91,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl border text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
                 type === ct.id
                   ? 'border-[#2398c2] bg-[#2398c2]/10 text-[#2398c2]'
-                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
               }`}
             >
               <span className="text-lg leading-none">{ct.icon}</span>
@@ -102,27 +104,27 @@ export default function AddWidgetModal({ onSave, onClose }) {
         <div className="flex flex-1 overflow-hidden min-h-0">
 
           {/* Right panel — form */}
-          <div className="w-72 flex-shrink-0 border-l border-gray-100 p-6 overflow-y-auto space-y-5">
+          <div className="w-72 flex-shrink-0 border-l border-gray-100 dark:border-gray-700 p-6 overflow-y-auto space-y-5">
 
             {/* Title */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">כותרת</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">כותרת</label>
               <input
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="הזן כותרת..."
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30"
               />
             </div>
 
             {/* Data source */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">סוג נתונים</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">סוג נתונים</label>
               <select
                 value={dataSource}
                 onChange={e => setSource(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30"
               >
                 {DATA_SOURCES.map(ds => (
                   <option key={ds.id} value={ds.id}>{ds.label}</option>
@@ -130,26 +132,26 @@ export default function AddWidgetModal({ onSave, onClose }) {
               </select>
             </div>
 
-            {/* Color (shown for all, but most useful for kpi/bar) */}
+            {/* Color */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">צבע</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">צבע</label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
                   value={color}
                   onChange={e => setColor(e.target.value)}
-                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5"
+                  className="w-10 h-10 rounded-lg border border-gray-200 dark:border-gray-600 cursor-pointer p-0.5 bg-white dark:bg-gray-700"
                 />
-                <span className="text-xs text-gray-500 font-mono">{color}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">{color}</span>
               </div>
             </div>
           </div>
 
           {/* Left panel — preview */}
-          <div className="flex-1 p-6 bg-gray-50 overflow-y-auto">
-            <div className="text-xs font-medium text-gray-500 mb-3">תצוגה מקדימה</div>
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <div className="text-sm font-semibold text-gray-700 mb-3">
+          <div className="flex-1 p-6 bg-gray-50 dark:bg-gray-900/50 overflow-y-auto">
+            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">תצוגה מקדימה</div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
+              <div className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
                 {title || 'כותרת Widget'}
               </div>
               <WidgetCard widget={previewWidget} preview={true} dateParams={{}} />
@@ -158,7 +160,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-start gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
+        <div className="flex items-center justify-start gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex-shrink-0">
           <button
             onClick={handleSave}
             className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
@@ -167,7 +169,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
           </button>
           <button
             onClick={onClose}
-            className="border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+            className="border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium px-5 py-2 rounded-lg transition-colors"
           >
             ביטול
           </button>

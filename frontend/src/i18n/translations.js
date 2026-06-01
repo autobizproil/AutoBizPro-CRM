@@ -2,6 +2,7 @@ export const translations = {
   he: {
     dashboard:    'דשבורד',
     leads:        'לידים',
+    clients:      'לקוחות',
     contacts:     'אנשי קשר',
     pipeline:     'פייפליין',
     import:       'ייבוא',
@@ -41,6 +42,7 @@ export const translations = {
   en: {
     dashboard:    'Dashboard',
     leads:        'Leads',
+    clients:      'Clients',
     contacts:     'Contacts',
     pipeline:     'Pipeline',
     import:       'Import',

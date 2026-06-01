@@ -7,9 +7,9 @@ const nav = [
   { to: '/dashboard',    icon: '📊', labelKey: 'dashboard'    },
   { to: '/reports',      icon: '📈', labelKey: 'reports'      },
   { to: '/leads',        icon: '👥', labelKey: 'leads'        },
+  { to: '/clients',      icon: '🏢', labelKey: 'clients'      },
   { to: '/contacts',     icon: '📋', labelKey: 'contacts'     },
   { to: '/pipeline',     icon: '🔀', labelKey: 'pipeline'     },
-  { to: '/import',       icon: '📥', labelKey: 'import'       },
   { to: '/automations',  icon: '⚡', labelKey: 'automations'  },
   { to: '/forms',        icon: '📝', labelKey: 'forms'        },
   { to: '/landing-pages',icon: '🌐', labelKey: 'landingPages' },
@@ -59,7 +59,7 @@ export default function Layout() {
               </div>
               <span className="text-xs text-gray-700 dark:text-gray-300 truncate">{user?.name}</span>
             </div>
-            <button onClick={logout} className="text-xs text-gray-400 hover:text-red-500 transition-colors">{tr('logout')}</button>
+            <button onClick={logout} className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors">{tr('logout')}</button>
           </div>
         </div>
       </aside>

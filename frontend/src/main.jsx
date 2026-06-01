@@ -11,8 +11,10 @@ initCsrf().catch(() => {})
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60,
+      staleTime: 1000 * 60 * 3,   // 3 min — avoid redundant refetches on nav
+      gcTime:    1000 * 60 * 10,  // keep cache 10 min
       retry: 1,
+      refetchOnWindowFocus: false, // don't blast API every tab-switch
     },
   },
 })
