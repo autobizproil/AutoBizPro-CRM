@@ -100,7 +100,7 @@ function BoardItem({ board, isActive, onClick, onRename }) {
           onChange={e => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={onKeyDown}
-          className="w-full border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          className="w-full border border-[#2398c2] rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30"
         />
       </div>
     )
@@ -113,7 +113,7 @@ function BoardItem({ board, isActive, onClick, onRename }) {
       title="לחץ פעמיים לשינוי שם"
       className={`w-full text-right px-4 py-2.5 text-sm transition-colors ${
         isActive
-          ? 'bg-indigo-50 text-indigo-700 font-medium'
+          ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium'
           : 'text-gray-600 hover:bg-gray-50'
       }`}
     >
@@ -234,7 +234,7 @@ export default function DashboardsPage() {
             {/* Add widget */}
             <button
               onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-medium px-3 py-2 rounded-xl shadow-sm transition-colors"
+              className="flex items-center gap-1.5 bg-[#b1e239] hover:bg-[#9ecf30] text-gray-900 text-xs font-medium px-3 py-2 rounded-xl shadow-sm transition-colors"
             >
               <span>＋</span>
               הוסף Widget
@@ -299,7 +299,7 @@ export default function DashboardsPage() {
         <div className="p-3 border-t border-gray-100">
           <button
             onClick={addBoard}
-            className="w-full text-sm text-indigo-600 hover:text-indigo-800 text-right py-1 transition-colors"
+            className="w-full text-sm text-[#2398c2] hover:text-[#1d7fa3] text-right py-1 transition-colors"
           >
             + הוסף לוח בקרה
           </button>

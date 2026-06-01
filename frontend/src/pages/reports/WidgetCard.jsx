@@ -11,7 +11,7 @@ import { dashboardApi } from '../../api/dashboard'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6']
+const PIE_COLORS = ['#2398c2', '#b1e239', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6']
 
 const TYPE_LABELS = {
   call: 'שיחה', note: 'הערה', email: 'מייל',
@@ -157,13 +157,13 @@ function ChartBar({ data, color, preview }) {
         <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 11 }} />
         {hasMultiBars ? (
           <>
-            <Bar dataKey="total" name="סה״כ" fill="#6366f1" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="total" name="סה״כ" fill="#2398c2" radius={[4, 4, 0, 0]} />
             <Bar dataKey="open"  name="פתוחים" fill="#10b981" radius={[4, 4, 0, 0]} />
             <Bar dataKey="closed" name="סגורים" fill="#f59e0b" radius={[4, 4, 0, 0]} />
             <Legend formatter={v => <span style={{ fontSize: 11, color: '#374151' }}>{v}</span>} />
           </>
         ) : (
-          <Bar dataKey="total" fill={color ?? '#6366f1'} radius={[4, 4, 0, 0]} />
+          <Bar dataKey="total" fill={color ?? '#2398c2'} radius={[4, 4, 0, 0]} />
         )}
       </BarChart>
     </ResponsiveContainer>
@@ -242,7 +242,7 @@ function ChartLine({ data, color, preview }) {
         <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
         <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
         <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 11 }} />
-        <Line type="monotone" dataKey="total" stroke={color ?? '#6366f1'} strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey="total" stroke={color ?? '#2398c2'} strokeWidth={2} dot={false} />
       </LineChart>
     </ResponsiveContainer>
   )
@@ -312,7 +312,7 @@ function KpiCard({ widget, onDelete, data, isLoading }) {
       ) : (
         <>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">{widget.title}</p>
-          <p className="text-3xl font-bold tabular-nums" style={{ color: widget.color ?? '#6366f1' }}>
+          <p className="text-3xl font-bold tabular-nums" style={{ color: widget.color ?? '#2398c2' }}>
             {typeof value === 'number' ? value.toLocaleString() : value}
           </p>
         </>
@@ -369,7 +369,7 @@ function renderPreviewChart(widget, data, isLoading) {
     return (
       <div className="flex flex-col items-start py-3">
         <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">{widget.title || 'כותרת'}</p>
-        <p className="text-3xl font-bold tabular-nums" style={{ color: widget.color ?? '#6366f1' }}>
+        <p className="text-3xl font-bold tabular-nums" style={{ color: widget.color ?? '#2398c2' }}>
           {typeof value === 'number' ? value.toLocaleString() : value}
         </p>
       </div>

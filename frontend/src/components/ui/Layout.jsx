@@ -22,8 +22,8 @@ export default function Layout() {
       <aside className="w-56 bg-white border-l border-gray-200 flex flex-col shadow-sm flex-shrink-0">
         <div className="px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">C</div>
-            <span className="font-bold text-gray-800 text-base">CRM Pro</span>
+            <div className="w-8 h-8 rounded-lg bg-[#2398c2] flex items-center justify-center text-white font-bold text-sm">A</div>
+            <span className="font-bold text-gray-800 text-base">AutoBizPro</span>
           </div>
         </div>
 
@@ -35,7 +35,7 @@ export default function Layout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-700'
+                    ? 'bg-[#2398c2]/10 text-[#2398c2]'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`
               }
@@ -49,7 +49,7 @@ export default function Layout() {
         <div className="px-4 py-3 border-t border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
+              <div className="w-7 h-7 rounded-full bg-[#2398c2]/20 flex items-center justify-center text-xs font-bold text-[#2398c2] flex-shrink-0">
                 {user?.name?.[0] ?? 'U'}
               </div>
               <span className="text-xs text-gray-700 truncate">{user?.name}</span>

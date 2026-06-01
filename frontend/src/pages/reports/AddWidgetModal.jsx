@@ -40,7 +40,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
   const [type, setType]         = useState('bar')
   const [title, setTitle]       = useState('')
   const [dataSource, setSource] = useState(TYPE_DEFAULT_SOURCE['bar'])
-  const [color, setColor]       = useState('#6366f1')
+  const [color, setColor]       = useState('#2398c2')
 
   function handleTypeChange(newType) {
     setType(newType)
@@ -88,7 +88,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
               onClick={() => handleTypeChange(ct.id)}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl border text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
                 type === ct.id
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  ? 'border-[#2398c2] bg-[#2398c2]/10 text-[#2398c2]'
                   : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -161,7 +161,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
         <div className="flex items-center justify-start gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
           <button
             onClick={handleSave}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+            className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
           >
             שמור
           </button>

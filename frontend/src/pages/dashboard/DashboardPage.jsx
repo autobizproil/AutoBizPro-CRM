@@ -64,7 +64,7 @@ export default function DashboardPage() {
     { label: 'לידים פתוחים', value: stats?.open_leads     ?? 0, icon: '🔓', color: 'amber'  },
   ]
 
-  const colorMap = { indigo: 'text-indigo-600 bg-indigo-50', green: 'text-green-600 bg-green-50', blue: 'text-blue-600 bg-blue-50', amber: 'text-amber-600 bg-amber-50' }
+  const colorMap = { indigo: 'text-[#2398c2] bg-[#2398c2]/10', green: 'text-green-600 bg-green-50', blue: 'text-blue-600 bg-blue-50', amber: 'text-amber-600 bg-amber-50' }
 
   return (
     <div dir="rtl">
@@ -82,7 +82,7 @@ export default function DashboardPage() {
             onClick={() => setPeriod(p.value)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
               period === p.value
-                ? 'bg-white text-indigo-700 shadow-sm'
+                ? 'bg-white text-[#2398c2] shadow-sm'
                 : 'text-gray-500 hover:text-gray-800'
             }`}
           >
@@ -135,9 +135,9 @@ export default function DashboardPage() {
                 <Line
                   type="monotone"
                   dataKey="count"
-                  stroke="#6366f1"
+                  stroke="#2398c2"
                   strokeWidth={2.5}
-                  dot={{ r: 3, fill: '#6366f1', strokeWidth: 0 }}
+                  dot={{ r: 3, fill: '#2398c2', strokeWidth: 0 }}
                   activeDot={{ r: 5 }}
                 />
               </LineChart>
@@ -177,7 +177,7 @@ export default function DashboardPage() {
                   contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }}
                   formatter={(v) => [v, 'לידים']}
                 />
-                <Bar dataKey="total" fill="#10b981" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="total" fill="#b1e239" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (

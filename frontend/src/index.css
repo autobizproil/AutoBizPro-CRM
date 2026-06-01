@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+:root {
+  --brand-blue: #2398c2;
+  --brand-green: #b1e239;
+  --brand-gray: #cfcfcf;
+}
+
 /* RTL base */
 * {
   box-sizing: border-box;
