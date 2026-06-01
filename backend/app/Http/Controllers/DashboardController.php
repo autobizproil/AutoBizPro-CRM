@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Activity;
 use App\Models\Contact;
 use App\Models\Lead;
 use App\Models\PipelineStage;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -55,5 +59,255 @@ class DashboardController extends Controller
             ->get();
 
         return response()->json(['success' => true, 'data' => ['leads_per_day' => $leadsPerDay]]);
+    }
+
+    // ── Reports ────────────────────────────────────────────────────────────────
+
+    /**
+     * Resolve date range from request params.
+     * Priority: explicit date_from/date_to > period keyword > default last 30 days.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function dateRange(Request $request): array
+    {
+        if ($request->filled('date_from') || $request->filled('date_to')) {
+            $from = $request->filled('date_from')
+                ? Carbon::parse($request->input('date_from'))->startOfDay()
+                : Carbon::now()->subDays(30)->startOfDay();
+            $to = $request->filled('date_to')
+                ? Carbon::parse($request->input('date_to'))->endOfDay()
+                : Carbon::now()->endOfDay();
+            return [$from, $to];
+        }
+
+        $now = Carbon::now();
+        [$from, $to] = match ($request->input('period')) {
+            'today'   => [$now->copy()->startOfDay(),     $now->copy()->endOfDay()],
+            'week'    => [$now->copy()->startOfWeek(),    $now->copy()->endOfWeek()],
+            'month'   => [$now->copy()->startOfMonth(),   $now->copy()->endOfMonth()],
+            'quarter' => [$now->copy()->startOfQuarter(), $now->copy()->endOfQuarter()],
+            'year'    => [$now->copy()->startOfYear(),    $now->copy()->endOfYear()],
+            default   => [$now->copy()->subDays(30)->startOfDay(), $now->copy()->endOfDay()],
+        };
+
+        return [$from, $to];
+    }
+
+    /**
+     * GET /dashboard/reports/leads-by-source
+     * Returns lead counts grouped by source, with percentage of total.
+     */
+    public function reportLeadsBySource(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        [$from, $to] = $this->dateRange($request);
+
+        $query = Lead::query()
+            ->whereBetween('created_at', [$from, $to]);
+
+        if ($user->role === 'agent') {
+            $query->ownedBy($user->id);
+        }
+
+        $rows = $query
+            ->select('source', DB::raw('count(*) as total'))
+            ->groupBy('source')
+            ->orderByDesc('total')
+            ->get();
+
+        $grandTotal = $rows->sum('total');
+
+        $data = $rows->map(function ($row) use ($grandTotal) {
+            return [
+                'source'  => $row->source ?? '',
+                'total'   => (int) $row->total,
+                'percent' => $grandTotal > 0
+                    ? round($row->total / $grandTotal * 100, 2)
+                    : 0.0,
+            ];
+        })->values();
+
+        return response()->json(['success' => true, 'data' => $data]);
+    }
+
+    /**
+     * GET /dashboard/reports/leads-by-agent
+     * Returns lead counts per agent, split into open vs closed.
+     */
+    public function reportLeadsByAgent(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        [$from, $to] = $this->dateRange($request);
+
+        $query = Lead::query()
+            ->whereBetween('created_at', [$from, $to]);
+
+        // Agents only see themselves
+        if ($user->role === 'agent') {
+            $query->ownedBy($user->id);
+        }
+
+        $rows = $query
+            ->select(
+                'assigned_to',
+                DB::raw('count(*) as total'),
+                DB::raw("sum(case when pipeline_stage_id in (
+                    select id from pipeline_stages
+                    where name like '%סגור%' or name like '%לא רלוונטי%'
+                ) then 1 else 0 end) as closed_count")
+            )
+            ->groupBy('assigned_to')
+            ->get();
+
+        // Load user names in one query
+        $userIds = $rows->pluck('assigned_to')->filter()->unique()->values();
+        $users   = User::whereIn('id', $userIds)->get()->keyBy('id');
+
+        $data = $rows->map(function ($row) use ($users) {
+            $total  = (int) $row->total;
+            $closed = (int) $row->closed_count;
+            $u      = $row->assigned_to ? $users->get($row->assigned_to) : null;
+
+            return [
+                'user_id' => $row->assigned_to,
+                'name'    => $u ? $u->name : null,
+                'total'   => $total,
+                'open'    => $total - $closed,
+                'closed'  => $closed,
+            ];
+        })->values();
+
+        return response()->json(['success' => true, 'data' => $data]);
+    }
+
+    /**
+     * GET /dashboard/reports/activities
+     * Returns activity counts grouped by type, scoped through lead ownership for agents.
+     */
+    public function reportActivities(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        [$from, $to] = $this->dateRange($request);
+
+        $query = Activity::query()
+            ->where('entity_type', 'lead')
+            ->whereBetween('activities.created_at', [$from, $to]);
+
+        if ($user->role === 'agent') {
+            // Scope to activities on leads owned by the agent
+            $query->whereIn('entity_id', function ($sub) use ($user) {
+                $sub->select('id')->from('leads')
+                    ->where('assigned_to', $user->id)
+                    ->whereNull('deleted_at');
+            });
+        }
+
+        $rows = $query
+            ->select('type', DB::raw('count(*) as total'))
+            ->groupBy('type')
+            ->orderByDesc('total')
+            ->get();
+
+        $data = $rows->map(fn ($row) => [
+            'type'  => $row->type,
+            'total' => (int) $row->total,
+        ])->values();
+
+        return response()->json(['success' => true, 'data' => $data]);
+    }
+
+    /**
+     * GET /dashboard/reports/conversion
+     * Returns funnel data: leads per pipeline stage ordered by position.
+     */
+    public function reportConversion(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        [$from, $to] = $this->dateRange($request);
+
+        $leadQuery = Lead::query()
+            ->whereBetween('leads.created_at', [$from, $to]);
+
+        if ($user->role === 'agent') {
+            $leadQuery->ownedBy($user->id);
+        }
+
+        $totalEntered = (clone $leadQuery)->count();
+
+        $stages = PipelineStage::orderBy('position')->get();
+
+        $stageCounts = (clone $leadQuery)
+            ->select('pipeline_stage_id', DB::raw('count(*) as total'))
+            ->groupBy('pipeline_stage_id')
+            ->get()
+            ->keyBy('pipeline_stage_id');
+
+        $funnel = $stages->map(function ($stage) use ($stageCounts, $totalEntered) {
+            $total = (int) ($stageCounts->get($stage->id)?->total ?? 0);
+            return [
+                'stage_id' => $stage->id,
+                'name'     => $stage->name,
+                'color'    => $stage->color,
+                'total'    => $total,
+                'rate'     => $totalEntered > 0
+                    ? round($total / $totalEntered * 100, 2)
+                    : 0.0,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'funnel'        => $funnel,
+                'total_entered' => $totalEntered,
+            ],
+        ]);
+    }
+
+    /**
+     * GET /dashboard/reports/export
+     * Streams a CSV download of leads with UTF-8 BOM for Hebrew Excel support.
+     */
+    public function exportLeads(Request $request): StreamedResponse
+    {
+        $user = $request->user();
+        [$from, $to] = $this->dateRange($request);
+
+        $query = Lead::with(['stage:id,name', 'assignedUser:id,name'])
+            ->whereBetween('leads.created_at', [$from, $to]);
+
+        if ($user->role === 'agent') {
+            $query->ownedBy($user->id);
+        }
+
+        $leads    = $query->get();
+        $filename = 'leads-export-' . now()->format('Y-m-d') . '.csv';
+
+        return response()->streamDownload(function () use ($leads) {
+            $out = fopen('php://output', 'w');
+
+            // UTF-8 BOM for Excel Hebrew support
+            fwrite($out, "\xEF\xBB\xBF");
+
+            fputcsv($out, ['id', 'name', 'phone', 'email', 'source', 'stage', 'assigned_to', 'created_at']);
+
+            foreach ($leads as $lead) {
+                fputcsv($out, [
+                    $lead->id,
+                    $lead->name,
+                    $lead->phone,
+                    $lead->email,
+                    $lead->source,
+                    $lead->stage?->name,
+                    $lead->assignedUser?->name,
+                    $lead->created_at?->toDateTimeString(),
+                ]);
+            }
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 }

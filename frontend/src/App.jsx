@@ -11,6 +11,7 @@ import AutomationsPage from './pages/automations/AutomationsPage'
 import FormsPage from './pages/forms/FormsPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import ImportPage from './pages/import/ImportPage'
+import ReportsPage from './pages/reports/ReportsPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -34,6 +35,7 @@ function AppRoutes() {
         <Route path="pipeline"    element={<PipelinePage />} />
         <Route path="contacts"    element={<ContactsPage />} />
         <Route path="import"      element={<ImportPage />} />
+        <Route path="reports"     element={<ReportsPage />} />
         <Route path="automations" element={<AutomationsPage />} />
         <Route path="forms"       element={<FormsPage />} />
         <Route path="settings"    element={<SettingsPage />} />

@@ -179,6 +179,18 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::get('/dashboard/chart-data', [DashboardController::class, 'chartData'])
         ->middleware('permission:reports,can_read');
 
+    // Dashboard — Advanced Reports
+    Route::get('/dashboard/reports/leads-by-source', [DashboardController::class, 'reportLeadsBySource'])
+        ->middleware('permission:reports,can_read');
+    Route::get('/dashboard/reports/leads-by-agent', [DashboardController::class, 'reportLeadsByAgent'])
+        ->middleware('permission:reports,can_read');
+    Route::get('/dashboard/reports/activities', [DashboardController::class, 'reportActivities'])
+        ->middleware('permission:reports,can_read');
+    Route::get('/dashboard/reports/conversion', [DashboardController::class, 'reportConversion'])
+        ->middleware('permission:reports,can_read');
+    Route::get('/dashboard/reports/export', [DashboardController::class, 'exportLeads'])
+        ->middleware('permission:reports,can_read');
+
     // ── PDF / Digital Signature — Protected routes ─────────────────────────
     // Ported from Taskey lead_signature_ajax.php (pdf_sig_v2_send_to_lead_event)
     Route::post('/pdf/token/lead/{lead}', [PdfController::class, 'createToken'])
