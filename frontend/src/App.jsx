@@ -12,6 +12,9 @@ import FormsPage from './pages/forms/FormsPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import ImportPage from './pages/import/ImportPage'
 import ReportsPage from './pages/reports/ReportsPage'
+import LandingPagesPage from './pages/landing-pages/LandingPagesPage'
+import LandingPageEditor from './pages/landing-pages/LandingPageEditor'
+import LandingPagePublicPage from './pages/landing-pages/LandingPagePublicPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -24,6 +27,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* Public landing page — no auth required */}
+      <Route path="/lp/:tenant/:slug" element={<LandingPagePublicPage />} />
       <Route path="/" element={
         <ProtectedRoute>
           <Layout />
@@ -39,6 +44,9 @@ function AppRoutes() {
         <Route path="automations" element={<AutomationsPage />} />
         <Route path="forms"       element={<FormsPage />} />
         <Route path="settings"    element={<SettingsPage />} />
+        <Route path="landing-pages"           element={<LandingPagesPage />} />
+        <Route path="landing-pages/new"       element={<LandingPageEditor />} />
+        <Route path="landing-pages/:id/edit"  element={<LandingPageEditor />} />
       </Route>
     </Routes>
   )

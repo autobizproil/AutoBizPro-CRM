@@ -6,6 +6,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FormController;
 use App\Http\Controllers\IntegrationsController;
+use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\PipelineController;
@@ -15,6 +16,11 @@ use Illuminate\Support\Facades\Route;
 
 // ── Public routes (no auth) ────────────────────────────────────────────────
 Route::post('/auth/login', [AuthController::class, 'login']);
+
+// Landing page builder — public render & form submission
+Route::get('/lp/{tenant}/{slug}',         [LandingPageController::class, 'render']);
+Route::post('/lp/{tenant}/{slug}/submit',  [LandingPageController::class, 'submitForm'])
+    ->middleware('throttle:10,1');
 
 Route::get('/forms/{slug}', [FormController::class, 'showPublic']);
 Route::post('/forms/{slug}/submit', [FormController::class, 'submit'])
@@ -114,6 +120,18 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::put('/forms/{form}', [FormController::class, 'update'])
         ->middleware('permission:forms,can_update');
     Route::delete('/forms/{form}', [FormController::class, 'destroy'])
+        ->middleware('permission:forms,can_delete');
+
+    // Landing pages (management — authenticated)
+    Route::get('/landing-pages', [LandingPageController::class, 'index'])
+        ->middleware('permission:forms,can_read');
+    Route::post('/landing-pages', [LandingPageController::class, 'store'])
+        ->middleware('permission:forms,can_create');
+    Route::get('/landing-pages/{landing_page}', [LandingPageController::class, 'show'])
+        ->middleware('permission:forms,can_read');
+    Route::put('/landing-pages/{landing_page}', [LandingPageController::class, 'update'])
+        ->middleware('permission:forms,can_update');
+    Route::delete('/landing-pages/{landing_page}', [LandingPageController::class, 'destroy'])
         ->middleware('permission:forms,can_delete');
 
     // Users

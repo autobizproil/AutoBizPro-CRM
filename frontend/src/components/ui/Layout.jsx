@@ -9,8 +9,9 @@ const nav = [
   { to: '/pipeline',    icon: '🔀', label: 'פייפליין'   },
   { to: '/import',      icon: '📥', label: 'ייבוא'      },
   { to: '/automations', icon: '⚡', label: 'אוטומציות' },
-  { to: '/forms',       icon: '📝', label: 'טפסים'      },
-  { to: '/settings',    icon: '⚙️',  label: 'הגדרות'    },
+  { to: '/forms',          icon: '📝', label: 'טפסים'       },
+  { to: '/landing-pages',  icon: '🌐', label: 'דפי נחיתה'  },
+  { to: '/settings',       icon: '⚙️',  label: 'הגדרות'     },
 ]
 
 export default function Layout() {
