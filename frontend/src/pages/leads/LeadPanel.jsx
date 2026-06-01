@@ -12,7 +12,7 @@ const ACTIVITY_TYPES = {
   meeting:      { label: 'פגישה', icon: '🤝', color: '#f59e0b' },
   note:         { label: 'הערה',  icon: '📝', color: '#6b7280' },
   task:         { label: 'משימה', icon: '✅', color: '#0ea5e9' },
-  stage_change: { label: 'שינוי שלב', icon: '🔀', color: '#6366f1' },
+  stage_change: { label: 'שינוי שלב', icon: '🔀', color: '#2398c2' },
 }
 
 function timeAgo(iso) {
@@ -178,10 +178,10 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
           <>
             {/* Header */}
             <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between"
-              style={{ borderTop: `4px solid ${lead.stage?.color ?? '#6366f1'}` }}>
+              style={{ borderTop: `4px solid ${lead.stage?.color ?? '#2398c2'}` }}>
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold flex-shrink-0"
-                  style={{ backgroundColor: lead.stage?.color ?? '#6366f1' }}>
+                  style={{ backgroundColor: lead.stage?.color ?? '#2398c2' }}>
                   {lead.name?.[0] ?? '?'}
                 </div>
                 <div className="min-w-0">
@@ -283,7 +283,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                       className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
                   </div>
                   <button type="submit" disabled={!activityBody.trim() || addActivity.isPending}
-                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-sm font-medium w-full">
+                    className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-sm font-medium w-full">
                     {addActivity.isPending ? 'שומר...' : 'הוסף לתיעוד'}
                   </button>
                 </form>
@@ -371,7 +371,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={addItem} className="mt-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium">+ הוסף פריט</button>
+                <button type="button" onClick={addItem} className="mt-2 text-[#2398c2] hover:text-[#1d7fa3] text-sm font-medium">+ הוסף פריט</button>
               </div>
               <div className="text-left text-sm font-semibold text-gray-700">סה"כ: ₪{invTotal.toLocaleString('he-IL')}</div>
               <div className="flex gap-2 pt-1">
@@ -493,7 +493,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={addYeshItem} className="mt-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium">+ הוסף פריט</button>
+                <button type="button" onClick={addYeshItem} className="mt-2 text-[#2398c2] hover:text-[#1d7fa3] text-sm font-medium">+ הוסף פריט</button>
               </div>
               <div className="text-left text-sm font-semibold text-gray-700">סה"כ: ₪{yeshTotal.toLocaleString('he-IL')}</div>
               <div className="flex gap-2 pt-1">
@@ -580,7 +580,7 @@ function EditableDetail({ label, value, onChange, onBlur, disabled, type = 'text
     <div className="flex items-center justify-between gap-2">
       <span className="text-xs text-gray-500 flex-shrink-0">{label}</span>
       <input type={type} value={value} onChange={onChange} onBlur={onBlur} disabled={disabled}
-        className="text-sm text-gray-800 text-left border border-transparent hover:border-gray-200 focus:border-indigo-300 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60"
+        className="text-sm text-gray-800 text-left border border-transparent hover:border-gray-200 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60"
         placeholder="—" />
     </div>
   )
