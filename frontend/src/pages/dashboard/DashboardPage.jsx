@@ -70,20 +70,20 @@ export default function DashboardPage() {
     <div dir="rtl">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">דשבורד</h1>
-        <p className="text-sm text-gray-500 mt-1">סקירה כללית של המערכת</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">דשבורד</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">סקירה כללית של המערכת</p>
       </div>
 
       {/* Period selector */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-gray-100 dark:bg-gray-700 rounded-xl p-1 w-fit">
         {PERIODS.map(p => (
           <button
             key={p.value}
             onClick={() => setPeriod(p.value)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
               period === p.value
-                ? 'bg-white text-[#2398c2] shadow-sm'
-                : 'text-gray-500 hover:text-gray-800'
+                ? 'bg-white dark:bg-gray-800 text-[#2398c2] shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
             }`}
           >
             {p.label}
@@ -94,13 +94,13 @@ export default function DashboardPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {cards.map(({ label, value, icon, color, strip }) => (
-          <div key={label} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+          <div key={label} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
             <div className="h-1 w-full" style={{ backgroundColor: strip }} />
             <div className="p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">{label}</p>
-                  <p className="text-3xl font-bold text-gray-900">{value.toLocaleString('he-IL')}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{label}</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{value.toLocaleString('he-IL')}</p>
                 </div>
                 <span className={`text-xl p-2 rounded-lg ${colorMap[color]}`}>{icon}</span>
               </div>
@@ -112,8 +112,8 @@ export default function DashboardPage() {
       {/* Charts row */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
         {/* Line chart — leads over time */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <h3 className="font-semibold text-gray-800 mb-4">לידים לאורך זמן</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4">לידים לאורך זמן</h3>
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -151,8 +151,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Horizontal bar chart — leads by source */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <h3 className="font-semibold text-gray-800 mb-4">לידים לפי מקור</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4">לידים לפי מקור</h3>
           {sourceData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart
@@ -192,16 +192,16 @@ export default function DashboardPage() {
       {/* Bottom row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Leads by stage */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <h3 className="font-semibold text-gray-800 mb-4">לידים לפי שלב</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4">לידים לפי שלב</h3>
           <div className="space-y-3">
             {(stats?.leads_by_stage ?? []).map((item) => (
               <div key={item.pipeline_stage_id} className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full flex-shrink-0"
                   style={{ backgroundColor: item.stage?.color ?? '#6366f1' }} />
-                <span className="text-sm text-gray-600 flex-1">{item.stage?.name ?? 'ללא שלב'}</span>
-                <span className="font-semibold text-gray-900 text-sm">{item.total}</span>
-                <div className="w-24 bg-gray-100 rounded-full h-1.5">
+                <span className="text-sm text-gray-600 dark:text-gray-300 flex-1">{item.stage?.name ?? 'ללא שלב'}</span>
+                <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{item.total}</span>
+                <div className="w-24 bg-gray-100 dark:bg-gray-600 rounded-full h-1.5">
                   <div className="h-1.5 rounded-full"
                     style={{
                       backgroundColor: item.stage?.color ?? '#6366f1',
@@ -217,18 +217,18 @@ export default function DashboardPage() {
         </div>
 
         {/* Recent leads */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <h3 className="font-semibold text-gray-800 mb-4">לידים אחרונים</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4">לידים אחרונים</h3>
           <div className="space-y-2">
             {recent.map(lead => (
-              <div key={lead.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+              <div key={lead.id} className="flex items-center gap-3 py-2 border-b border-gray-50 dark:border-gray-700 last:border-0">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                  style={{ backgroundColor: lead.stage?.color ?? '#6366f1' }}>
+                  style={{ backgroundColor: lead.stage?.color ?? '#2398c2' }}>
                   {lead.name[0]}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{lead.name}</p>
-                  <p className="text-xs text-gray-500">{lead.phone ?? lead.email ?? '—'}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{lead.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{lead.phone ?? lead.email ?? '—'}</p>
                 </div>
                 {lead.stage && (
                   <span className="inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 whitespace-nowrap flex-shrink-0"

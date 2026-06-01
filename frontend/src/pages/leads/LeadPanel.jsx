@@ -171,13 +171,13 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed top-0 left-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col" dir="rtl">
+      <div className="fixed top-0 left-0 h-full w-full max-w-md bg-white dark:bg-gray-800 shadow-2xl z-50 flex flex-col" dir="rtl">
         {isLoading || !lead ? (
           <div className="flex items-center justify-center h-full text-gray-400">טוען...</div>
         ) : (
           <>
             {/* Header */}
-            <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between"
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-start justify-between"
               style={{ borderTop: `4px solid ${lead.stage?.color ?? '#2398c2'}` }}>
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold flex-shrink-0"
@@ -185,8 +185,8 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   {lead.name?.[0] ?? '?'}
                 </div>
                 <div className="min-w-0">
-                  <h2 className="font-bold text-gray-900 text-lg truncate">{lead.name}</h2>
-                  <p className="text-xs text-gray-400">נוצר {new Date(lead.created_at).toLocaleDateString('he-IL')}</p>
+                  <h2 className="font-bold text-gray-900 dark:text-gray-100 text-lg truncate">{lead.name}</h2>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">נוצר {new Date(lead.created_at).toLocaleDateString('he-IL')}</p>
                 </div>
               </div>
               <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
