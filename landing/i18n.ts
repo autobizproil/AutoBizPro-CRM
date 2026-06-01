@@ -3,9 +3,11 @@ import { getRequestConfig } from 'next-intl/server'
 
 const LOCALES = ['he', 'en'] as const
 
-export default getRequestConfig(async ({ locale }) => {
+export default getRequestConfig(async ({ requestLocale }) => {
+  const locale = await requestLocale ?? 'he'
   if (!LOCALES.includes(locale as (typeof LOCALES)[number])) notFound()
   return {
+    locale,
     messages: (await import(`./messages/${locale}.json`)).default,
   }
 })
