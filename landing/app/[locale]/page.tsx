@@ -1,3 +1,4 @@
+import { setRequestLocale } from 'next-intl/server'
 import Navbar from '@/components/Navbar'
 import Hero from '@/components/Hero'
 import SocialProof from '@/components/SocialProof'
@@ -6,7 +7,9 @@ import Pricing from '@/components/Pricing'
 import CtaSection from '@/components/CtaSection'
 import Footer from '@/components/Footer'
 
-export default function Page() {
+export default function Page({ params: { locale } }: { params: { locale: string } }) {
+  setRequestLocale(locale)
+
   return (
     <main className="bg-bg">
       <Navbar />

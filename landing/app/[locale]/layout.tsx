@@ -2,7 +2,7 @@
 import type { Metadata } from 'next'
 import { Inter, Heebo } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
-import { getMessages } from 'next-intl/server'
+import { getMessages, setRequestLocale } from 'next-intl/server'
 import '../globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
@@ -34,6 +34,8 @@ export default async function LocaleLayout({
   children: React.ReactNode
   params: { locale: string }
 }) {
+  // Enable static rendering for next-intl (avoids headers() calls)
+  setRequestLocale(locale)
   const messages = await getMessages()
   const dir = locale === 'he' ? 'rtl' : 'ltr'
 
