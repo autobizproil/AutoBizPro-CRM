@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* RTL base */
+* {
+  box-sizing: border-box;
+}
