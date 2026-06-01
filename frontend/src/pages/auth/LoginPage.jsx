@@ -26,12 +26,15 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center" dir="rtl">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 w-full max-w-sm">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[#2398c2] flex items-center justify-center text-white font-bold text-sm">A</div>
-          <span className="font-bold text-gray-800 text-lg">AutoBizPro</span>
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 w-full max-w-sm">
+        <div className="flex flex-col items-center gap-1 mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-9 h-9 rounded-xl bg-[#2398c2] flex items-center justify-center text-white font-bold text-base">A</div>
+            <span className="font-bold text-gray-900 text-xl">AutoBizPro</span>
+          </div>
+          <p className="text-sm text-gray-400 tracking-wide">מערכת CRM מתקדמת</p>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">כניסה למערכת</h1>
+        <h1 className="text-xl font-semibold text-gray-800 mb-6 text-center">כניסה למערכת</h1>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -46,7 +49,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]"
+              className="w-full border border-gray-300 rounded-lg h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               required
             />
           </div>
@@ -56,14 +59,14 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]"
+              className="w-full border border-gray-300 rounded-lg h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               required
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#2398c2] text-white rounded-lg py-2 text-sm font-medium hover:bg-[#1d7fa3] disabled:opacity-50 transition-colors"
+            className="w-full bg-[#2398c2] text-white rounded-lg h-11 text-sm font-semibold hover:bg-[#1d7fa3] disabled:opacity-50 transition-colors"
           >
             {loading ? 'מתחבר...' : 'כניסה'}
           </button>

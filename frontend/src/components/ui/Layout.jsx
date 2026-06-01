@@ -33,12 +33,13 @@ export default function Layout() {
               key={to}
               to={to}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors ${
                   isActive
                     ? 'bg-[#2398c2]/10 text-[#2398c2]'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`
               }
+              style={{ fontSize: '13px' }}
             >
               <span className="text-base leading-none">{icon}</span>
               <span>{label}</span>

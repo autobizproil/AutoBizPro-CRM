@@ -84,7 +84,7 @@ export default function LeadsPage() {
           )}
           {can('leads', 'can_create') && (
             <button onClick={() => setModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
+              className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
               <span className="text-lg leading-none">+</span> {t('lead')} חדש
             </button>
           )}
@@ -95,9 +95,9 @@ export default function LeadsPage() {
       <div className="flex gap-3 mb-4">
         <input type="text" placeholder={`🔍  חיפוש ${t('lead')}...`}
           value={search} onChange={e => setSearch(e.target.value)}
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
         <select value={stageFilter} onChange={e => setStage(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2] bg-white">
           <option value="">כל ה{t('stage')}ים</option>
           {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
@@ -105,10 +105,10 @@ export default function LeadsPage() {
 
       {/* Bulk toolbar */}
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 mb-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5">
-          <span className="text-sm font-medium text-indigo-700">{selected.size} נבחרו</span>
+        <div className="flex items-center gap-3 mb-3 bg-[#2398c2]/5 border border-[#2398c2]/20 rounded-lg px-4 py-2.5">
+          <span className="text-sm font-medium text-[#2398c2]">{selected.size} נבחרו</span>
           <select onChange={e => { if (e.target.value) runBulk('change_stage', Number(e.target.value)); e.target.value = '' }}
-            className="border border-indigo-200 rounded-lg px-2 py-1 text-sm bg-white" defaultValue="">
+            className="border border-[#2398c2]/20 rounded-lg px-2 py-1 text-sm bg-white" defaultValue="">
             <option value="" disabled>שנה {t('stage')}...</option>
             {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -129,11 +129,11 @@ export default function LeadsPage() {
                 <input type="checkbox" checked={leads.length > 0 && selected.size === leads.length} onChange={toggleAll}
                   className="rounded border-gray-300" />
               </th>
-              <th className="px-4 py-3 font-medium text-gray-500">{t('lead')}</th>
-              <th className="px-4 py-3 font-medium text-gray-500">טלפון</th>
-              <th className="px-4 py-3 font-medium text-gray-500">{t('source')}</th>
-              <th className="px-4 py-3 font-medium text-gray-500">{t('stage')}</th>
-              <th className="px-4 py-3 font-medium text-gray-500">תאריך</th>
+              <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('lead')}</th>
+              <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">טלפון</th>
+              <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('source')}</th>
+              <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('stage')}</th>
+              <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">תאריך</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -144,32 +144,45 @@ export default function LeadsPage() {
               </td></tr>
             )}
             {leads.map(lead => (
-              <tr key={lead.id} className={`hover:bg-indigo-50/40 transition-colors ${selected.has(lead.id) ? 'bg-indigo-50/60' : ''}`}>
-                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+              <tr key={lead.id} className={`border-b border-gray-100 transition-colors duration-100 ${selected.has(lead.id) ? 'bg-[#2398c2]/5' : 'hover:bg-gray-50/80'}`}>
+                <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
                   <input type="checkbox" checked={selected.has(lead.id)} onChange={() => toggle(lead.id)}
                     className="rounded border-gray-300" />
                 </td>
-                <td className="px-4 py-3 cursor-pointer" onClick={() => setPanelId(lead.id)}>
+                <td className="px-4 py-2.5 cursor-pointer" onClick={() => setPanelId(lead.id)}>
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                      style={{ backgroundColor: lead.stage?.color ?? '#6366f1' }}>{lead.name[0]}</div>
-                    <span className="font-medium text-gray-900">{lead.name}</span>
+                      style={{ backgroundColor: lead.stage?.color ?? '#2398c2' }}>{lead.name[0]}</div>
+                    <span className="font-medium text-gray-900 text-sm">{lead.name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {lead.phone ? <a href={`tel:${lead.phone}`} className="hover:text-indigo-600" onClick={e => e.stopPropagation()}>{lead.phone}</a> : <span className="text-gray-300">—</span>}
+                <td className="px-4 py-2.5 text-sm text-gray-700">
+                  {lead.phone ? <a href={`tel:${lead.phone}`} className="hover:text-[#2398c2]" onClick={e => e.stopPropagation()}>{lead.phone}</a> : <span className="text-gray-300">—</span>}
                 </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{lead.source || <span className="text-gray-300">—</span>}</td>
-                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                  <select value={lead.pipeline_stage_id ?? ''} disabled={!canEdit}
-                    onChange={e => changeStage.mutate({ leadId: lead.id, stageId: Number(e.target.value) })}
-                    className="text-xs rounded-full px-2 py-1 border-0 font-medium text-white cursor-pointer disabled:cursor-default appearance-none"
-                    style={{ backgroundColor: lead.stage?.color ?? '#9ca3af' }}>
-                    <option value="" className="text-gray-700 bg-white">ללא שלב</option>
-                    {stages.map(s => <option key={s.id} value={s.id} className="text-gray-700 bg-white">{s.name}</option>)}
-                  </select>
+                <td className="px-4 py-2.5 text-sm text-gray-500">{lead.source || <span className="text-gray-300">—</span>}</td>
+                <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                  {lead.stage ? (
+                    <select value={lead.pipeline_stage_id ?? ''} disabled={!canEdit}
+                      onChange={e => changeStage.mutate({ leadId: lead.id, stageId: Number(e.target.value) })}
+                      className="inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 whitespace-nowrap border cursor-pointer disabled:cursor-default appearance-none"
+                      style={{
+                        backgroundColor: `${lead.stage.color}18`,
+                        color: lead.stage.color,
+                        borderColor: `${lead.stage.color}40`,
+                      }}>
+                      <option value="" className="text-gray-700 bg-white">ללא שלב</option>
+                      {stages.map(s => <option key={s.id} value={s.id} className="text-gray-700 bg-white">{s.name}</option>)}
+                    </select>
+                  ) : (
+                    <select value="" disabled={!canEdit}
+                      onChange={e => changeStage.mutate({ leadId: lead.id, stageId: Number(e.target.value) })}
+                      className="inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 whitespace-nowrap border border-gray-200 bg-gray-100 text-gray-500 cursor-pointer disabled:cursor-default appearance-none">
+                      <option value="" className="text-gray-700 bg-white">ללא שלב</option>
+                      {stages.map(s => <option key={s.id} value={s.id} className="text-gray-700 bg-white">{s.name}</option>)}
+                    </select>
+                  )}
                 </td>
-                <td className="px-4 py-3 text-gray-400 text-xs cursor-pointer" onClick={() => setPanelId(lead.id)}>
+                <td className="px-4 py-2.5 text-gray-400 text-xs cursor-pointer" onClick={() => setPanelId(lead.id)}>
                   {new Date(lead.created_at).toLocaleDateString('he-IL')}
                 </td>
               </tr>
@@ -194,32 +207,32 @@ export default function LeadsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">שם <span className="text-red-500">*</span></label>
                 <input required value={form.name} onChange={set('name')} placeholder={`שם ה${t('lead')}`}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">טלפון</label>
                   <input value={form.phone} onChange={set('phone')} type="tel" placeholder="05X-XXXXXXX"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">אימייל</label>
                   <input value={form.email} onChange={set('email')} type="email" placeholder="email@..."
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t('source')}</label>
                   <select value={form.source} onChange={set('source')}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]">
                     {SOURCES.map(s => <option key={s} value={s}>{s || `בחר ${t('source')}`}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t('stage')}</label>
                   <select value={form.pipeline_stage_id} onChange={set('pipeline_stage_id')}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]">
                     <option value="">בחר {t('stage')}</option>
                     {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
@@ -228,11 +241,11 @@ export default function LeadsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">הערות</label>
                 <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="הערות נוספות..."
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={saving}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
+                  className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
                   {saving ? 'שומר...' : `הוסף ${t('lead')}`}
                 </button>
                 <button type="button" onClick={() => setModal(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">ביטול</button>

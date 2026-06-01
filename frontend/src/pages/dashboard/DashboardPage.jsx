@@ -58,10 +58,10 @@ export default function DashboardPage() {
   const sourceData = Array.isArray(sourceRaw) ? sourceRaw : []
 
   const cards = [
-    { label: 'סה״כ לידים',   value: stats?.total_leads   ?? 0, icon: '👥', color: 'indigo' },
-    { label: 'לידים היום',   value: stats?.new_leads      ?? 0, icon: '🆕', color: 'green'  },
-    { label: 'אנשי קשר',     value: stats?.total_contacts ?? 0, icon: '📋', color: 'blue'   },
-    { label: 'לידים פתוחים', value: stats?.open_leads     ?? 0, icon: '🔓', color: 'amber'  },
+    { label: 'סה״כ לידים',   value: stats?.total_leads   ?? 0, icon: '👥', color: 'indigo', strip: '#2398c2' },
+    { label: 'לידים היום',   value: stats?.new_leads      ?? 0, icon: '🆕', color: 'green',  strip: '#22c55e' },
+    { label: 'אנשי קשר',     value: stats?.total_contacts ?? 0, icon: '📋', color: 'blue',   strip: '#3b82f6' },
+    { label: 'לידים פתוחים', value: stats?.open_leads     ?? 0, icon: '🔓', color: 'amber',  strip: '#f59e0b' },
   ]
 
   const colorMap = { indigo: 'text-[#2398c2] bg-[#2398c2]/10', green: 'text-green-600 bg-green-50', blue: 'text-blue-600 bg-blue-50', amber: 'text-amber-600 bg-amber-50' }
@@ -93,14 +93,17 @@ export default function DashboardPage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {cards.map(({ label, value, icon, color }) => (
-          <div key={label} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">{label}</p>
-                <p className="text-3xl font-bold text-gray-900">{value.toLocaleString('he-IL')}</p>
+        {cards.map(({ label, value, icon, color, strip }) => (
+          <div key={label} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+            <div className="h-1 w-full" style={{ backgroundColor: strip }} />
+            <div className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">{label}</p>
+                  <p className="text-3xl font-bold text-gray-900">{value.toLocaleString('he-IL')}</p>
+                </div>
+                <span className={`text-xl p-2 rounded-lg ${colorMap[color]}`}>{icon}</span>
               </div>
-              <span className={`text-xl p-2 rounded-lg ${colorMap[color]}`}>{icon}</span>
             </div>
           </div>
         ))}
@@ -228,8 +231,12 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-500">{lead.phone ?? lead.email ?? '—'}</p>
                 </div>
                 {lead.stage && (
-                  <span className="text-xs px-2 py-0.5 rounded-full text-white flex-shrink-0"
-                    style={{ backgroundColor: lead.stage.color }}>
+                  <span className="inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 whitespace-nowrap flex-shrink-0"
+                    style={{
+                      backgroundColor: `${lead.stage.color}18`,
+                      color: lead.stage.color,
+                      border: `1px solid ${lead.stage.color}40`,
+                    }}>
                     {lead.stage.name}
                   </span>
                 )}
