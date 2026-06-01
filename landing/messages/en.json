@@ -1,0 +1,56 @@
+{
+  "nav": {
+    "features": "Features",
+    "pricing": "Pricing",
+    "contact": "Contact",
+    "cta": "Start Free Trial"
+  },
+  "hero": {
+    "badge": "CRM + Automations for Business",
+    "headline": "Manage clients, automations & sales — all in one place",
+    "subtitle": "A smart platform that saves time, grows sales, and streamlines your business",
+    "cta_primary": "Start Free Trial",
+    "cta_secondary": "Contact Us"
+  },
+  "social": {
+    "text": "Trusted by 500+ businesses",
+    "rating": "Rated 4.9 ★★★★★"
+  },
+  "features": {
+    "section_label": "Features",
+    "section_title": "Everything you need to run your business",
+    "leads_title": "Lead Management",
+    "leads_desc": "Smart sales pipeline with automatic tracking",
+    "automations_title": "Automations",
+    "automations_desc": "Automated workflows, messages & tasks",
+    "customers_title": "Customer Management",
+    "customers_desc": "Full history, tags & segmentation",
+    "integrations_title": "Integrations",
+    "integrations_desc": "WhatsApp, Gmail, Zapier and more"
+  },
+  "pricing": {
+    "section_label": "Pricing",
+    "section_title": "Simple, transparent pricing",
+    "crm_name": "CRM",
+    "crm_price": "₪80",
+    "crm_period": "per user / month",
+    "crm_desc": "Lead management, customers & reports",
+    "crm_cta": "Start Trial",
+    "auto_name": "Automations",
+    "auto_price": "Custom",
+    "auto_desc": "Workflows tailored to your business",
+    "auto_cta": "Contact Us"
+  },
+  "cta": {
+    "headline": "Ready to start?",
+    "subtitle": "Join 500+ businesses already growing with AutoBizPro",
+    "button": "Start Free Trial — No Credit Card Required"
+  },
+  "footer": {
+    "tagline": "CRM & Automations for smart businesses",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "contact": "Contact",
+    "copyright": "© 2026 AutoBizPro. All rights reserved."
+  }
+}

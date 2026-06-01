@@ -1,0 +1,56 @@
+{
+  "nav": {
+    "features": "יתרונות",
+    "pricing": "מחירים",
+    "contact": "צור קשר",
+    "cta": "התחל ניסיון"
+  },
+  "hero": {
+    "badge": "CRM + אוטומציות לעסקים",
+    "headline": "נהל לקוחות, אוטומציות ומכירות — ממקום אחד",
+    "subtitle": "פלטפורמה חכמה שחוסכת זמן, מגדילה מכירות ומייעלת את העסק שלך",
+    "cta_primary": "התחל ניסיון חינמי",
+    "cta_secondary": "צור קשר"
+  },
+  "social": {
+    "text": "500+ עסקים סומכים עלינו",
+    "rating": "דירוג 4.9 ★★★★★"
+  },
+  "features": {
+    "section_label": "יתרונות",
+    "section_title": "כל מה שצריך לנהל עסק",
+    "leads_title": "ניהול לידים",
+    "leads_desc": "פייפליין מכירות חכם עם מעקב אוטומטי",
+    "automations_title": "אוטומציות",
+    "automations_desc": "Workflow אוטומטי, הודעות ומשימות",
+    "customers_title": "ניהול לקוחות",
+    "customers_desc": "היסטוריה מלאה, תיוגים וסגמנטציה",
+    "integrations_title": "אינטגרציות",
+    "integrations_desc": "WhatsApp, Gmail, Zapier ועוד"
+  },
+  "pricing": {
+    "section_label": "מחירים",
+    "section_title": "תמחור פשוט וברור",
+    "crm_name": "CRM",
+    "crm_price": "₪80",
+    "crm_period": "למשתמש / חודש",
+    "crm_desc": "ניהול לידים, לקוחות ודוחות",
+    "crm_cta": "התחל ניסיון",
+    "auto_name": "אוטומציות",
+    "auto_price": "Custom",
+    "auto_desc": "Workflow מותאם לעסק שלך",
+    "auto_cta": "צור קשר"
+  },
+  "cta": {
+    "headline": "מוכן להתחיל?",
+    "subtitle": "הצטרף ל-500+ עסקים שכבר צומחים עם AutoBizPro",
+    "button": "התחל ניסיון חינמי — ללא כרטיס אשראי"
+  },
+  "footer": {
+    "tagline": "CRM ואוטומציות לעסקים חכמים",
+    "privacy": "פרטיות",
+    "terms": "תנאי שימוש",
+    "contact": "צור קשר",
+    "copyright": "© 2026 AutoBizPro. כל הזכויות שמורות."
+  }
+}
