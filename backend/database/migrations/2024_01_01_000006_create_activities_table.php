@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('entity_type'); // 'lead' | 'contact'
             $table->unsignedBigInteger('entity_id');
-            $table->enum('type', ['call', 'note', 'email', 'meeting', 'task']);
+            $table->enum('type', ['call', 'note', 'email', 'meeting', 'task', 'whatsapp', 'payment']);
             $table->text('body')->nullable();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->timestamps();

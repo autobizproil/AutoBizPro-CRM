@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useLead, useLeadActivities, useUpdateLead, useAddLeadActivity } from '../../hooks/useLeads'
 import { useWhatsappTemplates } from '../../hooks/useWhatsapp'
 import { renderTemplate, waLink } from '../../api/whatsapp'
@@ -30,6 +30,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
   const updateLead                  = useUpdateLead()
   const addActivity                 = useAddLeadActivity()
   const { data: templates = [] }    = useWhatsappTemplates()
+  const qc                          = useQueryClient()
 
   const [edit, setEdit]       = useState({})
   const [activityType, setAT] = useState('call')
@@ -40,15 +41,57 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
   const [invItems, setInvItems] = useState([{ description: '', price: '', quantity: 1 }])
   const [invTaxId, setInvTaxId] = useState('')
 
+  // --- Cardcom modal state ---
+  const [showCardcom, setShowCardcom]         = useState(false)
+  const [cardcomAmount, setCardcomAmount]     = useState('')
+  const [cardcomDesc, setCardcomDesc]         = useState('')
+
+  // --- Yesh Invoice modal state ---
+  const [showYesh, setShowYesh]               = useState(false)
+  const [yeshType, setYeshType]               = useState(400)
+  const [yeshItems, setYeshItems]             = useState([{ description: '', price: '', quantity: 1 }])
+  const [yeshTaxId, setYeshTaxId]             = useState('')
+
+  // --- PDF modal state ---
+  const [showPdf, setShowPdf]                 = useState(false)
+  const [pdfSignUrl, setPdfSignUrl]           = useState('')
+
   const createInvoice = useMutation({
     mutationFn: (payload) => integrationsApi.greenInvoiceCreate(leadId, payload).then(r => r.data),
+  })
+
+  const cardcomCreatePage = useMutation({
+    mutationFn: (payload) => integrationsApi.cardcomCreatePage(leadId, payload).then(r => r.data),
+    onSuccess: (data) => {
+      if (data?.success && data?.data?.url) window.open(data.data.url, '_blank')
+    },
+  })
+
+  const yeshCreateInvoice = useMutation({
+    mutationFn: (payload) => integrationsApi.yeshInvoiceCreate(leadId, payload).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lead-activities', leadId] })
+    },
+  })
+
+  const pdfCreateToken = useMutation({
+    mutationFn: () => integrationsApi.pdfCreateToken(leadId).then(r => r.data),
+    onSuccess: (data) => {
+      if (data?.url) setPdfSignUrl(data.url)
+    },
   })
 
   // Reset local edit state when switching leads
   useEffect(() => {
     setEdit({}); setAB(''); setShowTemplates(false)
     setShowInvoice(false); setInvItems([{ description: '', price: '', quantity: 1 }]); setInvTaxId('')
+    setShowCardcom(false); setCardcomAmount(''); setCardcomDesc('')
+    setShowYesh(false); setYeshItems([{ description: '', price: '', quantity: 1 }]); setYeshTaxId('')
+    setShowPdf(false); setPdfSignUrl('')
     createInvoice.reset()
+    cardcomCreatePage.reset()
+    yeshCreateInvoice.reset()
+    pdfCreateToken.reset()
   }, [leadId])
 
   if (!leadId) return null
@@ -90,6 +133,36 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
     if (!items.length) return
     const res = await createInvoice.mutateAsync({ type: invType, items, tax_id: invTaxId || undefined })
     if (res?.success && res.data?.url) window.open(res.data.url, '_blank')
+  }
+
+  // Cardcom helpers
+  const submitCardcom = async (e) => {
+    e.preventDefault()
+    if (!cardcomAmount || Number(cardcomAmount) < 1) return
+    cardcomCreatePage.mutate({ amount: Number(cardcomAmount), description: cardcomDesc })
+  }
+
+  // Yesh Invoice helpers
+  const yeshTotal = yeshItems.reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0)
+  const setYeshItem = (i, key) => (e) => setYeshItems(items => items.map((it, idx) => idx === i ? { ...it, [key]: e.target.value } : it))
+  const addYeshItem = () => setYeshItems(items => [...items, { description: '', price: '', quantity: 1 }])
+  const removeYeshItem = (i) => setYeshItems(items => items.filter((_, idx) => idx !== i))
+
+  const submitYesh = async (e) => {
+    e.preventDefault()
+    const items = yeshItems
+      .filter(it => it.description.trim() && Number(it.price) > 0)
+      .map(it => ({ description: it.description, price: Number(it.price), quantity: Number(it.quantity) || 1 }))
+    if (!items.length) return
+    await yeshCreateInvoice.mutateAsync({ type: yeshType, items, tax_id: yeshTaxId || undefined })
+  }
+
+  // PDF helpers
+  const handlePdfSign = () => {
+    setPdfSignUrl('')
+    pdfCreateToken.reset()
+    setShowPdf(true)
+    pdfCreateToken.mutate()
   }
 
   return (
@@ -153,6 +226,24 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 <button onClick={() => setShowInvoice(true)}
                   className="flex-1 flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 py-2 rounded-lg text-sm font-medium transition-colors">
                   🧾 חשבונית
+                </button>
+              )}
+              {canEdit && lead?.name && (
+                <button onClick={() => { setShowCardcom(true); cardcomCreatePage.reset() }}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 py-2 rounded-lg text-sm font-medium transition-colors">
+                  💳 תשלום
+                </button>
+              )}
+              {canEdit && (
+                <button onClick={() => { setShowYesh(true); yeshCreateInvoice.reset() }}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 py-2 rounded-lg text-sm font-medium transition-colors">
+                  🧾 Yesh
+                </button>
+              )}
+              {canEdit && (
+                <button onClick={handlePdfSign}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 py-2 rounded-lg text-sm font-medium transition-colors">
+                  ✍️ חתימה
                 </button>
               )}
             </div>
@@ -291,6 +382,183 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 <button type="button" onClick={() => setShowInvoice(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">סגור</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Cardcom payment modal */}
+      {showCardcom && lead && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowCardcom(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900">💳 שליחת עמוד תשלום — {lead.name}</h2>
+              <button onClick={() => setShowCardcom(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+            <form onSubmit={submitCardcom} className="px-6 py-4 space-y-4">
+              {cardcomCreatePage.isError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">
+                  {cardcomCreatePage.error?.response?.data?.message ?? 'שגיאה ביצירת עמוד התשלום — בדוק הגדרות Cardcom'}
+                </div>
+              )}
+              {cardcomCreatePage.data?.success && (
+                <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-3 py-2 rounded-lg">
+                  ✓ עמוד תשלום נוצר בהצלחה — הקישור נפתח בחלון חדש
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">סכום לתשלום (₪)</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={cardcomAmount}
+                  onChange={e => setCardcomAmount(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="הכנס סכום..."
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">תיאור</label>
+                <input
+                  type="text"
+                  value={cardcomDesc}
+                  onChange={e => setCardcomDesc(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="תיאור העסקה..."
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={cardcomCreatePage.isPending || !cardcomAmount || Number(cardcomAmount) < 1}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
+                  {cardcomCreatePage.isPending ? 'יוצר...' : 'צור עמוד תשלום'}
+                </button>
+                <button type="button" onClick={() => setShowCardcom(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">סגור</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Yesh Invoice modal */}
+      {showYesh && lead && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowYesh(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900">🧾 Yesh Invoice — {lead.name}</h2>
+              <button onClick={() => setShowYesh(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+            <form onSubmit={submitYesh} className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
+              {yeshCreateInvoice.isError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">
+                  {yeshCreateInvoice.error?.response?.data?.message ?? 'שגיאה בהפקת המסמך — בדוק חיבור Yesh Invoice בהגדרות'}
+                </div>
+              )}
+              {yeshCreateInvoice.data?.success && (
+                <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-3 py-2 rounded-lg">
+                  ✓ הופק מסמך בהצלחה
+                  {yeshCreateInvoice.data?.data?.url && (
+                    <> — <a href={yeshCreateInvoice.data.data.url} target="_blank" rel="noreferrer" className="underline">הורד PDF</a></>
+                  )}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">סוג מסמך</label>
+                  <select value={yeshType} onChange={e => setYeshType(Number(e.target.value))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    {GI_DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ח.פ / ת.ז (אופציונלי)</label>
+                  <input value={yeshTaxId} onChange={e => setYeshTaxId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="—" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">פריטים</label>
+                <div className="space-y-2">
+                  {yeshItems.map((it, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input value={it.description} onChange={setYeshItem(i, 'description')} placeholder="תיאור"
+                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                      <input value={it.price} onChange={setYeshItem(i, 'price')} type="number" step="0.01" placeholder="מחיר"
+                        className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                      <input value={it.quantity} onChange={setYeshItem(i, 'quantity')} type="number" placeholder="כמות"
+                        className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm" />
+                      {yeshItems.length > 1 && (
+                        <button type="button" onClick={() => removeYeshItem(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addYeshItem} className="mt-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium">+ הוסף פריט</button>
+              </div>
+              <div className="text-left text-sm font-semibold text-gray-700">סה"כ: ₪{yeshTotal.toLocaleString('he-IL')}</div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={yeshCreateInvoice.isPending || yeshTotal <= 0}
+                  className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
+                  {yeshCreateInvoice.isPending ? 'מפיק...' : 'הפק מסמך'}
+                </button>
+                <button type="button" onClick={() => setShowYesh(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">סגור</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Signature modal */}
+      {showPdf && lead && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowPdf(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-gray-900">✍️ חתימה דיגיטלית — {lead.name}</h2>
+              <button onClick={() => setShowPdf(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              {pdfCreateToken.isPending && (
+                <div className="text-sm text-gray-500 text-center py-4">יוצר קישור לחתימה...</div>
+              )}
+              {pdfCreateToken.isError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">
+                  {pdfCreateToken.error?.response?.data?.message ?? 'שגיאה ביצירת קישור לחתימה — בדוק הגדרות PDF'}
+                </div>
+              )}
+              {pdfSignUrl && (
+                <>
+                  <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-3 py-2 rounded-lg">
+                    ✓ קישור לחתימה נוצר בהצלחה
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">קישור לחתימה</label>
+                    <div className="flex gap-2">
+                      <input
+                        readOnly
+                        value={pdfSignUrl}
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700 select-all"
+                        onClick={e => e.target.select()}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard.writeText(pdfSignUrl)}
+                        className="border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+                      >
+                        העתק קישור
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => window.open(pdfSignUrl, '_blank')}
+                    className="w-full bg-rose-600 hover:bg-rose-700 text-white py-2.5 rounded-lg text-sm font-medium"
+                  >
+                    פתח לחתימה
+                  </button>
+                </>
+              )}
+              <button type="button" onClick={() => setShowPdf(false)} className="w-full px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm">סגור</button>
+            </div>
           </div>
         </div>
       )}

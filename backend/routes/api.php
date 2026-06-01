@@ -5,7 +5,9 @@ use App\Http\Controllers\AutomationController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FormController;
+use App\Http\Controllers\IntegrationsController;
 use App\Http\Controllers\LeadController;
+use App\Http\Controllers\PdfController;
 use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
@@ -17,6 +19,18 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/forms/{slug}', [FormController::class, 'showPublic']);
 Route::post('/forms/{slug}/submit', [FormController::class, 'submit'])
     ->middleware(['throttle:10,1']); // 10 requests per minute per IP
+
+// Public GREEN-API webhook — resolves tenant from URL, no auth/session.
+Route::post('/integrations/whatsapp/webhook/{tenant}', [IntegrationsController::class, 'whatsappWebhook']);
+
+// Public Cardcom result webhook — GET or POST from Cardcom after payment, no auth.
+Route::any('/integrations/cardcom/result/{tenant}', [IntegrationsController::class, 'cardcomResult']);
+
+// ── PDF / Digital Signature — Public routes ───────────────────────────────
+// Ported from Taskey webapi/sign_document_v2.php + signature_form_to_pdf.php
+Route::get('/pdf/sign/{tenant}/{token}', [PdfController::class, 'signatureForm']);
+Route::post('/pdf/sign/{tenant}/{token}', [PdfController::class, 'signatureSubmit']);
+Route::get('/pdf/download/{tenant}/{filename}', [PdfController::class, 'download']);
 
 // ── Protected routes ───────────────────────────────────────────────────────
 Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
@@ -112,14 +126,30 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::delete('/users/{user}', [UserController::class, 'destroy'])
         ->middleware('permission:users,can_delete');
 
-    // Integrations
-    Route::get('/integrations/settings', [\App\Http\Controllers\IntegrationsController::class, 'getSettings'])
+    // Integrations — Green Invoice
+    Route::get('/integrations/settings', [IntegrationsController::class, 'getSettings'])
         ->middleware('permission:users,can_update');
-    Route::put('/integrations/settings', [\App\Http\Controllers\IntegrationsController::class, 'saveSettings'])
+    Route::put('/integrations/settings', [IntegrationsController::class, 'saveSettings'])
         ->middleware('permission:users,can_update');
-    Route::post('/integrations/greeninvoice/test', [\App\Http\Controllers\IntegrationsController::class, 'greenInvoiceTest'])
+    Route::post('/integrations/greeninvoice/test', [IntegrationsController::class, 'greenInvoiceTest'])
         ->middleware('permission:users,can_update');
-    Route::post('/integrations/greeninvoice/lead/{lead}', [\App\Http\Controllers\IntegrationsController::class, 'greenInvoiceCreate'])
+    Route::post('/integrations/greeninvoice/lead/{lead}', [IntegrationsController::class, 'greenInvoiceCreate'])
+        ->middleware('permission:leads,can_update');
+
+    // Integrations — WhatsApp (GREEN-API)
+    Route::post('/integrations/whatsapp/test', [IntegrationsController::class, 'whatsappTest'])
+        ->middleware('permission:users,can_update');
+    Route::post('/integrations/whatsapp/lead/{lead}', [IntegrationsController::class, 'whatsappSend'])
+        ->middleware('permission:leads,can_update');
+
+    // Integrations — Cardcom payment
+    Route::post('/integrations/cardcom/lead/{lead}', [IntegrationsController::class, 'cardcomCreatePage'])
+        ->middleware('permission:leads,can_update');
+
+    // Integrations — Yesh Invoice (יש חשבונית)
+    Route::post('/integrations/yeshinvoice/test', [IntegrationsController::class, 'yeshInvoiceTest'])
+        ->middleware('permission:users,can_update');
+    Route::post('/integrations/yeshinvoice/lead/{lead}', [IntegrationsController::class, 'yeshInvoiceCreate'])
         ->middleware('permission:leads,can_update');
 
     // WhatsApp templates
@@ -148,4 +178,11 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         ->middleware('permission:reports,can_read');
     Route::get('/dashboard/chart-data', [DashboardController::class, 'chartData'])
         ->middleware('permission:reports,can_read');
+
+    // ── PDF / Digital Signature — Protected routes ─────────────────────────
+    // Ported from Taskey lead_signature_ajax.php (pdf_sig_v2_send_to_lead_event)
+    Route::post('/pdf/token/lead/{lead}', [PdfController::class, 'createToken'])
+        ->middleware('permission:leads,can_update');
+    Route::post('/pdf/generate/lead/{lead}', [PdfController::class, 'generateDocument'])
+        ->middleware('permission:leads,can_update');
 });

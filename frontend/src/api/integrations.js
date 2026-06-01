@@ -5,6 +5,11 @@ export const integrationsApi = {
   saveSettings: (data) => client.put('/integrations/settings', data),
   greenInvoiceTest: () => client.post('/integrations/greeninvoice/test'),
   greenInvoiceCreate: (leadId, payload) => client.post(`/integrations/greeninvoice/lead/${leadId}`, payload),
+  cardcomCreatePage: (leadId, payload) => client.post(`/integrations/cardcom/lead/${leadId}`, payload),
+  yeshInvoiceTest: () => client.post('/integrations/yeshinvoice/test'),
+  yeshInvoiceCreate: (leadId, payload) => client.post(`/integrations/yeshinvoice/lead/${leadId}`, payload),
+  pdfCreateToken: (leadId) => client.post(`/pdf/token/lead/${leadId}`),
+  pdfGenerateDoc: (leadId, payload) => client.post(`/pdf/generate/lead/${leadId}`, payload),
 }
 
 export const GI_DOC_TYPES = [

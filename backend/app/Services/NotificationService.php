@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Tenant;
+use App\Services\Integrations\GreenApiService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -25,64 +26,23 @@ class NotificationService
 
     public function sendWhatsapp(int $tenantId, array $action, array $context): void
     {
-        $tenant   = Tenant::find($tenantId);
-        $settings = $tenant?->settings ?? [];
-        $provider = $settings['whatsapp_provider'] ?? null;
-        $apiKey   = $settings['whatsapp_api_key'] ?? null;
-        $phone    = $context['phone'] ?? null;
-        $message  = $action['message'] ?? '';
+        app()->instance('current_tenant_id', $tenantId);
 
-        if (! $provider || ! $apiKey || ! $phone) {
-            Log::warning("WhatsApp not configured for tenant $tenantId");
+        $phone   = $context['phone'] ?? null;
+        $message = $action['message'] ?? '';
+
+        if (! $phone) {
+            Log::warning("WhatsApp automation: no phone for tenant $tenantId");
             return;
         }
 
-        match ($provider) {
-            '360dialog' => $this->send360dialog($apiKey, $phone, $message),
-            'ultramsg'  => $this->sendUltramsg($apiKey, $phone, $message),
-            'smartsend' => $this->sendSmartsend($apiKey, $phone, $message),
-            'twilio'    => $this->sendTwilio($apiKey, $phone, $message),
-            default     => Log::warning("Unknown WhatsApp provider: $provider"),
-        };
-    }
+        $svc = app(GreenApiService::class);
 
-    private function send360dialog(string $apiKey, string $phone, string $message): void
-    {
-        Http::withHeaders(['D360-API-KEY' => $apiKey])
-            ->post('https://waba.360dialog.io/v1/messages', [
-                'to'   => $phone,
-                'type' => 'text',
-                'text' => ['body' => $message],
-            ]);
-    }
+        if (! $svc->isConfigured()) {
+            Log::warning("GREEN-API not configured for tenant $tenantId");
+            return;
+        }
 
-    private function sendUltramsg(string $apiKey, string $phone, string $message): void
-    {
-        Http::post("https://api.ultramsg.com/instance1/messages/chat", [
-            'token' => $apiKey,
-            'to'    => $phone,
-            'body'  => $message,
-        ]);
-    }
-
-    private function sendSmartsend(string $apiKey, string $phone, string $message): void
-    {
-        Http::withToken($apiKey)
-            ->post('https://api.smartsend.co.il/send', [
-                'phone'   => $phone,
-                'message' => $message,
-            ]);
-    }
-
-    private function sendTwilio(string $apiKey, string $phone, string $message): void
-    {
-        // apiKey format: "accountSid:authToken:fromNumber"
-        [$sid, $token, $from] = explode(':', $apiKey);
-        Http::withBasicAuth($sid, $token)
-            ->post("https://api.twilio.com/2010-04-01/Accounts/$sid/Messages.json", [
-                'From' => "whatsapp:$from",
-                'To'   => "whatsapp:$phone",
-                'Body' => $message,
-            ]);
+        $svc->sendMessage($phone, $message);
     }
 }
