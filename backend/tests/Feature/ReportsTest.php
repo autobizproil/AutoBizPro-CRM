@@ -81,7 +81,7 @@ class ReportsTest extends TestCase
         $resp->assertJsonStructure([
             'success',
             'data' => [
-                '*' => ['source', 'total', 'percent'],
+                '*' => ['source', 'total', 'pct'],
             ],
         ]);
 
@@ -89,8 +89,8 @@ class ReportsTest extends TestCase
         $fb   = $data->firstWhere('source', 'facebook');
         $this->assertNotNull($fb);
         $this->assertSame(2, $fb['total']);
-        // percent: 2/3 * 100 = 66.67
-        $this->assertEqualsWithDelta(66.67, $fb['percent'], 0.01);
+        // pct: 2/3 * 100 = 66.67
+        $this->assertEqualsWithDelta(66.67, $fb['pct'], 0.01);
     }
 
     public function test_leads_by_source_period_filter_excludes_old_leads(): void
@@ -183,7 +183,7 @@ class ReportsTest extends TestCase
         $resp->assertJsonStructure([
             'success',
             'data' => [
-                '*' => ['user_id', 'name', 'total', 'open', 'closed'],
+                '*' => ['user_id', 'agent_name', 'total', 'open', 'closed'],
             ],
         ]);
 

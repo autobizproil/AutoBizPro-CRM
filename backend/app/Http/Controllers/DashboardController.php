@@ -120,9 +120,9 @@ class DashboardController extends Controller
 
         $data = $rows->map(function ($row) use ($grandTotal) {
             return [
-                'source'  => $row->source ?? '',
-                'total'   => (int) $row->total,
-                'percent' => $grandTotal > 0
+                'source' => $row->source ?? '',
+                'total'  => (int) $row->total,
+                'pct'    => $grandTotal > 0
                     ? round($row->total / $grandTotal * 100, 2)
                     : 0.0,
             ];
@@ -141,7 +141,7 @@ class DashboardController extends Controller
         [$from, $to] = $this->dateRange($request);
 
         $query = Lead::query()
-            ->whereBetween('created_at', [$from, $to]);
+            ->whereBetween('leads.created_at', [$from, $to]);
 
         // Agents only see themselves
         if ($user->role === 'agent') {
@@ -149,32 +149,29 @@ class DashboardController extends Controller
         }
 
         $rows = $query
+            ->leftJoin('users', 'leads.assigned_to', '=', 'users.id')
             ->select(
-                'assigned_to',
+                'leads.assigned_to',
+                DB::raw("COALESCE(users.name, 'לא משויך') as agent_name"),
                 DB::raw('count(*) as total'),
-                DB::raw("sum(case when pipeline_stage_id in (
+                DB::raw("sum(case when leads.pipeline_stage_id in (
                     select id from pipeline_stages
                     where name like '%סגור%' or name like '%לא רלוונטי%'
                 ) then 1 else 0 end) as closed_count")
             )
-            ->groupBy('assigned_to')
+            ->groupBy('leads.assigned_to', 'users.name')
             ->get();
 
-        // Load user names in one query
-        $userIds = $rows->pluck('assigned_to')->filter()->unique()->values();
-        $users   = User::whereIn('id', $userIds)->get()->keyBy('id');
-
-        $data = $rows->map(function ($row) use ($users) {
+        $data = $rows->map(function ($row) {
             $total  = (int) $row->total;
             $closed = (int) $row->closed_count;
-            $u      = $row->assigned_to ? $users->get($row->assigned_to) : null;
 
             return [
-                'user_id' => $row->assigned_to,
-                'name'    => $u ? $u->name : null,
-                'total'   => $total,
-                'open'    => $total - $closed,
-                'closed'  => $closed,
+                'user_id'    => $row->assigned_to,
+                'agent_name' => $row->agent_name,
+                'total'      => $total,
+                'open'       => $total - $closed,
+                'closed'     => $closed,
             ];
         })->values();
 
