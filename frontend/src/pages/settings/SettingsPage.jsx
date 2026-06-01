@@ -3,10 +3,14 @@ import { useState, useEffect } from 'react'
 import client from '../../api/client'
 import { integrationsApi } from '../../api/integrations'
 import { useAuth } from '../../context/AuthContext'
+import { usePreferences } from '../../context/PreferencesContext'
+import { translations } from '../../i18n/translations'
 
 export default function SettingsPage() {
   const { can }    = useAuth()
   const qc         = useQueryClient()
+  const { theme, lang, fontSize, setTheme, setLang, setFontSize } = usePreferences()
+  const tr = (key) => translations[lang]?.[key] ?? key
 
   const { data: tenantData } = useQuery({
     queryKey: ['settings-tenant'],
@@ -248,6 +252,98 @@ export default function SettingsPage() {
             </div>
           )}
         </form>
+      </div>
+
+      {/* Preferences */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 max-w-lg mt-6 dark:text-gray-100">
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-5">⚙️ {tr('preferences')}</h3>
+
+        {/* Language */}
+        <div className="mb-5">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{tr('language')}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setLang('he')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                lang === 'he'
+                  ? 'bg-[#2398c2] text-white border-[#2398c2]'
+                  : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              {tr('hebrew')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLang('en')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                lang === 'en'
+                  ? 'bg-[#2398c2] text-white border-[#2398c2]'
+                  : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              {tr('english')}
+            </button>
+          </div>
+        </div>
+
+        {/* Theme */}
+        <div className="mb-5">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{lang === 'en' ? 'Theme' : 'מצב תצוגה'}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setTheme('light')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                theme === 'light'
+                  ? 'bg-[#2398c2] text-white border-[#2398c2]'
+                  : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              ☀️ {tr('lightMode')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTheme('dark')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                theme === 'dark'
+                  ? 'bg-[#2398c2] text-white border-[#2398c2]'
+                  : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              🌙 {tr('darkMode')}
+            </button>
+          </div>
+        </div>
+
+        {/* Font size / Accessibility */}
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{tr('accessibility')} — {tr('fontSize')}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setFontSize('normal')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                fontSize === 'normal'
+                  ? 'bg-[#2398c2] text-white border-[#2398c2]'
+                  : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              {tr('normalSize')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFontSize('large')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                fontSize === 'large'
+                  ? 'bg-[#2398c2] text-white border-[#2398c2]'
+                  : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              {tr('largeSize')}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

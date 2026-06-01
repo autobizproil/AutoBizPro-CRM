@@ -10,6 +10,16 @@
   --radius-xl: 16px;
 }
 
+html.dark {
+  color-scheme: dark;
+}
+
+/* Dark mode overrides for structural elements */
+html.dark body {
+  background-color: #111827;
+  color: #f9fafb;
+}
+
 /* RTL base */
 * {
   box-sizing: border-box;
