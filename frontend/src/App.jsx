@@ -18,6 +18,7 @@ import LandingPagesPage from './pages/landing-pages/LandingPagesPage'
 import LandingPageEditor from './pages/landing-pages/LandingPageEditor'
 import LandingPagePublicPage from './pages/landing-pages/LandingPagePublicPage'
 import ClientsPage from './pages/clients/ClientsPage'
+import TasksPage from './pages/tasks/TasksPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -41,6 +42,7 @@ function AppRoutes() {
         <Route path="dashboard"   element={<DashboardPage />} />
         <Route path="leads"       element={<LeadsPage />} />
         <Route path="clients"     element={<ClientsPage />} />
+        <Route path="tasks"       element={<TasksPage />} />
         <Route path="pipeline"    element={<PipelinePage />} />
         <Route path="contacts"    element={<ContactsPage />} />
         <Route path="import"      element={<ImportPage />} />

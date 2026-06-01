@@ -6,6 +6,7 @@ import { renderTemplate, waLink } from '../../api/whatsapp'
 import { integrationsApi, GI_DOC_TYPES } from '../../api/integrations'
 import { customFieldsApi } from '../../api/customFields'
 import { clientsApi } from '../../api/clients'
+import { tasksApi } from '../../api/tasks'
 import { useToast } from '../../context/ToastContext'
 
 const ACTIVITY_TYPES = {
@@ -66,6 +67,25 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
   // --- PDF modal state ---
   const [showPdf, setShowPdf]                 = useState(false)
   const [pdfSignUrl, setPdfSignUrl]           = useState('')
+
+  // --- Task modal state ---
+  const [showTask, setShowTask]               = useState(false)
+  const [taskTitle, setTaskTitle]             = useState('')
+  const [taskDue, setTaskDue]                 = useState('')
+  const [taskPriority, setTaskPriority]       = useState('medium')
+
+  const createTask = useMutation({
+    mutationFn: () => tasksApi.create({
+      title: taskTitle, due_at: taskDue || undefined, priority: taskPriority,
+      related_type: 'lead', related_id: leadId,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['task-counts'] })
+      setShowTask(false); setTaskTitle(''); setTaskDue(''); setTaskPriority('medium')
+      toast.success('המשימה נוצרה')
+    },
+    onError: () => toast.error('שגיאה ביצירת המשימה'),
+  })
 
   const createInvoice = useMutation({
     mutationFn: (payload) => integrationsApi.greenInvoiceCreate(leadId, payload).then(r => r.data),
@@ -207,11 +227,11 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   <p className="text-xs text-gray-400 dark:text-gray-500">נוצר {new Date(lead.created_at).toLocaleDateString('he-IL')}</p>
                 </div>
               </div>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
             </div>
 
             {/* Quick actions */}
-            <div className="px-5 py-3 border-b border-gray-100 flex gap-2">
+            <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-2 flex-wrap">
               {lead.phone && (
                 <a href={`tel:${lead.phone}`}
                   className="flex-1 flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -225,17 +245,17 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     💬 וואטסאפ
                   </button>
                   {showTemplates && (
-                    <div className="absolute top-full mt-1 right-0 left-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1 max-h-56 overflow-y-auto">
+                    <div className="absolute top-full mt-1 right-0 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 max-h-56 overflow-y-auto">
                       <button onClick={() => sendWhatsapp(null)}
-                        className="w-full text-right px-3 py-2 text-sm hover:bg-gray-50 text-gray-700">הודעה ריקה</button>
+                        className="w-full text-right px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">הודעה ריקה</button>
                       {templates.map(t => (
                         <button key={t.id} onClick={() => sendWhatsapp(t)}
-                          className="w-full text-right px-3 py-2 text-sm hover:bg-gray-50 border-t border-gray-50">
-                          <div className="font-medium text-gray-800">{t.name}</div>
-                          <div className="text-xs text-gray-400 truncate">{t.body}</div>
+                          className="w-full text-right px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 border-t border-gray-50 dark:border-gray-700">
+                          <div className="font-medium text-gray-800 dark:text-gray-200">{t.name}</div>
+                          <div className="text-xs text-gray-400 dark:text-gray-500 truncate">{t.body}</div>
                         </button>
                       ))}
-                      {templates.length === 0 && <div className="px-3 py-2 text-xs text-gray-400">אין תבניות — הוסף בהגדרות</div>}
+                      {templates.length === 0 && <div className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">אין תבניות — הוסף בהגדרות</div>}
                     </div>
                   )}
                 </div>
@@ -272,15 +292,22 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   🏢 לקוח
                 </button>
               )}
+              {canEdit && (
+                <button onClick={() => setShowTask(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/30 dark:hover:bg-sky-900/50 text-sky-700 dark:text-sky-300 py-2 rounded-lg text-sm font-medium transition-colors"
+                  title="צור משימת מעקב">
+                  ✅ משימה
+                </button>
+              )}
             </div>
 
             {/* Scrollable body */}
             <div className="flex-1 overflow-y-auto">
               {/* Details */}
-              <div className="px-5 py-4 space-y-3 border-b border-gray-100">
-                <Detail label="שלב">
+              <div className="px-5 py-4 space-y-3 border-b border-gray-100 dark:border-gray-700">
+                <Detail label="סטטוס">
                   <select value={lead.pipeline_stage_id ?? ''} onChange={changeStage} disabled={!canEdit}
-                    className="border border-gray-200 rounded-lg px-2 py-1 text-sm bg-white disabled:opacity-60">
+                    className="border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 disabled:opacity-60">
                     <option value="">ללא שלב</option>
                     {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
@@ -289,9 +316,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 <EditableDetail label="אימייל" value={field('email')} onChange={setField('email')} onBlur={() => commit('email')} disabled={!canEdit} type="email" />
                 <EditableDetail label="מקור" value={field('source')} onChange={setField('source')} onBlur={() => commit('source')} disabled={!canEdit} />
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">הערות</label>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">הערות</label>
                   <textarea value={field('notes')} onChange={setField('notes')} onBlur={() => commit('notes')} disabled={!canEdit} rows={2}
-                    className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm resize-none disabled:opacity-60" placeholder="הוסף הערה..." />
+                    className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-2 py-1.5 text-sm resize-none disabled:opacity-60" placeholder="הוסף הערה..." />
                 </div>
 
                 {/* Custom fields */}
@@ -311,16 +338,16 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
 
               {/* Activity composer */}
               {canEdit && (
-                <form onSubmit={submitActivity} className="px-5 py-4 border-b border-gray-100">
-                  <label className="text-xs font-medium text-gray-600 block mb-2">תיעוד פעילות</label>
+                <form onSubmit={submitActivity} className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block mb-2">תיעוד פעילות</label>
                   <div className="flex gap-2 mb-2">
                     <select value={activityType} onChange={e => setAT(e.target.value)}
-                      className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white">
+                      className="border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
                       {['call','whatsapp','email','meeting','note','task'].map(t =>
                         <option key={t} value={t}>{ACTIVITY_TYPES[t].icon} {ACTIVITY_TYPES[t].label}</option>)}
                     </select>
                     <input value={activityBody} onChange={e => setAB(e.target.value)} placeholder="מה קרה?"
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm" />
+                      className="flex-1 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-1.5 text-sm" />
                   </div>
                   <button type="submit" disabled={!activityBody.trim() || addActivity.isPending}
                     className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-40 text-white px-4 py-1.5 rounded-lg text-sm font-medium w-full">
@@ -331,9 +358,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
 
               {/* Timeline */}
               <div className="px-5 py-4">
-                <h3 className="text-xs font-medium text-gray-600 mb-3">ציר זמן ({activities.length})</h3>
+                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-3">ציר זמן ({activities.length})</h3>
                 {activities.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-6">אין פעילות עדיין</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">אין פעילות עדיין</p>
                 ) : (
                   <div className="space-y-3">
                     {activities.map(a => {
@@ -344,10 +371,10 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                             style={{ backgroundColor: meta.color + '22' }}>{meta.icon}</div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-gray-700">{meta.label}</span>
-                              <span className="text-xs text-gray-400">{timeAgo(a.created_at)}</span>
+                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{meta.label}</span>
+                              <span className="text-xs text-gray-400 dark:text-gray-500">{timeAgo(a.created_at)}</span>
                             </div>
-                            <p className="text-sm text-gray-600 mt-0.5 break-words">{a.body}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5 break-words">{a.body}</p>
                           </div>
                         </div>
                       )
@@ -602,6 +629,48 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
           </div>
         </div>
       )}
+
+      {/* Task modal */}
+      {showTask && lead && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowTask(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">✅ משימת מעקב — {lead.name}</h2>
+              <button onClick={() => setShowTask(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
+            </div>
+            <form onSubmit={e => { e.preventDefault(); if (taskTitle.trim()) createTask.mutate() }} className="px-6 py-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">כותרת <span className="text-red-500">*</span></label>
+                <input autoFocus required value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="לדוגמה: לחזור ללקוח"
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">עדיפות</label>
+                  <select value={taskPriority} onChange={e => setTaskPriority(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm">
+                    <option value="low">נמוכה</option>
+                    <option value="medium">בינונית</option>
+                    <option value="high">גבוהה</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">תאריך יעד</label>
+                  <input type="datetime-local" value={taskDue} onChange={e => setTaskDue(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={createTask.isPending || !taskTitle.trim()}
+                  className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
+                  {createTask.isPending ? 'שומר...' : 'צור משימה'}
+                </button>
+                <button type="button" onClick={() => setShowTask(false)} className="px-4 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm">ביטול</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -609,7 +678,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
 function Detail({ label, children }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-gray-500">{label}</span>
+      <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
       {children}
     </div>
   )

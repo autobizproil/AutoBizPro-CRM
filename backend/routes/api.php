@@ -13,6 +13,7 @@ use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CustomFieldController;
+use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -196,6 +197,13 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::get('/clients/{client}',       [ClientController::class, 'show'])   ->middleware('permission:leads,can_read');
     Route::put('/clients/{client}',       [ClientController::class, 'update']) ->middleware('permission:leads,can_update');
     Route::delete('/clients/{client}',    [ClientController::class, 'destroy'])->middleware('permission:leads,can_delete');
+
+    // Tasks & reminders
+    Route::get('/tasks',                 [TaskController::class, 'index'])  ->middleware('permission:leads,can_read');
+    Route::get('/tasks/counts',          [TaskController::class, 'counts']) ->middleware('permission:leads,can_read');
+    Route::post('/tasks',                [TaskController::class, 'store'])  ->middleware('permission:leads,can_create');
+    Route::put('/tasks/{task}',          [TaskController::class, 'update']) ->middleware('permission:leads,can_update');
+    Route::delete('/tasks/{task}',       [TaskController::class, 'destroy'])->middleware('permission:leads,can_update');
 
     // Custom field definitions
     Route::get('/custom-fields',                              [CustomFieldController::class, 'index'])
