@@ -11,8 +11,8 @@ export default function Navbar() {
 
   function toggleLocale() {
     const next = locale === 'he' ? 'en' : 'he'
-    const newPath = pathname.replace(`/${locale}`, `/${next}`)
-    router.push(newPath)
+    const newPath = pathname.replace(new RegExp(`^/${locale}(/|$)`), `/${next}$1`)
+    router.push(newPath || `/${next}`)
   }
 
   return (
@@ -32,6 +32,7 @@ export default function Navbar() {
           </a>
           <button
             onClick={toggleLocale}
+            aria-label={locale === 'he' ? 'Switch to English' : 'עבור לעברית'}
             className="rounded border border-primary px-3 py-1 text-xs text-primary hover:bg-primary/10 transition-colors"
           >
             {locale === 'he' ? 'EN' : 'עב'}

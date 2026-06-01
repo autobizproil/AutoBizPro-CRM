@@ -39,7 +39,7 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} dir={dir} suppressHydrationWarning className={`${inter.variable} ${heebo.variable}`}>
-      <body className="font-sans antialiased">
+      <body className={`${locale === 'he' ? 'font-hebrew' : 'font-sans'} antialiased`}>
         <NextIntlClientProvider messages={messages}>
           {children}
         </NextIntlClientProvider>
