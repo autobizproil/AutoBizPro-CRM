@@ -526,6 +526,28 @@ function IntegrationsTab({ toast }) {
     toast(item.connected ? t('toast.disconnected', { name: item.name }) : t('toast.connected', { name: item.name }))
   }
 
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhookEvents, setWebhookEvents] = useState({
+    leadCreated:      true,
+    leadStageChanged: true,
+    dealClosed:       true,
+    contactCreated:   false,
+  })
+  const toggleEvent = (key) => setWebhookEvents(p => ({ ...p, [key]: !p[key] }))
+
+  const saveWebhook = () => {
+    settingsApi.putIntegrations({
+      webhook_url: webhookUrl,
+      webhook_events: webhookEvents,
+    }).catch(() => {})
+    toast(t('toast.webhookSaved'))
+  }
+
+  const testWebhook = () => {
+    settingsApi.testWebhook().catch(() => {})
+    toast(t('toast.testSent'))
+  }
+
   return (
     <div>
       <SettingCard title="חיבורים" desc="שירותים חיצוניים המחוברים למערכת">
@@ -575,6 +597,60 @@ function IntegrationsTab({ toast }) {
               <code style={{ fontSize: 12, color: 'var(--text-subtle)' }} dir="ltr">https://api.autobizpro.co.il/webhook/v1</code>
             </div>
             <button className="btn btn--outline" style={{ fontSize: 12 }} onClick={() => toast(t('toast.webhookSaved'))}>ערוך</button>
+          </div>
+        </div>
+      </SettingCard>
+
+      <SettingCard
+        title={t('settings.integrations.makeWebhook.title')}
+        desc={t('settings.integrations.makeWebhook.desc')}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <label className="input__label">{t('settings.integrations.makeWebhook.label')}</label>
+            <input
+              className="input"
+              value={webhookUrl}
+              onChange={e => setWebhookUrl(e.target.value)}
+              placeholder={t('settings.integrations.makeWebhook.placeholder')}
+              dir="ltr"
+            />
+          </div>
+
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+              {t('settings.integrations.makeWebhook.events')}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {Object.entries(webhookEvents).map(([key, val]) => (
+                <div
+                  key={key}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+                  onClick={() => toggleEvent(key)}
+                >
+                  {val
+                    ? <ToggleRight size={22} style={{ color: 'var(--brand-500)', flexShrink: 0 }} />
+                    : <ToggleLeft  size={22} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />
+                  }
+                  <span style={{ fontSize: 13 }}>
+                    {t(`settings.integrations.makeWebhook.${key}`)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <button className="btn btn--primary" onClick={saveWebhook}>
+              <Save size={14} /> {t('common.save')}
+            </button>
+            <button
+              className="btn btn--outline"
+              onClick={testWebhook}
+              disabled={!webhookUrl}
+            >
+              {t('settings.integrations.makeWebhook.test')}
+            </button>
           </div>
         </div>
       </SettingCard>
