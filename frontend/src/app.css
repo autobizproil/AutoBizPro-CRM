@@ -199,6 +199,22 @@
 .toggle--on::after { transform: translateX(-16px); }
 .dark .toggle { background: var(--neutral-700); }
 
+/* ---------------- Automations ---------------- */
+.au-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-xs); padding:16px 18px; transition:box-shadow .14s,border-color .14s; }
+.au-card:hover { box-shadow:var(--shadow-sm); border-color:var(--border-strong); }
+.au-card--off { opacity:.72; }
+.au-card__head { display:flex; align-items:flex-start; gap:13px; }
+.au-card__name { font-size:15px; font-weight:700; }
+.au-card__desc { font-size:13px; color:var(--text-muted); margin-top:2px; }
+.au-flow { display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin:14px 0; padding:12px 14px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-md); }
+.au-step { display:inline-flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:7px 11px 7px 9px; box-shadow:var(--shadow-xs); }
+.au-step__ic { width:26px; height:26px; border-radius:7px; display:grid; place-items:center; flex:none; }
+.au-step__lbl { font-size:12.5px; font-weight:600; white-space:nowrap; }
+.au-arrow { color:var(--text-subtle); font-size:14px; padding:0 2px; }
+.au-card__foot { display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin-top:4px; }
+.au-stat { display:flex; align-items:center; gap:5px; font-size:12.5px; color:var(--text-muted); }
+.au-stat b { color:var(--text); font-weight:700; }
+
 /* ---------------- Cards ---------------- */
 .card {
   background: var(--surface); border: 1px solid var(--border);
