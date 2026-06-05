@@ -1,60 +1,146 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+import {
+  LayoutDashboard, Users, GitBranch, BookUser, Building2,
+  Zap, FileText, FileImage, BarChart3, Bell, Sun, Moon, Settings,
+} from 'lucide-react'
 
-const nav = [
-  { to: '/dashboard',   label: 'דשבורד' },
-  { to: '/leads',       label: 'לידים' },
-  { to: '/pipeline',    label: 'פייפליין' },
-  { to: '/contacts',    label: 'אנשי קשר' },
-  { to: '/automations', label: 'אוטומציות' },
-  { to: '/forms',       label: 'טפסים' },
-  { to: '/settings',    label: 'הגדרות' },
-]
+function useTheme() {
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('abp-theme') || 'light' } catch { return 'light' }
+  })
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    try { localStorage.setItem('abp-theme', theme) } catch {}
+  }, [theme])
+  const toggle = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), [])
+  return [theme, toggle]
+}
 
 export default function Layout() {
   const { user, logout } = useAuth()
+  const { t, i18n } = useTranslation()
+
+  const toggleLang = () => {
+    const next = i18n.language === 'he' ? 'en' : 'he'
+    i18n.changeLanguage(next)
+    document.documentElement.setAttribute('dir', next === 'he' ? 'rtl' : 'ltr')
+    document.documentElement.setAttribute('lang', next)
+  }
+
+  const NAV = [
+    { group: null, items: [
+      { to: '/dashboard', label: 'לוחות בקרה', icon: LayoutDashboard },
+      { to: '/leads',     label: 'לידים',      icon: Users, badge: '128' },
+      { to: '/pipeline',  label: 'פייפליין',   icon: GitBranch },
+    ]},
+    { group: 'אנשים', items: [
+      { to: '/contacts',  label: 'אנשי קשר', icon: BookUser },
+      { to: '/customers', label: 'לקוחות',    icon: Building2 },
+    ]},
+    { group: 'כלים', items: [
+      { to: '/automations', label: 'אוטומציות', icon: Zap },
+      { to: '/forms',       label: 'טפסים',     icon: FileText },
+      { to: '/landing',     label: 'דפי נחיתה', icon: FileImage },
+      { to: '/reports',     label: 'דוחות',     icon: BarChart3 },
+    ]},
+  ]
+
+  const PAGE_META = {
+    '/dashboard':   { title: 'לוח בקרה',  sub: 'סקירת מכירות · רבעון נוכחי' },
+    '/leads':       { title: 'לידים',      sub: null },
+    '/pipeline':    { title: 'פייפליין',   sub: null },
+    '/contacts':    { title: 'אנשי קשר',  sub: null },
+    '/customers':   { title: 'לקוחות',     sub: null },
+    '/automations': { title: 'אוטומציות',  sub: null },
+    '/forms':       { title: 'טפסים',      sub: null },
+    '/landing':     { title: 'דפי נחיתה',  sub: null },
+    '/reports':     { title: 'דוחות',      sub: null },
+    '/settings':    { title: 'הגדרות',     sub: null },
+  }
+
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [theme, toggleTheme] = useTheme()
+  const meta = PAGE_META[location.pathname] || { title: '', sub: null }
+  const initials = user?.name ? user.name.split(' ').map(w => w[0]).join('').slice(0, 2) : 'AB'
 
   return (
-    <div className="flex h-screen bg-gray-50" dir="rtl">
+    <div className="app" dir="rtl" lang="he">
       {/* Sidebar */}
-      <aside className="w-56 bg-white border-l border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <h1 className="text-lg font-bold text-indigo-600">CRM</h1>
-        </div>
+      <aside className="sidebar">
+        <a className="brand" href="/dashboard">
+          <img className="brand__logo" src="/assets/autobizpro-logo.png" alt="AutoBiz Pro IL" width={36} height={36} />
+          <span className="brand__name bidi-ltr">
+            AutoBiz<b>Pro</b><span className="brand__il">IL</span>
+          </span>
+        </a>
 
-        <nav className="flex-1 p-3 space-y-1">
-          {nav.map(({ to, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `block px-3 py-2 rounded-lg text-sm transition-colors ${
-                  isActive
-                    ? 'bg-indigo-50 text-indigo-700 font-medium'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`
-              }
-            >
-              {label}
-            </NavLink>
-          ))}
-        </nav>
+        {NAV.map((sec, i) => (
+          <div className="nav-group" key={i}>
+            {sec.group && <div className="nav-group__label">{sec.group}</div>}
+            {sec.items.map(it => (
+              <NavLink
+                key={it.to}
+                to={it.to}
+                className={({ isActive }) => 'nav-item' + (isActive ? ' nav-item--active' : '')}
+              >
+                <it.icon />
+                <span>{it.label}</span>
+                {it.badge && <span className="nav-item__badge">{it.badge}</span>}
+              </NavLink>
+            ))}
+          </div>
+        ))}
 
-        <div className="p-3 border-t border-gray-200">
-          <div className="text-xs text-gray-500 mb-2">{user?.name}</div>
-          <button
-            onClick={logout}
-            className="w-full text-right text-sm text-red-500 hover:text-red-700 px-3 py-1"
-          >
-            התנתק
-          </button>
+        <div className="sidebar__foot">
+          <div className="user-chip" onClick={() => {}}>
+            <div className="avatar">{initials}</div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user?.name || 'משתמש'}
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-subtle)' }}>
+                {user?.role || 'מנהל'}
+              </div>
+            </div>
+            <Settings size={16} style={{ color: 'var(--text-subtle)', cursor: 'pointer' }} onClick={() => navigate('/settings')} title="הגדרות" />
+          </div>
         </div>
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto p-6">
-        <Outlet />
-      </main>
+      <div className="main">
+        <header className="header">
+          <div>
+            <div className="header__title">{meta.title}</div>
+            {meta.sub && <div className="header__sub">{meta.sub}</div>}
+          </div>
+          <div className="header__spacer" />
+          <div className="header__actions">
+            <button
+              className="btn btn--ghost"
+              onClick={toggleLang}
+              style={{ fontSize: 12, fontWeight: 700, minWidth: 40, padding: '0 10px' }}
+              title="שפה / Language"
+            >
+              {i18n.language === 'he' ? 'EN' : 'HE'}
+            </button>
+            <button className="btn btn--ghost btn--icon" title="התראות">
+              <Bell size={18} />
+            </button>
+            <button className="btn btn--ghost btn--icon" onClick={toggleTheme} title={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}>
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
+        </header>
+
+        <div className="content">
+          <Outlet />
+        </div>
+      </div>
     </div>
   )
 }
