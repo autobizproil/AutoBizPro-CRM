@@ -22,7 +22,7 @@ export function useContacts(filters = {}) {
   return useQuery({
     queryKey: ['contacts', filters],
     queryFn: () => contactsApi.list(filters)
-      .then(r => r.data.data)
+      .then(r => r.data)        // r.data is { data: Contact[] } from Laravel
       .catch(() => MOCK_SHAPE(filters)),
     placeholderData: MOCK_SHAPE(filters),
   })

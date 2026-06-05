@@ -23,7 +23,7 @@ export function useLeads(filters = {}) {
   return useQuery({
     queryKey: ['leads', filters],
     queryFn: () => leadsApi.list(filters)
-      .then(r => r.data.data)
+      .then(r => r.data)        // r.data is { data: Lead[] } from Laravel
       .catch(() => MOCK_SHAPE(filters)),
     placeholderData: MOCK_SHAPE(filters),
   })
