@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { useDashboardStats, useDashboardChart } from '../../hooks/useDashboard'
 import {
   Users, DollarSign, Target, CheckCircle2, TrendingUp, TrendingDown, Plus,
@@ -63,6 +64,7 @@ function CardHead({ title, sub, children }) {
 
 export default function DashboardPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [range, setRange] = useState(t('dashboard.year'))
   const { data: stats }  = useDashboardStats()
   const { data: charts } = useDashboardChart(range)
@@ -81,7 +83,7 @@ export default function DashboardPage() {
             <button key={r} className={range === r ? 'on' : ''} onClick={() => setRange(r)}>{r}</button>
           ))}
         </div>
-        <button className="btn btn--accent"><Plus size={16} />{t('dashboard.createLead')}</button>
+        <button className="btn btn--accent" onClick={() => navigate('/leads')}><Plus size={16} />{t('dashboard.createLead')}</button>
       </div>
 
       <div className="dash-grid kpi-row" style={{ marginBottom: 16 }}>

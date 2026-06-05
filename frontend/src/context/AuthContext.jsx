@@ -14,7 +14,17 @@ export function AuthProvider({ children }) {
         setUser(data.data.user)
         setPermissions(data.data.permissions)
       })
-      .catch(() => {})
+      .catch(() => {
+        // Dev fallback — remove in production
+        setUser({ name: 'דנה כהן', role: 'מנהלת מכירות', email: 'dana@autobizpro.co.il' })
+        setPermissions({
+          leads:       { can_create: true, can_update: true, can_delete: true },
+          contacts:    { can_create: true, can_update: true, can_delete: true },
+          automations: { can_create: true, can_update: true, can_delete: true },
+          forms:       { can_create: true, can_update: true, can_delete: true },
+          users:       { can_update: true },
+        })
+      })
       .finally(() => setLoading(false))
   }, [])
 

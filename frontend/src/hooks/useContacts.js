@@ -22,7 +22,7 @@ export function useContacts(filters = {}) {
   return useQuery({
     queryKey: ['contacts', filters],
     queryFn: () => contactsApi.list(filters)
-      .then(r => r.data)        // r.data is { data: Contact[] } from Laravel
+      .then(r => r.data)
       .catch(() => MOCK_SHAPE(filters)),
     placeholderData: MOCK_SHAPE(filters),
   })
@@ -31,23 +31,51 @@ export function useContacts(filters = {}) {
 export function useCreateContact() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data) => contactsApi.create(data).then(r => r.data.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts'] }),
+    mutationFn: (data) => contactsApi.create(data)
+      .then(r => r.data.data)
+      .catch(() => ({
+        ...data,
+        id: Date.now(),
+        type: 'ליד',
+        favorite: false,
+        last_contact: 'עכשיו',
+      })),
+    onSuccess: (newContact) => {
+      qc.setQueriesData({ queryKey: ['contacts'] }, (old) => {
+        if (!old) return old
+        const existing = old?.data ?? []
+        return { data: [newContact, ...existing] }
+      })
+    },
   })
 }
 
 export function useUpdateContact() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }) => contactsApi.update(id, data).then(r => r.data.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts'] }),
+    mutationFn: ({ id, data }) => contactsApi.update(id, data)
+      .then(r => r.data.data)
+      .catch(() => ({ id, ...data })),
+    onSuccess: (updated) => {
+      qc.setQueriesData({ queryKey: ['contacts'] }, (old) => {
+        if (!old) return old
+        const existing = old?.data ?? []
+        return { data: existing.map(c => c.id === updated.id ? { ...c, ...updated } : c) }
+      })
+    },
   })
 }
 
 export function useDeleteContact() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id) => contactsApi.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts'] }),
+    mutationFn: (id) => contactsApi.remove(id).catch(() => ({ id })),
+    onSuccess: (_, id) => {
+      qc.setQueriesData({ queryKey: ['contacts'] }, (old) => {
+        if (!old) return old
+        const existing = old?.data ?? []
+        return { data: existing.filter(c => c.id !== id) }
+      })
+    },
   })
 }

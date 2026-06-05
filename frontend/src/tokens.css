@@ -1,0 +1,231 @@
+/* =====================================================================
+   AutoBizPro — Design Tokens
+   Brand: #2398c2 (primary blue) · #b1e239 (lime accent) · #cfcfcf (neutral)
+   Font: Heebo · RTL-first · Light + Dark
+
+   How this file works:
+   - :root and .dark hold the RUNTIME CSS variables the browser actually
+     paints with (so the mockups render with no build step).
+   - @theme inline maps those runtime vars onto Tailwind v4 tokens, so in
+     the real React+Tailwind codebase you get utilities like bg-brand-500,
+     text-muted, rounded-lg, shadow-md — all dark-mode aware automatically.
+   ===================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap');
+
+/* ---------- Tailwind v4 theme mapping (used by the build, not the browser) ---------- */
+@theme inline {
+  --font-sans: "Heebo", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --color-brand-50:  var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  --color-lime-50:  var(--lime-50);
+  --color-lime-100: var(--lime-100);
+  --color-lime-200: var(--lime-200);
+  --color-lime-300: var(--lime-300);
+  --color-lime-400: var(--lime-400);
+  --color-lime-500: var(--lime-500);
+  --color-lime-600: var(--lime-600);
+  --color-lime-700: var(--lime-700);
+
+  --color-success: var(--green-500);
+  --color-warning: var(--amber-500);
+  --color-danger:  var(--red-500);
+
+  --color-bg:            var(--bg);
+  --color-surface:       var(--surface);
+  --color-surface-2:     var(--surface-2);
+  --color-border:        var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg:            var(--text);
+  --color-muted:         var(--text-muted);
+  --color-subtle:        var(--text-subtle);
+
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 14px;
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+/* ---------- Runtime tokens ---------- */
+:root {
+  /* Brand blue ramp (base 500 = #2398c2) */
+  --brand-50:  #ecf6fb;
+  --brand-100: #d0ebf4;
+  --brand-200: #a6d9ea;
+  --brand-300: #70c2dd;
+  --brand-400: #42a9ce;
+  --brand-500: #2398c2;
+  --brand-600: #1c80a6;
+  --brand-700: #1a6b8a;
+  --brand-800: #1a586f;
+  --brand-900: #19495d;
+
+  /* Lime accent ramp (base 400 = #b1e239) */
+  --lime-50:  #f6fce6;
+  --lime-100: #ebf7c8;
+  --lime-200: #dcf09b;
+  --lime-300: #c8e966;
+  --lime-400: #b1e239;
+  --lime-500: #9bcf24;
+  --lime-600: #7caa1c;
+  --lime-700: #5f811b;
+
+  /* Neutrals — cool gray, 300 = brand #cfcfcf */
+  --neutral-0:   #ffffff;
+  --neutral-50:  #f6f7f9;
+  --neutral-100: #eceef1;
+  --neutral-200: #e0e3e8;
+  --neutral-300: #cfcfcf;
+  --neutral-400: #a7abb2;
+  --neutral-500: #7e838b;
+  --neutral-600: #5d626a;
+  --neutral-700: #454a52;
+  --neutral-800: #2e333a;
+  --neutral-900: #1b1f25;
+  --neutral-950: #11141a;
+
+  /* Semantic hues */
+  --green-50:  #e8f6ed; --green-100: #cdebd8; --green-500: #1f9d57; --green-600: #198049; --green-700: #166a3d;
+  --amber-50:  #fdf3e3; --amber-100: #f8e4c0; --amber-500: #e8930c; --amber-600: #c47908; --amber-700: #9a5f08;
+  --red-50:    #fdecec; --red-100:   #f9d4d5; --red-500:   #e5484d; --red-600:   #cf3439; --red-700:   #b4282d;
+
+  /* Radius + shadows */
+  --radius-xs: 3px; --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 10px; --radius-2xl: 14px;
+  --shadow-xs: 0 1px 2px rgba(16,24,40,.05);
+  --shadow-sm: 0 1px 3px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.04);
+  --shadow-md: 0 4px 12px -2px rgba(16,24,40,.10), 0 2px 6px -2px rgba(16,24,40,.06);
+  --shadow-lg: 0 16px 40px -8px rgba(16,24,40,.18);
+
+  /* Type scale */
+  --text-xs: 11px; --text-sm: 12px; --text-base: 14px; --text-md: 15px;
+  --text-lg: 16px; --text-xl: 20px; --text-2xl: 24px; --text-3xl: 30px; --text-display: 38px;
+
+  /* ===== Light semantic surfaces ===== */
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --surface-2: #f6f7f9;
+  --surface-hover: #f0f2f5;
+  --border: #e4e7eb;
+  --border-strong: #cfcfcf;
+  --text: #1b1f25;
+  --text-muted: #5d626a;
+  --text-subtle: #888e97;
+  --text-inverse: #ffffff;
+  --ring: rgba(35,152,194,.32);
+
+  --primary: var(--brand-500);
+  --primary-hover: var(--brand-600);
+  --primary-active: var(--brand-700);
+  --primary-soft: var(--brand-50);
+  --on-primary: #ffffff;
+
+  --accent: var(--lime-400);
+  --accent-hover: var(--lime-500);
+  --accent-active: var(--lime-600);
+  --on-accent: #243006;
+
+  /* Stage / status pills (light) */
+  --pill-new-bg:#e7f4f9;   --pill-new-fg:#1a6b8a;   --pill-new-dot:#2398c2;
+  --pill-talk-bg:#eef0f3;  --pill-talk-fg:#4a5059;  --pill-talk-dot:#7e838b;
+  --pill-quote-bg:#eaeef4; --pill-quote-fg:#455066; --pill-quote-dot:#66758f;
+  --pill-wait-bg:#f4efe7;  --pill-wait-fg:#6e5d42;  --pill-wait-dot:#b0935f;
+  --pill-won-bg:#e8f6ed;   --pill-won-fg:#1a7a45;   --pill-won-dot:#1f9d57;
+  --pill-lost-bg:#fdecec;  --pill-lost-fg:#b4282d;  --pill-lost-dot:#e5484d;
+
+  /* Chart palette */
+  --chart-grid: #eceef1;
+  --chart-axis: #888e97;
+  --chart-1: #2398c2;
+  --chart-2: #b1e239;
+  --chart-3: #70c2dd;
+  --chart-4: #a7abb2;
+
+  color-scheme: light;
+}
+
+/* ===== Dark semantic surfaces ===== */
+.dark {
+  --bg: #0f1216;
+  --surface: #171b21;
+  --surface-2: #1e232a;
+  --surface-hover: #232932;
+  --border: #2a3038;
+  --border-strong: #39414b;
+  --text: #e7eaed;
+  --text-muted: #9aa1aa;
+  --text-subtle: #6b727b;
+  --text-inverse: #0f1216;
+  --ring: rgba(66,169,206,.45);
+
+  --primary: #38acd2;
+  --primary-hover: #4fb9da;
+  --primary-active: #2c9bc0;
+  --primary-soft: rgba(35,152,194,.16);
+  --on-primary: #07232e;
+
+  --accent: var(--lime-400);
+  --accent-hover: var(--lime-300);
+  --accent-active: var(--lime-500);
+  --on-accent: #1b2406;
+
+  --pill-new-bg:rgba(35,152,194,.16);  --pill-new-fg:#6cc3e0;  --pill-new-dot:#38acd2;
+  --pill-talk-bg:rgba(126,131,139,.18);--pill-talk-fg:#b3b9c1; --pill-talk-dot:#8b919a;
+  --pill-quote-bg:rgba(102,117,143,.20);--pill-quote-fg:#aebccf;--pill-quote-dot:#8092ad;
+  --pill-wait-bg:rgba(176,147,95,.18); --pill-wait-fg:#d4b988; --pill-wait-dot:#c4a26a;
+  --pill-won-bg:rgba(31,157,87,.18);   --pill-won-fg:#5fc78a;  --pill-won-dot:#2fb86a;
+  --pill-lost-bg:rgba(229,72,77,.18);  --pill-lost-fg:#f08b8e; --pill-lost-dot:#ec5b60;
+
+  --chart-grid: #242a32;
+  --chart-axis: #6b727b;
+  --chart-1: #38acd2;
+  --chart-2: #b1e239;
+  --chart-3: #6cc3e0;
+  --chart-4: #5d626a;
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.35);
+  --shadow-md: 0 4px 14px -2px rgba(0,0,0,.5);
+  --shadow-lg: 0 18px 44px -10px rgba(0,0,0,.6);
+
+  color-scheme: dark;
+}
+
+/* ---------- Base reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: "Heebo", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+h1,h2,h3,h4,p,figure { margin: 0; }
+button { font-family: inherit; }
+
+/* Mixed LTR content (phones, emails, URLs) inside RTL flow */
+.bidi-ltr { direction: ltr; unicode-bidi: isolate; }
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+::selection { background: var(--brand-200); color: var(--neutral-900); }
+.dark ::selection { background: rgba(35,152,194,.4); color: #fff; }
