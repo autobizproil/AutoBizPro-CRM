@@ -1,0 +1,201 @@
+{
+  "nav": {
+    "dashboard":   "Dashboard",
+    "leads":       "Leads",
+    "pipeline":    "Pipeline",
+    "contacts":    "Contacts",
+    "customers":   "Customers",
+    "automations": "Automations",
+    "forms":       "Forms",
+    "landing":     "Landing Pages",
+    "reports":     "Reports",
+    "groups": { "people": "People", "tools": "Tools" }
+  },
+  "header": {
+    "notifications": "Notifications",
+    "darkMode":      "Dark mode",
+    "lightMode":     "Light mode",
+    "pages": {
+      "dashboard":   "Dashboard",
+      "leads":       "Leads",
+      "pipeline":    "Pipeline",
+      "contacts":    "Contacts",
+      "customers":   "Customers",
+      "automations": "Automations",
+      "forms":       "Forms",
+      "landing":     "Landing Pages",
+      "reports":     "Reports",
+      "settings":    "Settings"
+    },
+    "subs": { "dashboard": "Sales Overview · Current Quarter" }
+  },
+  "common": {
+    "save":        "Save",
+    "saveChanges": "Save Changes",
+    "cancel":      "Cancel",
+    "add":         "Add",
+    "edit":        "Edit",
+    "delete":      "Delete",
+    "search":      "Search",
+    "active":      "Active",
+    "inactive":    "Inactive",
+    "connected":   "Connected ✓",
+    "connect":     "Connect",
+    "loading":     "Loading...",
+    "noData":      "No data"
+  },
+  "settings": {
+    "tabs": {
+      "general":       "General",
+      "statuses":      "Statuses & Stages",
+      "users":         "Users",
+      "integrations":  "Integrations",
+      "whatsapp":      "WhatsApp",
+      "notifications": "Notifications",
+      "security":      "Security"
+    },
+    "general": {
+      "title":      "Business Details",
+      "desc":       "Basic information about your business",
+      "bizName":    "Business Name",
+      "field":      "Industry",
+      "phone":      "Phone",
+      "email":      "Email",
+      "address":    "Address",
+      "locale":     "Localization",
+      "localeDesc": "Language, timezone and currency",
+      "language":   "Language",
+      "timezone":   "Timezone",
+      "currency":   "Currency",
+      "logo":       "Logo",
+      "uploadLogo": "Upload Logo",
+      "logoHint":   "PNG, SVG — max 2MB"
+    },
+    "users": {
+      "title":   "User Management",
+      "count":   "{{count}} registered users",
+      "addUser": "Add User",
+      "cols": { "user": "User", "role": "Role", "status": "Status", "lastLogin": "Last Login" },
+      "roles": { "title": "Roles & Permissions", "desc": "Manage roles and access levels", "users": "{{count}} users" }
+    },
+    "integrations": {
+      "title":   "Connections",
+      "desc":    "External services connected to the system",
+      "api":     "API",
+      "apiDesc": "Manage API keys",
+      "copy":    "Copy",
+      "newKey":  "Rotate Key",
+      "webhook": "Webhook URL",
+      "edit":    "Edit",
+      "makeWebhook": {
+        "title":            "Make.com Webhook",
+        "desc":             "URL that Make sends data to",
+        "label":            "Webhook URL",
+        "placeholder":      "https://hook.eu2.make.com/...",
+        "test":             "Send Test",
+        "events":           "Triggering Events",
+        "leadCreated":      "Lead Created",
+        "leadStageChanged": "Lead Stage Changed",
+        "dealClosed":       "Deal Closed",
+        "contactCreated":   "Contact Created"
+      }
+    },
+    "whatsapp": {
+      "title":    "WhatsApp Settings",
+      "desc":     "Connect to WhatsApp Business API provider",
+      "provider": "Provider",
+      "apiKey":   "API Key",
+      "phone":    "Phone Number",
+      "display":  "Display Name",
+      "tip":      "After saving, send a test message to verify the connection.",
+      "test":     "Send Test Message"
+    },
+    "notifications": {
+      "title": "Notification Preferences",
+      "desc":  "Choose which notifications to receive",
+      "save":  "Save Preferences",
+      "items": {
+        "new_lead":      { "label": "New Lead",       "desc": "Alert when a new lead enters the system" },
+        "lead_assigned": { "label": "Lead Assigned",  "desc": "Alert when a lead is assigned to you" },
+        "deal_closed":   { "label": "Deal Closed",    "desc": "Alert when a deal closes successfully" },
+        "task_reminder": { "label": "Task Reminder",  "desc": "Reminder before a task due date" },
+        "daily_report":  { "label": "Daily Report",   "desc": "Daily summary of sales activity" },
+        "weekly_report": { "label": "Weekly Report",  "desc": "Weekly summary with charts and trends" }
+      }
+    },
+    "security": {
+      "password":     "Password",
+      "passwordDesc": "Change your login password",
+      "current":      "Current Password",
+      "new":          "New Password",
+      "confirm":      "Confirm Password",
+      "update":       "Update Password",
+      "mismatch":     "Passwords do not match",
+      "twofa":        "Two-Factor Authentication (2FA)",
+      "twofaDesc":    "Increase security with an additional verification step",
+      "twofaOff":     "Currently inactive",
+      "enable":       "Enable",
+      "loginHistory": "Login History",
+      "loginDesc":    "Recent account logins"
+    },
+    "statuses": {
+      "stages":      "Pipeline Stages",
+      "stagesDesc":  "Manage stages in the sales process",
+      "addStage":    "Add Stage",
+      "stageName":   "Stage Name",
+      "stageColor":  "Color",
+      "stageOrder":  "Stage {{n}}",
+      "editStage":   "Edit Stage",
+      "editStatus":  "Edit Status",
+      "statuses":    "Lead Statuses",
+      "statusesDesc":"Statuses shown in the leads table",
+      "sources":     "Lead Sources",
+      "sourcesDesc": "Where leads come from",
+      "addSource":   "Add new source..."
+    }
+  },
+  "dashboard": {
+    "week":       "Week",
+    "month":      "Month",
+    "year":       "Year",
+    "createLead": "Create Lead",
+    "kpi": {
+      "newLeads":   "New Leads This Month",
+      "openQuotes": "Open Quotes",
+      "closeRate":  "Close Rate",
+      "dealsWon":   "Deals Closed"
+    },
+    "charts": {
+      "leadsTrend":   "New Leads Trend",
+      "leadsByStage": "Leads by Stage",
+      "revenue":      "Cumulative Revenue",
+      "repPerf":      "Rep Performance",
+      "bySource":     "Leads by Source",
+      "activity":     "Recent Activity"
+    }
+  },
+  "toast": {
+    "saved":           "Changes saved",
+    "logoUploaded":    "Logo uploaded",
+    "stageAdded":      "Stage added",
+    "stageUpdated":    "Stage updated",
+    "stageDeleted":    "Stage deleted",
+    "statusUpdated":   "Status updated",
+    "sourceAdded":     "Source added",
+    "userAdded":       "User added",
+    "userUpdated":     "User updated",
+    "statusToggled":   "Status updated",
+    "keyCopied":       "Key copied",
+    "keyRotated":      "New key created",
+    "webhookSaved":    "Webhook saved",
+    "testSent":        "Test message sent",
+    "notifsSaved":     "Notification preferences saved",
+    "passwordUpdated": "Password updated",
+    "passwordMismatch":"Passwords do not match",
+    "twoFaEnabled":    "2FA enabled",
+    "connected":       "{{name}} connected",
+    "disconnected":    "{{name}} disconnected",
+    "whatsappSaved":   "WhatsApp settings saved",
+    "generalSaved":    "General settings saved"
+  }
+}

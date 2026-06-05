@@ -1,0 +1,201 @@
+{
+  "nav": {
+    "dashboard":   "לוחות בקרה",
+    "leads":       "לידים",
+    "pipeline":    "פייפליין",
+    "contacts":    "אנשי קשר",
+    "customers":   "לקוחות",
+    "automations": "אוטומציות",
+    "forms":       "טפסים",
+    "landing":     "דפי נחיתה",
+    "reports":     "דוחות",
+    "groups": { "people": "אנשים", "tools": "כלים" }
+  },
+  "header": {
+    "notifications": "התראות",
+    "darkMode":      "מצב כהה",
+    "lightMode":     "מצב בהיר",
+    "pages": {
+      "dashboard":   "לוח בקרה",
+      "leads":       "לידים",
+      "pipeline":    "פייפליין",
+      "contacts":    "אנשי קשר",
+      "customers":   "לקוחות",
+      "automations": "אוטומציות",
+      "forms":       "טפסים",
+      "landing":     "דפי נחיתה",
+      "reports":     "דוחות",
+      "settings":    "הגדרות"
+    },
+    "subs": { "dashboard": "סקירת מכירות · רבעון נוכחי" }
+  },
+  "common": {
+    "save":        "שמור",
+    "saveChanges": "שמור שינויים",
+    "cancel":      "ביטול",
+    "add":         "הוסף",
+    "edit":        "ערוך",
+    "delete":      "מחק",
+    "search":      "חיפוש",
+    "active":      "פעיל",
+    "inactive":    "לא פעיל",
+    "connected":   "מחובר ✓",
+    "connect":     "חבר",
+    "loading":     "טוען...",
+    "noData":      "אין נתונים"
+  },
+  "settings": {
+    "tabs": {
+      "general":       "כללי",
+      "statuses":      "מצבים ושלבים",
+      "users":         "משתמשים",
+      "integrations":  "אינטגרציות",
+      "whatsapp":      "WhatsApp",
+      "notifications": "התראות",
+      "security":      "אבטחה"
+    },
+    "general": {
+      "title":      "פרטי העסק",
+      "desc":       "מידע בסיסי על העסק שלך",
+      "bizName":    "שם העסק",
+      "field":      "תחום",
+      "phone":      "טלפון",
+      "email":      "אימייל",
+      "address":    "כתובת",
+      "locale":     "לוקליזציה",
+      "localeDesc": "שפה, אזור זמן ומטבע",
+      "language":   "שפה",
+      "timezone":   "אזור זמן",
+      "currency":   "מטבע",
+      "logo":       "לוגו",
+      "uploadLogo": "העלה לוגו",
+      "logoHint":   "PNG, SVG — מקסימום 2MB"
+    },
+    "users": {
+      "title":   "ניהול משתמשים",
+      "count":   "{{count}} משתמשים רשומים",
+      "addUser": "הוסף משתמש",
+      "cols": { "user": "משתמש", "role": "תפקיד", "status": "סטטוס", "lastLogin": "כניסה אחרונה" },
+      "roles": { "title": "תפקידים והרשאות", "desc": "ניהול תפקידים ורמות גישה", "users": "{{count}} משתמשים" }
+    },
+    "integrations": {
+      "title":   "חיבורים",
+      "desc":    "שירותים חיצוניים המחוברים למערכת",
+      "api":     "API",
+      "apiDesc": "ניהול מפתחות API",
+      "copy":    "העתק",
+      "newKey":  "חדש מפתח",
+      "webhook": "Webhook URL",
+      "edit":    "ערוך",
+      "makeWebhook": {
+        "title":             "Make.com Webhook",
+        "desc":              "URL שמייק שולח אליו נתונים",
+        "label":             "Webhook URL",
+        "placeholder":       "https://hook.eu2.make.com/...",
+        "test":              "שלח בדיקה",
+        "events":            "אירועים שמפעילים",
+        "leadCreated":       "ליד נוצר",
+        "leadStageChanged":  "שלב ליד שונה",
+        "dealClosed":        "עסקה נסגרה",
+        "contactCreated":    "איש קשר נוצר"
+      }
+    },
+    "whatsapp": {
+      "title":    "הגדרות WhatsApp",
+      "desc":     "חיבור לספק WhatsApp Business API",
+      "provider": "ספק",
+      "apiKey":   "API Key",
+      "phone":    "מספר טלפון",
+      "display":  "שם תצוגה",
+      "tip":      "לאחר שמירת ההגדרות, שלח הודעת בדיקה כדי לוודא שהחיבור תקין.",
+      "test":     "שלח הודעת בדיקה"
+    },
+    "notifications": {
+      "title": "העדפות התראות",
+      "desc":  "בחר אילו התראות לקבל",
+      "save":  "שמור העדפות",
+      "items": {
+        "new_lead":      { "label": "ליד חדש",       "desc": "התראה כשנכנס ליד חדש למערכת" },
+        "lead_assigned": { "label": "הקצאת ליד",     "desc": "התראה כשליד מוקצה אליך" },
+        "deal_closed":   { "label": "עסקה נסגרה",    "desc": "התראה כשעסקה נסגרת בהצלחה" },
+        "task_reminder": { "label": "תזכורת משימה",  "desc": "תזכורת לפני מועד יעד של משימה" },
+        "daily_report":  { "label": "דוח יומי",      "desc": "סיכום יומי של פעילות המכירות" },
+        "weekly_report": { "label": "דוח שבועי",     "desc": "סיכום שבועי עם גרפים ומגמות" }
+      }
+    },
+    "security": {
+      "password":     "סיסמה",
+      "passwordDesc": "שינוי סיסמת הכניסה",
+      "current":      "סיסמה נוכחית",
+      "new":          "סיסמה חדשה",
+      "confirm":      "אימות סיסמה",
+      "update":       "עדכן סיסמה",
+      "mismatch":     "הסיסמאות לא תואמות",
+      "twofa":        "אימות דו-שלבי (2FA)",
+      "twofaDesc":    "הגברת האבטחה עם אימות נוסף",
+      "twofaOff":     "כרגע לא פעיל",
+      "enable":       "הפעל",
+      "loginHistory": "היסטוריית כניסות",
+      "loginDesc":    "כניסות אחרונות לחשבון"
+    },
+    "statuses": {
+      "stages":      "שלבי פייפליין",
+      "stagesDesc":  "ניהול השלבים בתהליך המכירה",
+      "addStage":    "הוסף שלב",
+      "stageName":   "שם השלב",
+      "stageColor":  "צבע",
+      "stageOrder":  "שלב {{n}}",
+      "editStage":   "עריכת שלב",
+      "editStatus":  "עריכת מצב",
+      "statuses":    "מצבי ליד",
+      "statusesDesc":"סטטוסים שמוצגים בטבלת הלידים",
+      "sources":     "מקורות ליד",
+      "sourcesDesc": "מאיפה מגיעים הלידים",
+      "addSource":   "הוסף מקור חדש..."
+    }
+  },
+  "dashboard": {
+    "week":       "שבוע",
+    "month":      "חודש",
+    "year":       "שנה",
+    "createLead": "צור ליד",
+    "kpi": {
+      "newLeads":   "לידים חדשים החודש",
+      "openQuotes": "הצעות מחיר פתוחות",
+      "closeRate":  "שיעור סגירה",
+      "dealsWon":   "עסקאות שנסגרו"
+    },
+    "charts": {
+      "leadsTrend":   "מגמת לידים חדשים",
+      "leadsByStage": "לידים לפי שלב",
+      "revenue":      "הכנסות מצטברות",
+      "repPerf":      "ביצועים לפי נציג",
+      "bySource":     "לידים לפי מקור",
+      "activity":     "פעילות אחרונה"
+    }
+  },
+  "toast": {
+    "saved":           "שינויים נשמרו",
+    "logoUploaded":    "לוגו הועלה",
+    "stageAdded":      "שלב נוסף",
+    "stageUpdated":    "שלב עודכן",
+    "stageDeleted":    "שלב נמחק",
+    "statusUpdated":   "מצב עודכן",
+    "sourceAdded":     "מקור נוסף",
+    "userAdded":       "משתמש נוסף",
+    "userUpdated":     "משתמש עודכן",
+    "statusToggled":   "סטטוס עודכן",
+    "keyCopied":       "מפתח הועתק",
+    "keyRotated":      "מפתח חדש נוצר",
+    "webhookSaved":    "Webhook נשמר",
+    "testSent":        "הודעת בדיקה נשלחה",
+    "notifsSaved":     "העדפות התראות נשמרו",
+    "passwordUpdated": "סיסמה עודכנה",
+    "passwordMismatch":"הסיסמאות לא תואמות",
+    "twoFaEnabled":    "2FA הופעל",
+    "connected":       "{{name}} חובר",
+    "disconnected":    "{{name}} נותק",
+    "whatsappSaved":   "הגדרות WhatsApp נשמרו",
+    "generalSaved":    "הגדרות כלליות נשמרו"
+  }
+}
