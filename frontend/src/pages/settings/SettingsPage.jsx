@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import client from '../../api/client'
 import { settingsApi } from '../../api/settings'
 import { useAuth } from '../../context/AuthContext'
@@ -9,16 +10,6 @@ import {
   Bell, Globe, Database, GripVertical, Pencil,
   Trash2, Plus, ToggleLeft, ToggleRight, Check, X, Save,
 } from 'lucide-react'
-
-const TABS = [
-  { id: 'general',      label: 'כללי',        icon: Settings },
-  { id: 'statuses',     label: 'מצבים ושלבים', icon: Palette },
-  { id: 'users',        label: 'משתמשים',      icon: Users },
-  { id: 'integrations', label: 'אינטגרציות',   icon: Link2 },
-  { id: 'whatsapp',     label: 'WhatsApp',     icon: MessageSquare },
-  { id: 'notifications',label: 'התראות',       icon: Bell },
-  { id: 'security',     label: 'אבטחה',       icon: Shield },
-]
 
 const INIT_USERS = [
   { id: 1, name: 'דנה כהן',   email: 'dana@autobizpro.co.il',  role: 'מנהלת מכירות', status: 'active', last_login: '03/06/2026 09:12' },
@@ -101,6 +92,7 @@ function EditModal({ title, children, onSave, onClose }) {
 }
 
 function GeneralTab({ toast }) {
+  const { t } = useTranslation()
   const fileRef = useRef(null)
   const [logoPreview, setLogoPreview] = useState(null)
 
@@ -109,7 +101,7 @@ function GeneralTab({ toast }) {
     if (!file) return
     setLogoPreview(URL.createObjectURL(file))
     settingsApi.uploadLogo(file).catch(() => {})
-    toast('לוגו הועלה')
+    toast(t('toast.logoUploaded'))
   }
 
   const [biz, setBiz] = useState({
@@ -202,7 +194,7 @@ function GeneralTab({ toast }) {
       </SettingCard>
 
       <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 8 }}>
-        <button className="btn btn--primary" onClick={() => toast('הגדרות כלליות נשמרו')}>
+        <button className="btn btn--primary" onClick={() => toast(t('toast.generalSaved'))}>
           <Save size={14} /> שמור שינויים
         </button>
       </div>
@@ -211,6 +203,7 @@ function GeneralTab({ toast }) {
 }
 
 function StatusesTab({ toast }) {
+  const { t } = useTranslation()
   const [stages, setStages] = useState([...MOCK_STAGES])
   const [statuses, setStatuses] = useState([...INIT_LEAD_STATUSES])
   const [sources, setSources] = useState(['דף נחיתה', 'גוגל', 'פייסבוק', 'הפניה', 'אתר החברה', 'שיחה נכנסת', 'אינסטגרם', 'לינקדאין'])
@@ -224,7 +217,7 @@ function StatusesTab({ toast }) {
     if (newSource.trim() && !sources.includes(newSource.trim())) {
       setSources(p => [...p, newSource.trim()])
       setNewSource('')
-      toast('מקור נוסף')
+      toast(t('toast.sourceAdded'))
     }
   }
   const removeSource = (src) => setSources(p => p.filter(s => s !== src))
@@ -236,17 +229,17 @@ function StatusesTab({ toast }) {
   const saveStage = () => {
     setStages(p => p.map(s => s.id === editingStage ? { ...s, name: stageForm.name, color: stageForm.color } : s))
     setEditingStage(null)
-    toast('שלב עודכן')
+    toast(t('toast.stageUpdated'))
   }
   const deleteStage = (id) => {
     setStages(p => p.filter(s => s.id !== id))
-    toast('שלב נמחק')
+    toast(t('toast.stageDeleted'))
   }
   const addStage = () => {
     const maxOrder = Math.max(0, ...stages.map(s => s.order))
     const maxId = Math.max(0, ...stages.map(s => s.id))
     setStages(p => [...p, { id: maxId + 1, name: 'שלב חדש', color: '#2398c2', order: maxOrder + 1 }])
-    toast('שלב נוסף')
+    toast(t('toast.stageAdded'))
   }
 
   const openEditStatus = (status) => {
@@ -256,7 +249,7 @@ function StatusesTab({ toast }) {
   const saveStatus = () => {
     setStatuses(p => p.map(s => s.id === editingStatus ? { ...s, label: statusForm.label, color: statusForm.color } : s))
     setEditingStatus(null)
-    toast('מצב עודכן')
+    toast(t('toast.statusUpdated'))
   }
 
   return (
@@ -365,6 +358,7 @@ function StatusesTab({ toast }) {
 }
 
 function UsersTab({ toast }) {
+  const { t } = useTranslation()
   const [users, setUsers] = useState([...INIT_USERS])
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ name: '', email: '', role: '', status: 'active' })
@@ -379,11 +373,11 @@ function UsersTab({ toast }) {
       const maxId = Math.max(0, ...users.map(u => u.id))
       setUsers(p => [...p, { ...form, id: maxId + 1, last_login: '—' }])
       setAdding(false)
-      toast('משתמש נוסף')
+      toast(t('toast.userAdded'))
     } else {
       setUsers(p => p.map(u => u.id === editing ? { ...u, ...form } : u))
       setEditing(null)
-      toast('משתמש עודכן')
+      toast(t('toast.userUpdated'))
     }
   }
   const openAdd = () => {
@@ -393,7 +387,7 @@ function UsersTab({ toast }) {
 
   const toggleStatus = (id) => {
     setUsers(p => p.map(u => u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u))
-    toast('סטטוס עודכן')
+    toast(t('toast.statusToggled'))
   }
 
   return (
@@ -522,13 +516,14 @@ function UsersTab({ toast }) {
 }
 
 function IntegrationsTab({ toast }) {
+  const { t } = useTranslation()
   const [integrations, setIntegrations] = useState(INIT_INTEGRATIONS)
   const toggle = (id) => {
     setIntegrations(prev => prev.map(i =>
       i.id === id ? { ...i, connected: !i.connected } : i
     ))
     const item = integrations.find(i => i.id === id)
-    toast(item.connected ? `${item.name} נותק` : `${item.name} חובר`)
+    toast(item.connected ? t('toast.disconnected', { name: item.name }) : t('toast.connected', { name: item.name }))
   }
 
   return (
@@ -569,8 +564,8 @@ function IntegrationsTab({ toast }) {
             <div style={{ fontSize: 13, fontWeight: 500 }}>API Key</div>
             <code style={{ fontSize: 12, color: 'var(--text-subtle)' }} dir="ltr">abp_live_••••••••••••3k7f</code>
           </div>
-          <button className="btn btn--outline" style={{ fontSize: 12 }} onClick={() => { navigator.clipboard?.writeText('abp_live_demo_key_3k7f'); toast('מפתח הועתק') }}>העתק</button>
-          <button className="btn btn--outline" style={{ fontSize: 12, color: 'var(--danger)' }} onClick={() => toast('מפתח חדש נוצר')}>חדש מפתח</button>
+          <button className="btn btn--outline" style={{ fontSize: 12 }} onClick={() => { navigator.clipboard?.writeText('abp_live_demo_key_3k7f'); toast(t('toast.keyCopied')) }}>העתק</button>
+          <button className="btn btn--outline" style={{ fontSize: 12, color: 'var(--danger)' }} onClick={() => toast(t('toast.keyRotated'))}>חדש מפתח</button>
         </div>
         <div style={{ marginTop: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }}>
@@ -579,7 +574,7 @@ function IntegrationsTab({ toast }) {
               <div style={{ fontSize: 13, fontWeight: 500 }}>Webhook URL</div>
               <code style={{ fontSize: 12, color: 'var(--text-subtle)' }} dir="ltr">https://api.autobizpro.co.il/webhook/v1</code>
             </div>
-            <button className="btn btn--outline" style={{ fontSize: 12 }} onClick={() => toast('Webhook URL עודכן')}>ערוך</button>
+            <button className="btn btn--outline" style={{ fontSize: 12 }} onClick={() => toast(t('toast.webhookSaved'))}>ערוך</button>
           </div>
         </div>
       </SettingCard>
@@ -588,6 +583,7 @@ function IntegrationsTab({ toast }) {
 }
 
 function WhatsAppTab({ whatsappProvider, setWhatsappProvider, whatsappApiKey, setWhatsappApiKey, waPhone, setWaPhone, waDisplay, setWaDisplay, handleSave, canUpdate, toast }) {
+  const { t } = useTranslation()
   return (
     <div>
       <SettingCard title="הגדרות WhatsApp" desc="חיבור לספק WhatsApp Business API">
@@ -626,7 +622,7 @@ function WhatsAppTab({ whatsappProvider, setWhatsappProvider, whatsappApiKey, se
           {canUpdate && (
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="submit" className="btn btn--primary"><Save size={14} /> שמור</button>
-              <button type="button" className="btn btn--outline" onClick={() => toast('הודעת בדיקה נשלחה')}>שלח הודעת בדיקה</button>
+              <button type="button" className="btn btn--outline" onClick={() => toast(t('toast.testSent'))}>שלח הודעת בדיקה</button>
             </div>
           )}
         </form>
@@ -636,6 +632,7 @@ function WhatsAppTab({ whatsappProvider, setWhatsappProvider, whatsappApiKey, se
 }
 
 function NotificationsTab({ toast }) {
+  const { t } = useTranslation()
   const [notifs, setNotifs] = useState({
     new_lead: true, lead_assigned: true, deal_closed: true,
     task_reminder: true, daily_report: false, weekly_report: true,
@@ -674,7 +671,7 @@ function NotificationsTab({ toast }) {
         ))}
       </div>
       <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-start' }}>
-        <button className="btn btn--primary" onClick={() => toast('העדפות התראות נשמרו')}>
+        <button className="btn btn--primary" onClick={() => toast(t('toast.notifsSaved'))}>
           <Save size={14} /> שמור העדפות
         </button>
       </div>
@@ -683,13 +680,14 @@ function NotificationsTab({ toast }) {
 }
 
 function SecurityTab({ toast }) {
+  const { t } = useTranslation()
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' })
 
   const updatePassword = () => {
     if (!passwords.current || !passwords.newPass) return
-    if (passwords.newPass !== passwords.confirm) { toast('הסיסמאות לא תואמות'); return }
+    if (passwords.newPass !== passwords.confirm) { toast(t('toast.passwordMismatch')); return }
     setPasswords({ current: '', newPass: '', confirm: '' })
-    toast('סיסמה עודכנה')
+    toast(t('toast.passwordUpdated'))
   }
 
   return (
@@ -725,7 +723,7 @@ function SecurityTab({ toast }) {
             <div style={{ fontSize: 14, fontWeight: 500 }}>אימות דו-שלבי</div>
             <div style={{ fontSize: 12, color: 'var(--text-subtle)' }}>כרגע לא פעיל</div>
           </div>
-          <button className="btn btn--outline" style={{ fontSize: 13 }} onClick={() => toast('2FA הופעל')}>הפעל</button>
+          <button className="btn btn--outline" style={{ fontSize: 13 }} onClick={() => toast(t('toast.twoFaEnabled'))}>הפעל</button>
         </div>
       </SettingCard>
 
@@ -752,9 +750,20 @@ function SecurityTab({ toast }) {
 }
 
 export default function SettingsPage() {
+  const { t } = useTranslation()
   const { can }    = useAuth()
   const qc         = useQueryClient()
   const [tab, setTab] = useState('general')
+
+  const TABS = [
+    { id: 'general',       label: t('settings.tabs.general'),       icon: Settings },
+    { id: 'statuses',      label: t('settings.tabs.statuses'),      icon: Palette },
+    { id: 'users',         label: t('settings.tabs.users'),         icon: Users },
+    { id: 'integrations',  label: t('settings.tabs.integrations'),  icon: Link2 },
+    { id: 'whatsapp',      label: t('settings.tabs.whatsapp'),      icon: MessageSquare },
+    { id: 'notifications', label: t('settings.tabs.notifications'), icon: Bell },
+    { id: 'security',      label: t('settings.tabs.security'),      icon: Shield },
+  ]
   const [toastMsg, showToast] = useToast()
 
   const { data: tenantData } = useQuery({
@@ -780,7 +789,7 @@ export default function SettingsPage() {
         whatsapp_api_key:  whatsappApiKey,
       },
     })
-    showToast('הגדרות WhatsApp נשמרו')
+    showToast(t('toast.whatsappSaved'))
   }
 
   return (

@@ -32,33 +32,33 @@ export default function Layout() {
 
   const NAV = [
     { group: null, items: [
-      { to: '/dashboard', label: 'לוחות בקרה', icon: LayoutDashboard },
-      { to: '/leads',     label: 'לידים',      icon: Users, badge: '128' },
-      { to: '/pipeline',  label: 'פייפליין',   icon: GitBranch },
+      { to: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+      { to: '/leads',     label: t('nav.leads'),     icon: Users, badge: '128' },
+      { to: '/pipeline',  label: t('nav.pipeline'),  icon: GitBranch },
     ]},
-    { group: 'אנשים', items: [
-      { to: '/contacts',  label: 'אנשי קשר', icon: BookUser },
-      { to: '/customers', label: 'לקוחות',    icon: Building2 },
+    { group: t('nav.groups.people'), items: [
+      { to: '/contacts',  label: t('nav.contacts'),  icon: BookUser },
+      { to: '/customers', label: t('nav.customers'), icon: Building2 },
     ]},
-    { group: 'כלים', items: [
-      { to: '/automations', label: 'אוטומציות', icon: Zap },
-      { to: '/forms',       label: 'טפסים',     icon: FileText },
-      { to: '/landing',     label: 'דפי נחיתה', icon: FileImage },
-      { to: '/reports',     label: 'דוחות',     icon: BarChart3 },
+    { group: t('nav.groups.tools'), items: [
+      { to: '/automations', label: t('nav.automations'), icon: Zap },
+      { to: '/forms',       label: t('nav.forms'),       icon: FileText },
+      { to: '/landing',     label: t('nav.landing'),     icon: FileImage },
+      { to: '/reports',     label: t('nav.reports'),     icon: BarChart3 },
     ]},
   ]
 
   const PAGE_META = {
-    '/dashboard':   { title: 'לוח בקרה',  sub: 'סקירת מכירות · רבעון נוכחי' },
-    '/leads':       { title: 'לידים',      sub: null },
-    '/pipeline':    { title: 'פייפליין',   sub: null },
-    '/contacts':    { title: 'אנשי קשר',  sub: null },
-    '/customers':   { title: 'לקוחות',     sub: null },
-    '/automations': { title: 'אוטומציות',  sub: null },
-    '/forms':       { title: 'טפסים',      sub: null },
-    '/landing':     { title: 'דפי נחיתה',  sub: null },
-    '/reports':     { title: 'דוחות',      sub: null },
-    '/settings':    { title: 'הגדרות',     sub: null },
+    '/dashboard':   { title: t('header.pages.dashboard'),   sub: t('header.subs.dashboard') },
+    '/leads':       { title: t('header.pages.leads'),       sub: null },
+    '/pipeline':    { title: t('header.pages.pipeline'),    sub: null },
+    '/contacts':    { title: t('header.pages.contacts'),    sub: null },
+    '/customers':   { title: t('header.pages.customers'),   sub: null },
+    '/automations': { title: t('header.pages.automations'), sub: null },
+    '/forms':       { title: t('header.pages.forms'),       sub: null },
+    '/landing':     { title: t('header.pages.landing'),     sub: null },
+    '/reports':     { title: t('header.pages.reports'),     sub: null },
+    '/settings':    { title: t('header.pages.settings'),    sub: null },
   }
 
   const location = useLocation()
@@ -128,10 +128,10 @@ export default function Layout() {
             >
               {i18n.language === 'he' ? 'EN' : 'HE'}
             </button>
-            <button className="btn btn--ghost btn--icon" title="התראות">
+            <button className="btn btn--ghost btn--icon" title={t('header.notifications')}>
               <Bell size={18} />
             </button>
-            <button className="btn btn--ghost btn--icon" onClick={toggleTheme} title={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}>
+            <button className="btn btn--ghost btn--icon" onClick={toggleTheme} title={theme === 'dark' ? t('header.lightMode') : t('header.darkMode')}>
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
           </div>

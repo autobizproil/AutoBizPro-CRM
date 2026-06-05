@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useDashboardStats, useDashboardChart } from '../../hooks/useDashboard'
 import {
   Users, DollarSign, Target, CheckCircle2, TrendingUp, TrendingDown, Plus,
@@ -61,7 +62,8 @@ function CardHead({ title, sub, children }) {
 }
 
 export default function DashboardPage() {
-  const [range, setRange] = useState('שנה')
+  const { t } = useTranslation()
+  const [range, setRange] = useState(t('dashboard.year'))
   const { data: stats }  = useDashboardStats()
   const { data: charts } = useDashboardChart(range)
 
@@ -75,40 +77,40 @@ export default function DashboardPage() {
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <div className="seg">
-          {['שבוע', 'חודש', 'שנה'].map(r => (
+          {[t('dashboard.week'), t('dashboard.month'), t('dashboard.year')].map(r => (
             <button key={r} className={range === r ? 'on' : ''} onClick={() => setRange(r)}>{r}</button>
           ))}
         </div>
-        <button className="btn btn--accent"><Plus size={16} />צור ליד</button>
+        <button className="btn btn--accent"><Plus size={16} />{t('dashboard.createLead')}</button>
       </div>
 
       <div className="dash-grid kpi-row" style={{ marginBottom: 16 }}>
         <Kpi icon={Users}
           tint={{ background: 'var(--brand-50)', color: 'var(--brand-600)' }}
-          label="לידים חדשים החודש"
+          label={t('dashboard.kpi.newLeads')}
           value={stats?.total_leads ?? 128}
           up delta={`${stats?.new_leads_delta ?? 18}%`} note="לעומת החודש שעבר" />
         <Kpi icon={DollarSign}
           tint={{ background: 'var(--lime-100)', color: 'var(--lime-700)' }}
-          label="הצעות מחיר פתוחות"
+          label={t('dashboard.kpi.openQuotes')}
           value={<>₪ {stats?.open_quotes_value ?? '247,500'}</>}
           up delta={`${stats?.quotes_delta ?? 12}%`}
           note={`${stats?.open_quotes_count ?? 34} הצעות`} />
         <Kpi icon={Target}
           tint={{ background: 'var(--amber-50,#fffbeb)', color: 'var(--amber-600,#d97706)' }}
-          label="שיעור סגירה"
+          label={t('dashboard.kpi.closeRate')}
           value={`${stats?.close_rate ?? 32}%`}
           up={false} delta={`${stats?.close_rate_delta ?? 4}%`} note="ממוצע צוות" />
         <Kpi icon={CheckCircle2}
           tint={{ background: 'var(--green-50,#f0fdf4)', color: 'var(--green-600,#16a34a)' }}
-          label="עסקאות שנסגרו"
+          label={t('dashboard.kpi.dealsWon')}
           value={stats?.deals_won ?? 24}
           up delta={`${stats?.deals_won_delta ?? 9}%`} note="הרבעון" />
       </div>
 
       <div className="dash-grid chart-row-2" style={{ marginBottom: 16 }}>
         <div className="card">
-          <CardHead title="מגמת לידים חדשים" sub="8 חודשים אחרונים" />
+          <CardHead title={t('dashboard.charts.leadsTrend')} sub="8 חודשים אחרונים" />
           <div className="card__body" style={{ paddingTop: 8 }}>
             <ResponsiveContainer width="100%" height={236}>
               <LineChart data={leadsData}>
@@ -124,7 +126,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="card">
-          <CardHead title="לידים לפי שלב" />
+          <CardHead title={t('dashboard.charts.leadsByStage')} />
           <div className="card__body" style={{ paddingTop: 8 }}>
             <ResponsiveContainer width="100%" height={236}>
               <PieChart>
@@ -149,7 +151,7 @@ export default function DashboardPage() {
 
       <div className="dash-grid chart-row-eq" style={{ marginBottom: 16 }}>
         <div className="card">
-          <CardHead title="הכנסות מצטברות" sub="₪ אלפים" />
+          <CardHead title={t('dashboard.charts.revenue')} sub="₪ אלפים" />
           <div className="card__body" style={{ paddingTop: 8 }}>
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={revenueData}>
@@ -170,7 +172,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="card">
-          <CardHead title="ביצועים לפי נציג" />
+          <CardHead title={t('dashboard.charts.repPerf')} />
           <div className="card__body" style={{ paddingTop: 8 }}>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={repData} layout="vertical">
@@ -187,7 +189,7 @@ export default function DashboardPage() {
 
       <div className="dash-grid chart-row-eq">
         <div className="card">
-          <CardHead title="לידים לפי מקור" />
+          <CardHead title={t('dashboard.charts.bySource')} />
           <div className="card__body" style={{ paddingTop: 8 }}>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={sourceData} layout="vertical">
@@ -202,7 +204,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="card">
-          <CardHead title="פעילות אחרונה" />
+          <CardHead title={t('dashboard.charts.activity')} />
           <div className="card__body">
             <div className="timeline">
               {activity.map((a, i) => (
