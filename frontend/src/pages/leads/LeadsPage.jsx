@@ -6,6 +6,40 @@ import { leadsApi } from '../../api/leads'
 import { useAuth } from '../../context/AuthContext'
 import LeadPanel from './LeadPanel'
 
+function exportLeadsCsv(leads) {
+  const COLS = ['id','name','phone','email','status','source','created_at']
+  const rows = [COLS.join(','), ...leads.map(l =>
+    COLS.map(k => {
+      const v = k === 'created_at' ? (l[k] ? new Date(l[k]).toLocaleDateString('he-IL') : '') : (l[k] ?? '')
+      return `"${String(v).replace(/"/g, '""')}"`
+    }).join(',')
+  )]
+  const blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = `leads-${Date.now()}.csv`; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function parseCsvLeads(text) {
+  const lines = text.trim().split(/\r?\n/)
+  if (lines.length < 2) return []
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase())
+  return lines.slice(1).map(line => {
+    const vals = []
+    let cur = '', inQ = false
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ }
+      else if (ch === ',' && !inQ) { vals.push(cur); cur = '' }
+      else { cur += ch }
+    }
+    vals.push(cur)
+    const obj = {}
+    headers.forEach((h, i) => { obj[h] = vals[i]?.trim() ?? '' })
+    return { name: obj.name || obj['שם'] || obj['שם מלא'] || '', phone: obj.phone || obj['טלפון'] || '', email: obj.email || obj['אימייל'] || obj['דוא"ל'] || '', source: obj.source || obj['מקור'] || '', status: 'new', id: Date.now() + Math.random(), created_at: new Date().toISOString() }
+  }).filter(l => l.name)
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS = {
@@ -101,6 +135,9 @@ export default function LeadsPage() {
   const [showColPanel, setShowColPanel] = useState(false)
   const colPanelRef                     = useRef(null)
 
+  // Import
+  const importRef                       = useRef(null)
+
   // Right sidebar
   const [sidebarOpen, setSidebarOpen]   = useState(true)
 
@@ -148,10 +185,34 @@ export default function LeadsPage() {
   const handleBulkDelete = async () => {
     if (!window.confirm(`למחוק ${selected.size} לידים?`)) return
     for (const id of selected) {
-      await leadsApi.remove(id)
+      deleteLead.mutate(id)
     }
     setSelected(new Set())
-    qc.invalidateQueries({ queryKey: ['leads'] })
+  }
+
+  const handleDeleteAll = async () => {
+    if (!window.confirm(`למחוק את כל ${leads.length} הלידים? פעולה זו אינה הפיכה.`)) return
+    for (const l of leads) {
+      deleteLead.mutate(l.id)
+    }
+    setSelected(new Set())
+  }
+
+  const handleImport = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const imported = parseCsvLeads(ev.target.result)
+      if (!imported.length) { alert('לא נמצאו לידים תקינים בקובץ'); return }
+      qc.setQueriesData({ queryKey: ['leads'] }, (old) => {
+        const existing = old?.data ?? []
+        return { data: [...imported, ...existing] }
+      })
+      alert(`יובאו ${imported.length} לידים`)
+    }
+    reader.readAsText(file, 'UTF-8')
+    e.target.value = ''
   }
 
   const startEdit = (leadId, field, e) => {
@@ -346,6 +407,33 @@ export default function LeadsPage() {
               )}
             </div>
 
+            {/* Import CSV */}
+            <input ref={importRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleImport} />
+            <button
+              onClick={() => importRef.current?.click()}
+              className="flex items-center gap-1 border border-gray-300 bg-white text-gray-600 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+            >
+              ↑ ייבא CSV
+            </button>
+
+            {/* Export CSV */}
+            <button
+              onClick={() => exportLeadsCsv(leads)}
+              className="flex items-center gap-1 border border-gray-300 bg-white text-gray-600 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+            >
+              ↓ ייצוא CSV
+            </button>
+
+            {/* Delete all */}
+            {can('leads', 'can_delete') && leads.length > 0 && (
+              <button
+                onClick={handleDeleteAll}
+                className="flex items-center gap-1 border border-red-200 bg-white text-red-500 px-3 py-1.5 rounded-lg text-sm hover:bg-red-50 transition-colors"
+              >
+                מחק הכל
+              </button>
+            )}
+
             {/* Search */}
             <input
               type="text"
@@ -450,7 +538,7 @@ export default function LeadsPage() {
                     leads.map(lead => (
                       <tr
                         key={lead.id}
-                        className={`hover:bg-gray-50 transition-colors ${selected.has(lead.id) ? 'bg-blue-50' : ''}`}
+                        className={`group hover:bg-gray-50 transition-colors ${selected.has(lead.id) ? 'bg-blue-50' : ''}`}
                       >
                         {/* Checkbox */}
                         <td className="px-3 py-2 w-8">
