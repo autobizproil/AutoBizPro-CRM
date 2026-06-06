@@ -65,8 +65,8 @@ function CardHead({ title, sub, children }) {
 export default function DashboardPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [range, setRange] = useState(t('dashboard.year'))
-  const { data: stats }  = useDashboardStats()
+  const [range, setRange] = useState('year')
+  const { data: stats }  = useDashboardStats(range)
   const { data: charts } = useDashboardChart(range)
 
   const leadsData   = charts?.leads_by_month  ?? []
@@ -79,8 +79,8 @@ export default function DashboardPage() {
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
         <div className="seg">
-          {[t('dashboard.week'), t('dashboard.month'), t('dashboard.year')].map(r => (
-            <button key={r} className={range === r ? 'on' : ''} onClick={() => setRange(r)}>{r}</button>
+          {[['week', t('dashboard.week')], ['month', t('dashboard.month')], ['year', t('dashboard.year')]].map(([key, label]) => (
+            <button key={key} className={range === key ? 'on' : ''} onClick={() => setRange(key)}>{label}</button>
           ))}
         </div>
         <button className="btn btn--accent" onClick={() => navigate('/leads')}><Plus size={16} />{t('dashboard.createLead')}</button>

@@ -54,39 +54,112 @@ export const MOCK_DASHBOARD = {
   })),
 }
 
-export const MOCK_DASHBOARD_CHART = {
-  leads_by_month: [
-    { name: 'ינו', value: 42 }, { name: 'פבר', value: 55 },
-    { name: 'מרץ', value: 49 }, { name: 'אפר', value: 63 },
-    { name: 'מאי', value: 58 }, { name: 'יונ', value: 71 },
-    { name: 'יול', value: 66 }, { name: 'אוג', value: 84 },
-  ],
-  revenue_by_month: [
-    { name: 'ינו', value: 120 }, { name: 'פבר', value: 210 },
-    { name: 'מרץ', value: 340 }, { name: 'אפר', value: 430 },
-    { name: 'מאי', value: 560 }, { name: 'יונ', value: 690 },
-    { name: 'יול', value: 810 }, { name: 'אוג', value: 980 },
-  ],
-  leads_by_source: [
-    { name: 'דף נחיתה', value: 64 }, { name: 'פייסבוק', value: 48 },
-    { name: 'גוגל', value: 39 }, { name: 'הפניה', value: 27 },
-    { name: 'שיחה נכנסת', value: 18 },
-  ],
-  reps: [
-    { name: 'דנה', value: 84 }, { name: 'אבי', value: 72 },
-    { name: 'מאיה', value: 65 }, { name: 'רון', value: 58 },
-  ],
-  leads_by_stage: [
-    { name: 'ליד חדש', value: 42, color: '#2398c2' },
-    { name: 'שיחת היכרות', value: 28, color: '#7e838b' },
-    { name: 'הצעת מחיר', value: 19, color: '#66758f' },
-    { name: 'ממתין לחתימה', value: 11, color: '#b0935f' },
-    { name: 'נסגר בהצלחה', value: 28, color: '#1f9d57' },
-  ],
-  stats: {
-    total_leads: 128, new_leads_delta: 18,
-    open_quotes_value: '247,500', open_quotes_count: 34, quotes_delta: 12,
-    close_rate: 32, close_rate_delta: 4,
-    deals_won: 24, deals_won_delta: 9,
+const CHART_BY_RANGE = {
+  week: {
+    leads_by_month: [
+      { name: 'א׳', value: 8 }, { name: 'ב׳', value: 12 },
+      { name: 'ג׳', value: 6 }, { name: 'ד׳', value: 15 },
+      { name: 'ה׳', value: 11 }, { name: 'ו׳', value: 9 },
+      { name: 'ש׳', value: 4 },
+    ],
+    revenue_by_month: [
+      { name: 'א׳', value: 18 }, { name: 'ב׳', value: 32 },
+      { name: 'ג׳', value: 21 }, { name: 'ד׳', value: 45 },
+      { name: 'ה׳', value: 38 }, { name: 'ו׳', value: 27 },
+      { name: 'ש׳', value: 12 },
+    ],
+    leads_by_source: [
+      { name: 'דף נחיתה', value: 18 }, { name: 'פייסבוק', value: 14 },
+      { name: 'גוגל', value: 11 }, { name: 'הפניה', value: 8 },
+      { name: 'שיחה נכנסת', value: 4 },
+    ],
+    reps: [
+      { name: 'דנה', value: 22 }, { name: 'אבי', value: 19 },
+      { name: 'מאיה', value: 16 }, { name: 'רון', value: 13 },
+    ],
+    leads_by_stage: [
+      { name: 'ליד חדש', value: 12, color: '#2398c2' },
+      { name: 'שיחת היכרות', value: 8, color: '#7e838b' },
+      { name: 'הצעת מחיר', value: 5, color: '#66758f' },
+      { name: 'ממתין לחתימה', value: 3, color: '#b0935f' },
+      { name: 'נסגר בהצלחה', value: 7, color: '#1f9d57' },
+    ],
+    stats: {
+      total_leads: 35, new_leads_delta: 8,
+      open_quotes_value: '62,400', open_quotes_count: 9, quotes_delta: 5,
+      close_rate: 29, close_rate_delta: 2,
+      deals_won: 6, deals_won_delta: 3,
+    },
+  },
+  month: {
+    leads_by_month: [
+      { name: 'ש1', value: 28 }, { name: 'ש2', value: 34 },
+      { name: 'ש3', value: 41 }, { name: 'ש4', value: 38 },
+    ],
+    revenue_by_month: [
+      { name: 'ש1', value: 68 }, { name: 'ש2', value: 95 },
+      { name: 'ש3', value: 124 }, { name: 'ש4', value: 110 },
+    ],
+    leads_by_source: [
+      { name: 'דף נחיתה', value: 42 }, { name: 'פייסבוק', value: 31 },
+      { name: 'גוגל', value: 25 }, { name: 'הפניה', value: 17 },
+      { name: 'שיחה נכנסת', value: 11 },
+    ],
+    reps: [
+      { name: 'דנה', value: 48 }, { name: 'אבי', value: 41 },
+      { name: 'מאיה', value: 37 }, { name: 'רון', value: 32 },
+    ],
+    leads_by_stage: [
+      { name: 'ליד חדש', value: 28, color: '#2398c2' },
+      { name: 'שיחת היכרות', value: 19, color: '#7e838b' },
+      { name: 'הצעת מחיר', value: 13, color: '#66758f' },
+      { name: 'ממתין לחתימה', value: 7, color: '#b0935f' },
+      { name: 'נסגר בהצלחה', value: 18, color: '#1f9d57' },
+    ],
+    stats: {
+      total_leads: 85, new_leads_delta: 11,
+      open_quotes_value: '148,200', open_quotes_count: 21, quotes_delta: 8,
+      close_rate: 30, close_rate_delta: 3,
+      deals_won: 14, deals_won_delta: 6,
+    },
+  },
+  year: {
+    leads_by_month: [
+      { name: 'ינו', value: 42 }, { name: 'פבר', value: 55 },
+      { name: 'מרץ', value: 49 }, { name: 'אפר', value: 63 },
+      { name: 'מאי', value: 58 }, { name: 'יונ', value: 71 },
+      { name: 'יול', value: 66 }, { name: 'אוג', value: 84 },
+    ],
+    revenue_by_month: [
+      { name: 'ינו', value: 120 }, { name: 'פבר', value: 210 },
+      { name: 'מרץ', value: 340 }, { name: 'אפר', value: 430 },
+      { name: 'מאי', value: 560 }, { name: 'יונ', value: 690 },
+      { name: 'יול', value: 810 }, { name: 'אוג', value: 980 },
+    ],
+    leads_by_source: [
+      { name: 'דף נחיתה', value: 64 }, { name: 'פייסבוק', value: 48 },
+      { name: 'גוגל', value: 39 }, { name: 'הפניה', value: 27 },
+      { name: 'שיחה נכנסת', value: 18 },
+    ],
+    reps: [
+      { name: 'דנה', value: 84 }, { name: 'אבי', value: 72 },
+      { name: 'מאיה', value: 65 }, { name: 'רון', value: 58 },
+    ],
+    leads_by_stage: [
+      { name: 'ליד חדש', value: 42, color: '#2398c2' },
+      { name: 'שיחת היכרות', value: 28, color: '#7e838b' },
+      { name: 'הצעת מחיר', value: 19, color: '#66758f' },
+      { name: 'ממתין לחתימה', value: 11, color: '#b0935f' },
+      { name: 'נסגר בהצלחה', value: 28, color: '#1f9d57' },
+    ],
+    stats: {
+      total_leads: 128, new_leads_delta: 18,
+      open_quotes_value: '247,500', open_quotes_count: 34, quotes_delta: 12,
+      close_rate: 32, close_rate_delta: 4,
+      deals_won: 24, deals_won_delta: 9,
+    },
   },
 }
+
+export const MOCK_DASHBOARD_CHART = CHART_BY_RANGE.year
+export { CHART_BY_RANGE }
