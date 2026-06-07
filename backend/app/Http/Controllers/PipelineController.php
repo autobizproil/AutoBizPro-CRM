@@ -39,6 +39,8 @@ class PipelineController extends Controller
 
     public function update(Request $request, PipelineStage $pipeline): JsonResponse
     {
+        abort_unless($pipeline->tenant_id === app('current_tenant_id'), 403);
+
         $data = $request->validate([
             'name'  => 'sometimes|required|string|max:255',
             'color' => 'nullable|string|max:20',
@@ -51,6 +53,7 @@ class PipelineController extends Controller
 
     public function destroy(PipelineStage $pipeline): JsonResponse
     {
+        abort_unless($pipeline->tenant_id === app('current_tenant_id'), 403);
         $pipeline->delete();
         return response()->json(['success' => true, 'data' => null]);
     }

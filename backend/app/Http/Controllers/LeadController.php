@@ -123,6 +123,10 @@ class LeadController extends Controller
      */
     private function authorizeLead(Request $request, Lead $lead): void
     {
+        // Route-model binding is not tenant-scoped (it resolves before the
+        // tenant middleware), so enforce tenant ownership explicitly here.
+        abort_unless($lead->tenant_id === app('current_tenant_id'), 403);
+
         $user = $request->user();
         if ($user->role === 'agent') {
             abort_unless($lead->assigned_to === $user->id, 403);

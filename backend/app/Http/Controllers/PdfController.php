@@ -116,6 +116,8 @@ class PdfController extends Controller
 
     public function generateDocument(Request $request, Lead $lead): JsonResponse
     {
+        abort_unless($lead->tenant_id === app('current_tenant_id'), 403);
+
         $request->validate([
             'template_html' => 'required|string|max:200000',
             'vars'          => 'sometimes|array',
@@ -145,6 +147,8 @@ class PdfController extends Controller
 
     public function createToken(Request $request, Lead $lead): JsonResponse
     {
+        abort_unless($lead->tenant_id === app('current_tenant_id'), 403);
+
         $tenantId = $lead->tenant_id;
 
         // Generate 64-character hex token — same as Taskey's bin2hex(random_bytes(32))

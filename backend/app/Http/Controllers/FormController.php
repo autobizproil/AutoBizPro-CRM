@@ -27,12 +27,14 @@ class FormController extends Controller
 
     public function update(StoreFormRequest $request, Form $form): JsonResponse
     {
+        abort_unless($form->tenant_id === app('current_tenant_id'), 403);
         $form->update($request->validated());
         return response()->json(['success' => true, 'data' => $form->fresh()]);
     }
 
     public function destroy(Form $form): JsonResponse
     {
+        abort_unless($form->tenant_id === app('current_tenant_id'), 403);
         $form->delete();
         return response()->json(['success' => true, 'data' => null]);
     }
