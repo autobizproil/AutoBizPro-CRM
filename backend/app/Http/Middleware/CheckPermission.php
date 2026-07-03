@@ -17,6 +17,10 @@ class CheckPermission
             return response()->json(['success' => false, 'message' => 'Unauthenticated', 'code' => 401], 401);
         }
 
+        if ($user->status === 'inactive') {
+            return response()->json(['success' => false, 'message' => 'המשתמש אינו פעיל', 'code' => 403], 403);
+        }
+
         if ($this->hasPermission($user, $module, $action)) {
             return $next($request);
         }

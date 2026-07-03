@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreFormRequest extends FormRequest
 {
@@ -16,7 +17,7 @@ class StoreFormRequest extends FormRequest
             'fields.*.label'          => 'required|string',
             'fields.*.type'           => 'required|string|in:text,email,phone,textarea,select,checkbox',
             'fields.*.required'       => 'nullable|boolean',
-            'destination_pipeline_id' => 'nullable|integer|exists:pipeline_stages,id',
+            'destination_pipeline_id' => ['nullable', 'integer', Rule::exists('pipeline_stages', 'id')->where('tenant_id', app('current_tenant_id'))],
             'active'                  => 'boolean',
         ];
     }

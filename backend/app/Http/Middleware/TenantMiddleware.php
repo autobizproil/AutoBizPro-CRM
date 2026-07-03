@@ -44,6 +44,14 @@ class TenantMiddleware
             ], 403);
         }
 
+        if ($request->user() && $request->user()->status === 'inactive') {
+            return response()->json([
+                'success' => false,
+                'message' => 'המשתמש אינו פעיל',
+                'code'    => 403,
+            ], 403);
+        }
+
         return $next($request);
     }
 }

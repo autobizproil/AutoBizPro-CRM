@@ -1,9 +1,11 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { authApi } from '../api/auth'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
+  const queryClient                   = useQueryClient()
   const [user, setUser]               = useState(null)
   const [permissions, setPermissions] = useState({})
   const [loading, setLoading]         = useState(true)
@@ -29,6 +31,8 @@ export function AuthProvider({ children }) {
     await authApi.logout()
     setUser(null)
     setPermissions({})
+    queryClient.clear()
+    window.localStorage.removeItem('abp-query-cache')
     window.location.href = '/login'
   }
 

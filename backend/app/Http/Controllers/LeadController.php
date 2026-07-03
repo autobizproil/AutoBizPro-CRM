@@ -9,6 +9,7 @@ use App\Models\Lead;
 use App\Services\LeadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class LeadController extends Controller
 {
@@ -58,9 +59,9 @@ class LeadController extends Controller
 
         // Validate the target value against the current tenant where relevant
         if ($data['action'] === 'change_stage') {
-            $request->validate(['value' => ['required', \Illuminate\Validation\Rule::exists('pipeline_stages', 'id')->where('tenant_id', $tenantId)]]);
+            $request->validate(['value' => ['required', Rule::exists('pipeline_stages', 'id')->where('tenant_id', $tenantId)]]);
         } elseif ($data['action'] === 'assign') {
-            $request->validate(['value' => ['required', \Illuminate\Validation\Rule::exists('users', 'id')->where('tenant_id', $tenantId)]]);
+            $request->validate(['value' => ['required', Rule::exists('users', 'id')->where('tenant_id', $tenantId)]]);
         } elseif ($data['action'] === 'delete') {
             // Bulk delete must require delete permission, not just update
             // (route guards can_update; deletion is a higher privilege)
@@ -83,29 +84,30 @@ class LeadController extends Controller
 
     public function show(Request $request, Lead $lead): JsonResponse
     {
-        $this->authorizeLead($request, $lead);
+        $this->authorizeOwnership($request, $lead);
         return response()->json(['success' => true, 'data' => $lead->load(['stage', 'assignedUser'])]);
     }
 
     public function update(UpdateLeadRequest $request, Lead $lead): JsonResponse
     {
-        $this->authorizeLead($request, $lead);
+        $this->authorizeOwnership($request, $lead);
+        (new CustomFieldValidator())->validate('leads', $request->validated()['custom_fields'] ?? []);
         $lead = $this->service->update($lead, $request->validated());
         return response()->json(['success' => true, 'data' => $lead]);
     }
 
     public function destroy(Request $request, Lead $lead): JsonResponse
     {
-        $this->authorizeLead($request, $lead);
+        $this->authorizeOwnership($request, $lead);
         $lead->delete(); // soft delete
         return response()->json(['success' => true, 'data' => null]);
     }
 
     public function changeStage(Request $request, Lead $lead): JsonResponse
     {
-        $this->authorizeLead($request, $lead);
+        $this->authorizeOwnership($request, $lead);
         $request->validate([
-            'stage_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('pipeline_stages', 'id')->where('tenant_id', app('current_tenant_id'))],
+            'stage_id' => ['required', 'integer', Rule::exists('pipeline_stages', 'id')->where('tenant_id', app('current_tenant_id'))],
         ]);
         $lead = $this->service->changeStage($lead, $request->stage_id);
         return response()->json(['success' => true, 'data' => $lead]);
@@ -113,25 +115,13 @@ class LeadController extends Controller
 
     public function activities(Request $request, Lead $lead): JsonResponse
     {
-        $this->authorizeLead($request, $lead);
+        $this->authorizeOwnership($request, $lead);
         return response()->json(['success' => true, 'data' => $lead->activities]);
-    }
-
-    /**
-     * Tenant binding is enforced by the global scope; here we enforce the
-     * agent-ownership rule — agents may only touch leads assigned to them.
-     */
-    private function authorizeLead(Request $request, Lead $lead): void
-    {
-        $user = $request->user();
-        if ($user->role === 'agent') {
-            abort_unless($lead->assigned_to === $user->id, 403);
-        }
     }
 
     public function storeActivity(Request $request, Lead $lead): JsonResponse
     {
-        $this->authorizeLead($request, $lead);
+        $this->authorizeOwnership($request, $lead);
 
         $data = $request->validate([
             'type' => 'required|in:call,note,email,meeting,task',
@@ -150,5 +140,13 @@ class LeadController extends Controller
         ]);
 
         return response()->json(['success' => true, 'data' => $activity], 201);
+    }
+
+    private function authorizeOwnership(Request $request, Lead $lead): void
+    {
+        $user = $request->user();
+        if ($user->role === 'agent' && (int) $lead->assigned_to !== (int) $user->id) {
+            abort(403, 'Forbidden');
+        }
     }
 }

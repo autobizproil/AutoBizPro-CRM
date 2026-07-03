@@ -15,7 +15,7 @@ class PipelineController extends Controller
         $stages = PipelineStage::with(['leads' => function ($q) use ($user) {
             $q->with('assignedUser');
             if ($user->role === 'agent') {
-                $q->where('assigned_to', $user->id);
+                $q->ownedBy($user->id);
             }
         }])
             ->orderBy('position')
