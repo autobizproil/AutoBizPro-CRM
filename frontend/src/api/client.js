@@ -13,8 +13,8 @@ const client = axios.create({
 client.interceptors.request.use((config) => {
   const hostname = window.location.hostname
   const subdomain = hostname.split('.')[0]
-  // Always send X-Tenant: use subdomain or 'demo' for localhost dev
-  config.headers['X-Tenant'] = (subdomain && subdomain !== 'localhost') ? subdomain : 'demo'
+  // Always send X-Tenant: real subdomain, or 'localhost' in dev (matches seeded tenant)
+  config.headers['X-Tenant'] = subdomain || 'localhost'
   return config
 })
 

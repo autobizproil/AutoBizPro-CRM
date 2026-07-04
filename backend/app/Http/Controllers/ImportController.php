@@ -56,7 +56,7 @@ class ImportController extends Controller
 
         // Whitelist mapping keys to known lead fields (validate() would strip
         // un-ruled sub-keys, so take the full input then filter explicitly)
-        $allowed = ['name', 'phone', 'email', 'source', 'notes'];
+        $allowed = ['name', 'phone', 'email', 'source', 'notes', 'created_at'];
         $mapping = array_intersect_key(
             $request->input('field_mapping', []),
             array_flip($allowed)

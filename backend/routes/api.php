@@ -210,6 +210,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         ->middleware('permission:leads,can_read');
     Route::post('/custom-fields',                             [CustomFieldController::class, 'store'])
         ->middleware('permission:users,can_update');
+    Route::post('/custom-fields/reorder',                     [CustomFieldController::class, 'reorder'])
+        ->middleware('permission:users,can_update');
     Route::put('/custom-fields/{customFieldDefinition}',      [CustomFieldController::class, 'update'])
         ->middleware('permission:users,can_update');
     Route::delete('/custom-fields/{customFieldDefinition}',   [CustomFieldController::class, 'destroy'])

@@ -91,7 +91,6 @@ class LeadController extends Controller
     public function update(UpdateLeadRequest $request, Lead $lead): JsonResponse
     {
         $this->authorizeOwnership($request, $lead);
-        (new CustomFieldValidator())->validate('leads', $request->validated()['custom_fields'] ?? []);
         $lead = $this->service->update($lead, $request->validated());
         return response()->json(['success' => true, 'data' => $lead]);
     }

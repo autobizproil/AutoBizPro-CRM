@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useCallback } from 'react'
 import client from '../../api/client'
 import { integrationsApi } from '../../api/integrations'
-import { customFieldsApi, FIELD_TYPE_LABELS } from '../../api/customFields'
+import { customFieldsApi, FIELD_TYPE_LABELS, ENTITIES, CREATABLE_TYPES } from '../../api/customFields'
 import { useAuth } from '../../context/AuthContext'
 import { usePreferences } from '../../context/PreferencesContext'
 import { translations } from '../../i18n/translations'
@@ -40,7 +40,7 @@ const TABS = [
   { id: 'connections', label: 'חיבורים למערכות' },
   { id: 'users',       label: 'משתמשים' },
   { id: 'permissions', label: 'הרשאות' },
-  { id: 'labels',      label: 'שדות' },
+  { id: 'labels',      label: 'הגדרות רשומות' },
   { id: 'preferences', label: 'העדפות' },
 ]
 
@@ -766,9 +766,7 @@ function PermissionsTab() {
 // ---------------------------------------------------------------------------
 // Tab: לייבלים → replaced by full custom fields manager (שדות מותאמים)
 // ---------------------------------------------------------------------------
-const FIELD_TYPES_CREATABLE = [
-  'text', 'textarea', 'number', 'select', 'date', 'checkbox', 'url', 'phone', 'email',
-]
+const FIELD_TYPES_CREATABLE = CREATABLE_TYPES
 
 const TYPE_ICON = {
   text: 'Aa', textarea: '¶', number: '#', select: '☰', date: '📅',
@@ -778,41 +776,47 @@ const TYPE_ICON = {
 function LabelsTab() {
   const qc = useQueryClient()
   const { can } = useAuth()
-  const [showModal, setShowModal] = useState(false)
-  const [draft, setDraft] = useState({ label: '', field_type: 'text', options: '', required: false })
-  const [optionInput, setOptionInput] = useState('')
-  const [createError, setCreateError] = useState('')
+  const canManage = can('users', 'can_update')
 
-  const { data, isLoading, error: listError } = useQuery({
-    queryKey: ['custom-fields'],
-    queryFn:  () => customFieldsApi.list().then(r => r.data.data),
+  const [entity, setEntity]         = useState('leads')
+  const [showModal, setShowModal]   = useState(false)
+  const [draft, setDraft]           = useState({ label: '', field_type: 'text', options: '', required: false })
+  const [createError, setCreateError] = useState('')
+  const [renameId, setRenameId]     = useState(null)
+  const [renameVal, setRenameVal]   = useState('')
+  const [optsId, setOptsId]         = useState(null)
+  const [optsVal, setOptsVal]       = useState('')
+
+  const { data: fields = [], isLoading, error: listError } = useQuery({
+    queryKey: ['custom-fields', entity],
+    queryFn:  () => customFieldsApi.list(entity).then(r => r.data.data),
   })
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['custom-fields', entity] })
 
   const createField = useMutation({
-    mutationFn: (d) => customFieldsApi.create(d),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: ['custom-fields'] })
-      setShowModal(false)
-      resetDraft()
-      setCreateError('')
-    },
-    onError: (err) => {
-      const msg = err.response?.data?.message
-        ?? Object.values(err.response?.data?.errors ?? {})[0]?.[0]
-        ?? err.message
-        ?? 'שגיאה בשמירה'
-      setCreateError(msg)
-    },
+    mutationFn: (d) => customFieldsApi.create(entity, d),
+    onSuccess:  () => { invalidate(); setShowModal(false); resetDraft() },
+    onError: (err) => setCreateError(
+      err.response?.data?.message
+      ?? Object.values(err.response?.data?.errors ?? {})[0]?.[0]
+      ?? 'שגיאה בשמירה'),
   })
-
-  const deleteField = useMutation({
+  const updateField  = useMutation({
+    mutationFn: ({ id, data }) => customFieldsApi.update(id, data),
+    onSuccess: invalidate,
+  })
+  const reorderField = useMutation({
+    mutationFn: (ids) => customFieldsApi.reorder(entity, ids),
+    onSuccess: invalidate,
+  })
+  const deleteField  = useMutation({
     mutationFn: (id) => customFieldsApi.destroy(id),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['custom-fields'] }),
+    onSuccess: invalidate,
   })
 
   function resetDraft() {
     setDraft({ label: '', field_type: 'text', options: '', required: false })
-    setOptionInput('')
     setCreateError('')
   }
 
@@ -832,27 +836,61 @@ function LabelsTab() {
     createField.mutate(payload)
   }
 
-  const systemFields = data?.system ?? []
-  const customFields = data?.custom ?? []
+  const commitRename = (f) => {
+    setRenameId(null)
+    const label = renameVal.trim()
+    if (label && label !== f.label) updateField.mutate({ id: f.id, data: { label } })
+  }
+
+  const commitOptions = (f) => {
+    setOptsId(null)
+    const options = optsVal.split('\n').map(s => s.trim()).filter(Boolean)
+    updateField.mutate({ id: f.id, data: { options } })
+  }
+
+  const move = (idx, dir) => {
+    const ids = fields.map(f => f.id)
+    const j = idx + dir
+    if (j < 0 || j >= ids.length) return
+    ;[ids[idx], ids[j]] = [ids[j], ids[idx]]
+    reorderField.mutate(ids)
+  }
 
   const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
 
   if (listError) return (
     <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm px-4 py-3 rounded-xl max-w-xl">
       שגיאה בטעינת השדות: {listError.response?.data?.message ?? listError.message}
-      <br /><span className="text-xs opacity-70">ייתכן שהמיגרציה לא רצה — הרץ: <code>php artisan migrate</code></span>
     </div>
   )
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-4xl">
+      {/* Entity tabs */}
+      <div className="flex items-center gap-1 mb-4 bg-gray-100 dark:bg-gray-700/50 rounded-xl p-1 w-fit">
+        {ENTITIES.map(en => (
+          <button key={en.id} onClick={() => setEntity(en.id)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              entity === en.id
+                ? 'bg-white dark:bg-gray-800 text-[#2398c2] shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            }`}>
+            {en.label}
+          </button>
+        ))}
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">הגדרת שדות — לידים</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">שדות מערכת הם קבועים. שדות מותאמים ניתנים להוספה ומחיקה.</p>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            שדות — {ENTITIES.find(e => e.id === entity)?.label}
+          </h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            שנה שם, הסתר וסדר כל שדה. שדות מערכת לא ניתנים למחיקה; שדות מותאמים — כן.
+          </p>
         </div>
-        {can('users', 'can_update') && (
+        {canManage && (
           <button onClick={() => { resetDraft(); setShowModal(true) }}
             className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm">
             <span className="text-lg leading-none">+</span> הוסף שדה
@@ -860,64 +898,102 @@ function LabelsTab() {
         )}
       </div>
 
-      {/* Table */}
+      {/* Fields table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-right">
+              <th className="px-3 py-3 w-16"></th>
               <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">שם שדה</th>
-              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">שם מערכת</th>
-              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">סוג שדה</th>
+              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">סוג</th>
               <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">אפשרויות</th>
+              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 w-24">מוצג</th>
               <th className="px-4 py-3 w-10"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {/* System fields */}
-            {systemFields.map(f => (
-              <tr key={f.name} className="bg-gray-50/50 dark:bg-gray-700/20">
-                <td className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                  <span className="w-6 text-center text-xs text-gray-400">{TYPE_ICON[f.field_type] ?? '—'}</span>
-                  {f.label}
-                </td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-400 dark:text-gray-500">{f.name}</td>
-                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</td>
-                <td className="px-4 py-3 text-gray-400 text-xs">—</td>
-                <td className="px-4 py-3">
-                  <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded font-mono">מערכת</span>
-                </td>
-              </tr>
-            ))}
-            {/* Custom fields */}
-            {isLoading && !systemFields.length && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">טוען...</td></tr>
+            {isLoading && (
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">טוען...</td></tr>
             )}
-            {customFields.map(f => (
-              <tr key={f.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                  <span className="w-6 text-center text-xs text-[#2398c2]">{TYPE_ICON[f.field_type] ?? 'Aa'}</span>
-                  {f.label}
+            {fields.map((f, idx) => (
+              <tr key={f.id} className={`transition-colors ${f.hidden ? 'opacity-50' : ''} ${f.is_system ? 'bg-gray-50/50 dark:bg-gray-700/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}`}>
+                {/* Reorder */}
+                <td className="px-3 py-2.5 whitespace-nowrap">
+                  {canManage && (
+                    <span className="inline-flex flex-col leading-none">
+                      <button onClick={() => move(idx, -1)} disabled={idx === 0}
+                        className="text-gray-300 hover:text-[#2398c2] disabled:opacity-30 text-xs">▲</button>
+                      <button onClick={() => move(idx, 1)} disabled={idx === fields.length - 1}
+                        className="text-gray-300 hover:text-[#2398c2] disabled:opacity-30 text-xs">▼</button>
+                    </span>
+                  )}
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">{f.name}</td>
-                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</td>
-                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">
-                  {f.options?.length ? f.options.join(', ') : '—'}
+                {/* Label — inline rename */}
+                <td className="px-4 py-2.5 font-medium text-gray-800 dark:text-gray-200">
+                  {renameId === f.id ? (
+                    <input autoFocus value={renameVal} dir="auto" lang="he"
+                      onChange={e => setRenameVal(e.target.value)}
+                      onBlur={() => commitRename(f)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') e.currentTarget.blur()
+                        if (e.key === 'Escape') setRenameId(null)
+                      }}
+                      className="border border-[#2398c2] rounded-md px-2 py-1 text-sm bg-white dark:bg-gray-700 focus:outline-none w-44" />
+                  ) : (
+                    <span className="group/lbl flex items-center gap-1.5">
+                      <span className="w-6 text-center text-xs text-gray-400">{TYPE_ICON[f.field_type] ?? 'Aa'}</span>
+                      {f.label}
+                      {f.is_system && <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded font-mono">מערכת</span>}
+                      {canManage && (
+                        <button onClick={() => { setRenameId(f.id); setRenameVal(f.label) }}
+                          className="opacity-0 group-hover/lbl:opacity-100 text-gray-300 hover:text-[#2398c2] transition-opacity" title="שנה שם">
+                          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>
+                          </svg>
+                        </button>
+                      )}
+                    </span>
+                  )}
                 </td>
-                <td className="px-4 py-3">
-                  {can('users', 'can_update') && (
+                <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 text-xs">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</td>
+                {/* Options — inline edit for custom select fields */}
+                <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 text-xs max-w-[200px]">
+                  {f.field_type === 'select' ? (
+                    optsId === f.id ? (
+                      <textarea autoFocus rows={3} value={optsVal}
+                        onChange={e => setOptsVal(e.target.value)}
+                        onBlur={() => commitOptions(f)}
+                        onKeyDown={e => { if (e.key === 'Escape') setOptsId(null) }}
+                        className="border border-[#2398c2] rounded-md px-2 py-1 text-xs bg-white dark:bg-gray-700 focus:outline-none w-full resize-none" />
+                    ) : (
+                      <button disabled={!canManage || f.is_system}
+                        onClick={() => { setOptsId(f.id); setOptsVal((f.options ?? []).join('\n')) }}
+                        className="text-right hover:text-[#2398c2] disabled:cursor-default truncate block w-full" title="ערוך אפשרויות">
+                        {f.options?.length ? f.options.join(', ') : 'הוסף אפשרויות...'}
+                      </button>
+                    )
+                  ) : '—'}
+                </td>
+                {/* Hidden toggle */}
+                <td className="px-4 py-2.5">
+                  {canManage && (
+                    <button onClick={() => updateField.mutate({ id: f.id, data: { hidden: !f.hidden } })}
+                      title={f.hidden ? 'הצג שדה' : 'הסתר שדה'}
+                      className={`text-lg leading-none ${f.hidden ? 'text-gray-300' : 'text-[#2398c2]'}`}>
+                      {f.hidden ? '🙈' : '👁'}
+                    </button>
+                  )}
+                </td>
+                {/* Delete (custom only) */}
+                <td className="px-4 py-2.5">
+                  {canManage && !f.is_system && (
                     <button
                       onClick={() => { if (confirm(`למחוק את השדה "${f.label}"? הנתונים ילכו לאיבוד.`)) deleteField.mutate(f.id) }}
-                      className="text-gray-300 dark:text-gray-600 hover:text-red-500 text-lg leading-none"
-                    >×</button>
+                      className="text-gray-300 dark:text-gray-600 hover:text-red-500 text-lg leading-none">×</button>
                   )}
                 </td>
               </tr>
             ))}
-            {!isLoading && customFields.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500 text-sm">
-                אין שדות מותאמים — לחץ "הוסף שדה" להתחלה
-              </td></tr>
-            )}
           </tbody>
         </table>
       </div>
@@ -927,7 +1003,9 @@ function LabelsTab() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowModal(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">הוסף שדה מותאם</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                הוסף שדה — {ENTITIES.find(e => e.id === entity)?.label}
+              </h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={handleCreate} className="px-6 py-4 space-y-4">
@@ -939,16 +1017,8 @@ function LabelsTab() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">שם השדה (תצוגה) <span className="text-red-500">*</span></label>
                 <input required value={draft.label} onChange={e => setDraft(d => ({ ...d, label: e.target.value }))}
-                  placeholder="לדוגמה: תקציב, שם חברה, מספר רישיון..."
+                  placeholder="לדוגמה: תקציב, שם חברה, מספר רישיון..." dir="auto" lang="he"
                   className={INPUT} />
-                {draft.label && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 font-mono">
-                    שם מערכת: <span className="text-[#2398c2]">{
-                      draft.label.trim().toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g,'') || 'cf_xxxxx'
-                    }</span>
-                    <span className="text-gray-300 dark:text-gray-600 mr-1">(נוצר אוטומטית)</span>
-                  </p>
-                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סוג שדה</label>
@@ -969,10 +1039,10 @@ function LabelsTab() {
               </div>
               {draft.field_type === 'select' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">אפשרויות (שורה אחת לאפשרות)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">אפשרויות לבחירה (שורה אחת לאפשרות)</label>
                   <textarea value={draft.options}
                     onChange={e => setDraft(d => ({ ...d, options: e.target.value }))}
-                    rows={4} placeholder={"אפשרות א\nאפשרות ב\nאפשרות ג"}
+                    rows={4} placeholder={"אפשרות א\nאפשרות ב\nאפשרות ג"} dir="auto" lang="he"
                     className={INPUT + ' resize-none'} />
                   {parsedOptions.length > 0 && (
                     <p className="text-xs text-gray-400 mt-1">{parsedOptions.length} אפשרויות</p>

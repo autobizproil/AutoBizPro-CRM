@@ -8,6 +8,7 @@ const FIELDS = [
   { key: 'email',  label: 'אימייל' },
   { key: 'source', label: 'מקור' },
   { key: 'notes',  label: 'הערות' },
+  { key: 'created_at', label: 'נוצר בתאריך (תאריך + שעה)' },
 ]
 
 const AUTO = {

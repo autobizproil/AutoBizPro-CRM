@@ -97,11 +97,11 @@ export default function LeadsPage() {
   })
 
   const { data: cfData } = useQuery({
-    queryKey: ['custom-fields'],
-    queryFn:  () => customFieldsApi.list().then(r => r.data.data),
+    queryKey: ['custom-fields', 'leads'],
+    queryFn:  () => customFieldsApi.list('leads').then(r => r.data.data),
     staleTime: 1000 * 60 * 5,
   })
-  const customFieldDefs = cfData?.custom ?? []
+  const customFieldDefs = (cfData ?? []).filter(f => !f.is_system && !f.hidden)
 
   // Merge static + custom columns
   const dynamicCols = [
@@ -158,6 +158,53 @@ export default function LeadsPage() {
   }
 
   const col = (key) => visibleCols[key] !== false
+
+  // ── Inline cell editing ──────────────────────────────────────────────────
+  // editCell: { id, field } — field is 'name'|'phone'|'email' or 'cf:<name>'
+  const [editCell, setEditCell] = useState(null)
+  const [draft, setDraft]       = useState('')
+
+  const cellValue = (lead, field) =>
+    field.startsWith('cf:') ? (lead.custom_fields?.[field.slice(3)] ?? '') : (lead[field] ?? '')
+
+  const startEdit = (lead, field) => {
+    if (!canEdit) return
+    setDraft(String(cellValue(lead, field)))
+    setEditCell({ id: lead.id, field })
+  }
+
+  const saveCell = (lead, field, value) => {
+    setEditCell(null)
+    if (String(cellValue(lead, field)) === String(value)) return
+    const data = field.startsWith('cf:')
+      ? { custom_fields: { ...(lead.custom_fields ?? {}), [field.slice(3)]: value } }
+      : { [field]: value }
+    updateLead.mutate({ id: lead.id, data })
+  }
+
+  const isEditing = (lead, field) => editCell?.id === lead.id && editCell?.field === field
+
+  const editInput = (lead, field, { inputType = 'text', dir = 'auto' } = {}) => (
+    <input autoFocus type={inputType} value={draft} dir={dir} lang={dir === 'auto' ? 'he' : undefined}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={() => saveCell(lead, field, draft)}
+      onKeyDown={e => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        if (e.key === 'Escape') setEditCell(null)
+      }}
+      onClick={e => e.stopPropagation()}
+      className="w-full min-w-[110px] border border-[#2398c2] rounded-md px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30" />
+  )
+
+  const pencilBtn = (lead, field) => canEdit && (
+    <button type="button" title="עריכה"
+      onClick={e => { e.stopPropagation(); startEdit(lead, field) }}
+      className="opacity-0 group-hover:opacity-100 flex-shrink-0 text-gray-300 hover:text-[#2398c2] transition-opacity">
+      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>
+      </svg>
+    </button>
+  )
 
   return (
     <div className="flex gap-0 -m-6 min-h-screen" dir="rtl">
@@ -309,23 +356,38 @@ export default function LeadsPage() {
                             : <svg className="w-3.5 h-3.5 opacity-80" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
                           }
                         </div>
-                        <span className="font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">{lead.name}</span>
+                        {isEditing(lead, 'name')
+                          ? editInput(lead, 'name')
+                          : <>
+                              <span className="font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">{lead.name}</span>
+                              {pencilBtn(lead, 'name')}
+                            </>}
                       </div>
                     </td>
                     {/* Phone */}
                     {col('phone') && (
                       <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap" dir="ltr">
-                        {lead.phone
-                          ? <a href={`tel:${lead.phone}`} className="text-gray-700 dark:text-gray-300 hover:text-[#2398c2]" onClick={e => e.stopPropagation()}>{lead.phone}</a>
-                          : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                        {isEditing(lead, 'phone')
+                          ? editInput(lead, 'phone', { inputType: 'tel', dir: 'ltr' })
+                          : <span className="flex items-center gap-1.5">
+                              {lead.phone
+                                ? <a href={`tel:${lead.phone}`} className="text-gray-700 dark:text-gray-300 hover:text-[#2398c2]" onClick={e => e.stopPropagation()}>{lead.phone}</a>
+                                : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                              {pencilBtn(lead, 'phone')}
+                            </span>}
                       </td>
                     )}
                     {/* Email */}
                     {col('email') && (
                       <td className="px-4 py-2.5 max-w-[160px]">
-                        {lead.email
-                          ? <span className="text-gray-600 dark:text-gray-400 truncate block text-xs">{lead.email}</span>
-                          : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                        {isEditing(lead, 'email')
+                          ? editInput(lead, 'email', { inputType: 'email', dir: 'ltr' })
+                          : <span className="flex items-center gap-1.5">
+                              {lead.email
+                                ? <span className="text-gray-600 dark:text-gray-400 truncate text-xs" dir="ltr">{lead.email}</span>
+                                : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                              {pencilBtn(lead, 'email')}
+                            </span>}
                       </td>
                     )}
                     {/* Stage — inline select */}
@@ -368,16 +430,45 @@ export default function LeadsPage() {
                       </td>
                     )}
                     {/* Custom fields */}
-                    {customFieldDefs.filter(cf => col(`cf_${cf.name}`)).map(cf => (
-                      <td key={cf.id} className="px-4 py-2.5 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">
-                        {(() => {
-                          const val = lead.custom_fields?.[cf.name]
-                          if (val === undefined || val === null || val === '') return <span className="text-gray-300 dark:text-gray-600">—</span>
-                          if (cf.field_type === 'checkbox') return val ? '✓' : '✗'
-                          return String(val)
-                        })()}
-                      </td>
-                    ))}
+                    {customFieldDefs.filter(cf => col(`cf_${cf.name}`)).map(cf => {
+                      const field = `cf:${cf.name}`
+                      const val = lead.custom_fields?.[cf.name]
+                      const empty = val === undefined || val === null || val === ''
+                      return (
+                        <td key={cf.id} className="px-4 py-2.5 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                          {cf.field_type === 'checkbox' ? (
+                            <input type="checkbox" checked={!!val} disabled={!canEdit}
+                              onChange={e => saveCell(lead, field, e.target.checked)}
+                              className="rounded border-gray-300 accent-[#2398c2] cursor-pointer" />
+                          ) : cf.field_type === 'select' ? (
+                            isEditing(lead, field) ? (
+                              <select autoFocus value={draft}
+                                onChange={e => saveCell(lead, field, e.target.value)}
+                                onBlur={() => setEditCell(null)}
+                                className="border border-[#2398c2] rounded-md px-2 py-1 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none">
+                                <option value="">—</option>
+                                {(cf.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            ) : (
+                              <span className="flex items-center gap-1.5">
+                                {empty ? <span className="text-gray-300 dark:text-gray-600">—</span> : String(val)}
+                                {pencilBtn(lead, field)}
+                              </span>
+                            )
+                          ) : isEditing(lead, field) ? (
+                            editInput(lead, field, {
+                              inputType: { number: 'number', date: 'date', email: 'email', phone: 'tel', url: 'url' }[cf.field_type] ?? 'text',
+                              dir: ['number', 'date', 'email', 'phone', 'url'].includes(cf.field_type) ? 'ltr' : 'auto',
+                            })
+                          ) : (
+                            <span className="flex items-center gap-1.5">
+                              {empty ? <span className="text-gray-300 dark:text-gray-600">—</span> : String(val)}
+                              {pencilBtn(lead, field)}
+                            </span>
+                          )}
+                        </td>
+                      )
+                    })}
                     {/* Quick actions */}
                     <td className="px-4 py-2.5 sticky left-0 z-20 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.08)]" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1.5">
