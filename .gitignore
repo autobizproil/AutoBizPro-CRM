@@ -25,3 +25,8 @@ frontend/.vite/
 .DS_Store
 Thumbs.db
 *.log
+
+.superpowers/
+graphify-out/
+awesome-design-md/
+landing/
