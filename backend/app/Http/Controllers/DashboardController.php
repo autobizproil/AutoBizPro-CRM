@@ -45,7 +45,8 @@ class DashboardController extends Controller
     public function chartData(Request $request): JsonResponse
     {
         $user  = $request->user();
-        $query = Lead::query();
+        [$from, $to] = $this->dateRange($request);
+        $query = Lead::query()->whereBetween('created_at', [$from, $to]);
 
         if ($user->role === 'agent') {
             $query->ownedBy($user->id);
@@ -53,7 +54,6 @@ class DashboardController extends Controller
 
         $leadsPerDay = $query
             ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as total'))
-            ->where('created_at', '>=', now()->subDays(30))
             ->groupBy('date')
             ->orderBy('date')
             ->get();
@@ -81,14 +81,17 @@ class DashboardController extends Controller
             return [$from, $to];
         }
 
+        // Rolling windows (not calendar boundaries) so "year" actually means
+        // "last 365 days" — otherwise Jan-1-anchored periods hide older data
+        // (e.g. imported leads dated before the current calendar year/quarter).
         $now = Carbon::now();
         [$from, $to] = match ($request->input('period')) {
-            'today'   => [$now->copy()->startOfDay(),     $now->copy()->endOfDay()],
-            'week'    => [$now->copy()->startOfWeek(),    $now->copy()->endOfWeek()],
-            'month'   => [$now->copy()->startOfMonth(),   $now->copy()->endOfMonth()],
-            'quarter' => [$now->copy()->startOfQuarter(), $now->copy()->endOfQuarter()],
-            'year'    => [$now->copy()->startOfYear(),    $now->copy()->endOfYear()],
-            default   => [$now->copy()->subDays(30)->startOfDay(), $now->copy()->endOfDay()],
+            'today'   => [$now->copy()->startOfDay(),      $now->copy()->endOfDay()],
+            'week'    => [$now->copy()->subDays(7)->startOfDay(),   $now->copy()->endOfDay()],
+            'month'   => [$now->copy()->subDays(30)->startOfDay(),  $now->copy()->endOfDay()],
+            'quarter' => [$now->copy()->subDays(90)->startOfDay(),  $now->copy()->endOfDay()],
+            'year'    => [$now->copy()->subDays(365)->startOfDay(), $now->copy()->endOfDay()],
+            default   => [$now->copy()->subDays(30)->startOfDay(),  $now->copy()->endOfDay()],
         };
 
         return [$from, $to];

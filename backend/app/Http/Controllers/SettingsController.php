@@ -43,15 +43,23 @@ class SettingsController extends Controller
     // a public storage symlink / static-file proxy in every deployment
     public function uploadLogo(Request $request): JsonResponse
     {
+        // SVG intentionally excluded — it can embed <script>/event-handler payloads,
+        // which would become stored XSS once rendered back via <img src="data:...">.
         $request->validate([
-            'logo' => 'required|image|mimes:png,jpg,jpeg,webp,svg|max:1024',
+            'logo' => 'required|image|mimes:png,jpg,jpeg,webp|max:1024',
         ], [
             'logo.max'   => 'הקובץ גדול מדי — עד 1MB',
-            'logo.image' => 'יש להעלות קובץ תמונה (PNG/JPG/SVG/WebP)',
+            'logo.image' => 'יש להעלות קובץ תמונה (PNG/JPG/WebP)',
         ]);
 
         $file = $request->file('logo');
-        $dataUri = 'data:' . $file->getMimeType() . ';base64,' . base64_encode($file->get());
+        // Pin the mime to a fixed allowlist rather than trusting getMimeType() verbatim
+        $mime = match ($file->getMimeType()) {
+            'image/png'  => 'image/png',
+            'image/webp' => 'image/webp',
+            default      => 'image/jpeg',
+        };
+        $dataUri = 'data:' . $mime . ';base64,' . base64_encode($file->get());
 
         $tenant = app('current_tenant');
         $settings = $tenant->settings ?? [];

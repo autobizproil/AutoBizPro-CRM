@@ -166,7 +166,7 @@ function GeneralTab({ tenantData, can, qc }) {
       {/* Logo */}
       <Card>
         <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">לוגו העסק</h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">מוצג בסרגל העליון במקום לוגו ברירת המחדל. PNG/JPG/SVG/WebP עד 1MB.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">מוצג בסרגל העליון במקום לוגו ברירת המחדל. PNG/JPG/WebP עד 1MB.</p>
         <div className="flex items-center gap-4">
           <div className="w-20 h-14 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
             {tenantData?.settings?.logo
@@ -175,7 +175,7 @@ function GeneralTab({ tenantData, can, qc }) {
           </div>
           {can('users', 'can_update') && (
             <div className="flex gap-2">
-              <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden"
+              <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo.mutate(f); e.target.value = '' }} />
               <button type="button" onClick={() => logoInputRef.current?.click()} disabled={uploadLogo.isPending}
                 className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
