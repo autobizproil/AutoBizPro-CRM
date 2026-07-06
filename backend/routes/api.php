@@ -13,6 +13,8 @@ use App\Http\Controllers\PipelineController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CustomFieldController;
+use App\Http\Controllers\RecordTypeController;
+use App\Http\Controllers\RecordController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -86,6 +88,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::post('/import/upload', [\App\Http\Controllers\ImportController::class, 'upload'])
         ->middleware('permission:leads,can_create');
     Route::post('/import/start', [\App\Http\Controllers\ImportController::class, 'start'])
+        ->middleware('permission:leads,can_create');
+    Route::post('/import/distinct-values', [\App\Http\Controllers\ImportController::class, 'distinctValues'])
         ->middleware('permission:leads,can_create');
     Route::get('/import/{import}', [\App\Http\Controllers\ImportController::class, 'status'])
         ->middleware('permission:leads,can_read');
@@ -217,6 +221,28 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::delete('/custom-fields/{customFieldDefinition}',   [CustomFieldController::class, 'destroy'])
         ->middleware('permission:users,can_update');
 
+    // Custom record types — user-defined entities beyond leads/clients/contacts/tasks
+    Route::get('/record-types',                    [RecordTypeController::class, 'index'])
+        ->middleware('permission:leads,can_read');
+    Route::post('/record-types',                    [RecordTypeController::class, 'store'])
+        ->middleware('permission:users,can_update');
+    Route::put('/record-types/{recordType}',        [RecordTypeController::class, 'update'])
+        ->middleware('permission:users,can_update');
+    Route::delete('/record-types/{recordType}',     [RecordTypeController::class, 'destroy'])
+        ->middleware('permission:users,can_update');
+
+    // Records within a custom record type
+    Route::get('/record-types/{recordType}/records',           [RecordController::class, 'index'])
+        ->middleware('permission:leads,can_read');
+    Route::post('/record-types/{recordType}/records',          [RecordController::class, 'store'])
+        ->middleware('permission:leads,can_create');
+    Route::get('/record-types/{recordType}/records/{record}',  [RecordController::class, 'show'])
+        ->middleware('permission:leads,can_read');
+    Route::put('/record-types/{recordType}/records/{record}',  [RecordController::class, 'update'])
+        ->middleware('permission:leads,can_update');
+    Route::delete('/record-types/{recordType}/records/{record}', [RecordController::class, 'destroy'])
+        ->middleware('permission:leads,can_delete');
+
     // WhatsApp templates
     Route::get('/whatsapp-templates', [\App\Http\Controllers\WhatsappTemplateController::class, 'index'])
         ->middleware('permission:leads,can_read');
@@ -233,6 +259,10 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
         ->middleware('permission:users,can_update');
     Route::get('/settings/permissions', [SettingsController::class, 'getPermissions']);
     Route::put('/settings/permissions', [SettingsController::class, 'updatePermissions'])
+        ->middleware('permission:users,can_update');
+    Route::post('/settings/logo', [SettingsController::class, 'uploadLogo'])
+        ->middleware('permission:users,can_update');
+    Route::delete('/settings/logo', [SettingsController::class, 'deleteLogo'])
         ->middleware('permission:users,can_update');
     Route::get('/settings/labels', [SettingsController::class, 'getLabels']);
     Route::put('/settings/labels', [SettingsController::class, 'updateLabels'])

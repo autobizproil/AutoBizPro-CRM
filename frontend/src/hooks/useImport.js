@@ -9,6 +9,12 @@ export function useStartImport() {
   return useMutation({ mutationFn: (payload) => importApi.start(payload).then(r => r.data.data) })
 }
 
+export function useDistinctValues() {
+  return useMutation({
+    mutationFn: ({ importId, column }) => importApi.distinctValues(importId, column).then(r => r.data.data),
+  })
+}
+
 export function useImportStatus(id, enabled) {
   return useQuery({
     queryKey: ['import', id],

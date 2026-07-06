@@ -24,15 +24,38 @@ class ImportService
         return $rows;
     }
 
-    // mapping: ['name'=>'csvCol', 'phone'=>'csvCol', ...]
-    public function importRow(array $row, array $mapping): string
+    /** Distinct trimmed, non-empty values of the given CSV column across the whole file. */
+    public function distinctValues(string $path, string $column): array
+    {
+        $csv = Reader::createFromPath($path, 'r');
+        $csv->setHeaderOffset(0);
+        $values = [];
+        foreach ($csv->getRecords() as $row) {
+            $v = trim($row[$column] ?? '');
+            if ($v !== '') $values[$v] = true;
+        }
+        return array_keys($values);
+    }
+
+    // Mapping keys not in this set are custom-field names, stored in the lead's custom_fields JSON
+    private const RESERVED_FIELDS = ['name', 'phone', 'email', 'source', 'notes', 'created_at', 'status'];
+
+    // mapping: ['name'=>'csvCol', 'phone'=>'csvCol', ..., 'cf_xxxxx'=>'csvCol' for custom fields]
+    // statusMap: ['csvStatusValue' => pipelineStageId], resolved ahead of time (new stages already created)
+    public function importRow(array $row, array $mapping, array $statusMap = []): string
     {
         $data = [];
+        $customFields = [];
         foreach ($mapping as $field => $csvCol) {
-            if ($csvCol && isset($row[$csvCol])) {
-                $data[$field] = trim($row[$csvCol]);
+            if (! $csvCol || ! isset($row[$csvCol])) continue;
+            $value = trim($row[$csvCol]);
+            if (in_array($field, self::RESERVED_FIELDS, true)) {
+                $data[$field] = $value;
+            } elseif ($value !== '') {
+                $customFields[$field] = $value;
             }
         }
+        if ($customFields) $data['custom_fields'] = $customFields;
         if (empty($data['name'])) return 'skipped';
 
         $normalized = PhoneNormalizer::normalize($data['phone'] ?? '');
@@ -45,6 +68,13 @@ class ImportService
         if (! empty($data['created_at'])) {
             $createdAt = self::parseDate($data['created_at']);
             unset($data['created_at']);
+        }
+
+        // Mapped status text is resolved to a pipeline stage; the raw text isn't stored
+        if (isset($data['status'])) {
+            $stageId = $statusMap[$data['status']] ?? null;
+            unset($data['status']);
+            if ($stageId) $data['pipeline_stage_id'] = $stageId;
         }
 
         $lead = Lead::create($data);

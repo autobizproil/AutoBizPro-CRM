@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CustomFieldDefinition;
+use App\Models\RecordType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -50,10 +51,19 @@ class CustomFieldController extends Controller
         ],
     ];
 
+    // Entity may be one of the fixed built-ins, or a tenant's own custom record type slug
     private function entityOr404(Request $request): string
     {
         $entity = $request->query('entity', $request->input('entity', 'leads'));
-        abort_unless(in_array($entity, self::ALLOWED_ENTITIES, true), 422, 'ישות לא חוקית');
+
+        if (in_array($entity, self::ALLOWED_ENTITIES, true)) {
+            return $entity;
+        }
+
+        $isCustomType = RecordType::where('tenant_id', app('current_tenant_id'))
+            ->where('slug', $entity)->exists();
+        abort_unless($isCustomType, 422, 'ישות לא חוקית');
+
         return $entity;
     }
 

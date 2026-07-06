@@ -18,7 +18,7 @@ class LeadController extends Controller
     public function index(Request $request): JsonResponse
     {
         $leads = $this->service->list(
-            $request->only(['stage_id', 'assigned_to', 'source', 'search']),
+            $request->only(['stage_id', 'assigned_to', 'source', 'search', 'sort_by', 'sort_dir']),
             $request->user()->id,
             $request->user()->role
         );

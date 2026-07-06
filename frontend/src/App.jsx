@@ -19,6 +19,7 @@ import LandingPageEditor from './pages/landing-pages/LandingPageEditor'
 import LandingPagePublicPage from './pages/landing-pages/LandingPagePublicPage'
 import ClientsPage from './pages/clients/ClientsPage'
 import TasksPage from './pages/tasks/TasksPage'
+import RecordsPage from './pages/records/RecordsPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -50,6 +51,7 @@ function AppRoutes() {
         <Route path="automations" element={<AutomationsPage />} />
         <Route path="forms"       element={<FormsPage />} />
         <Route path="settings"    element={<SettingsPage />} />
+        <Route path="records/:slug"           element={<RecordsPage />} />
         <Route path="landing-pages"           element={<LandingPagesPage />} />
         <Route path="landing-pages/new"       element={<LandingPageEditor />} />
         <Route path="landing-pages/:id/edit"  element={<LandingPageEditor />} />

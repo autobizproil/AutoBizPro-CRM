@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import client from '../../api/client'
+import { settingsApi } from '../../api/settings'
 import { integrationsApi } from '../../api/integrations'
 import { customFieldsApi, FIELD_TYPE_LABELS, ENTITIES, CREATABLE_TYPES } from '../../api/customFields'
+import { recordTypesApi, RECORD_TYPE_ICONS } from '../../api/recordTypes'
 import { useAuth } from '../../context/AuthContext'
 import { usePreferences } from '../../context/PreferencesContext'
 import { translations } from '../../i18n/translations'
@@ -101,6 +103,24 @@ function SaveRow({ isPending, isSuccess, isError, errorMsg, onTest, testPending,
 function GeneralTab({ tenantData, can, qc }) {
   const [whatsappProvider, setWhatsappProvider] = useState('')
   const [whatsappApiKey, setWhatsappApiKey]     = useState('')
+  const [logoError, setLogoError]               = useState('')
+  const logoInputRef = useRef(null)
+
+  const invalidateTenant = () => {
+    qc.invalidateQueries({ queryKey: ['settings-tenant'] })
+    qc.invalidateQueries({ queryKey: ['tenant-settings'] }) // topnav logo
+  }
+
+  const uploadLogo = useMutation({
+    mutationFn: (file) => settingsApi.uploadLogo(file),
+    onSuccess:  () => { setLogoError(''); invalidateTenant() },
+    onError:    (err) => setLogoError(err.response?.data?.message ?? 'שגיאה בהעלאת הלוגו'),
+  })
+
+  const deleteLogo = useMutation({
+    mutationFn: () => settingsApi.deleteLogo(),
+    onSuccess:  invalidateTenant,
+  })
 
   useEffect(() => {
     if (tenantData) {
@@ -142,6 +162,36 @@ function GeneralTab({ tenantData, can, qc }) {
           </div>
         </Card>
       )}
+
+      {/* Logo */}
+      <Card>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">לוגו העסק</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">מוצג בסרגל העליון במקום לוגו ברירת המחדל. PNG/JPG/SVG/WebP עד 1MB.</p>
+        <div className="flex items-center gap-4">
+          <div className="w-20 h-14 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
+            {tenantData?.settings?.logo
+              ? <img src={tenantData.settings.logo} alt="לוגו" className="max-h-12 max-w-[72px] object-contain" />
+              : <span className="text-xs text-gray-400">אין לוגו</span>}
+          </div>
+          {can('users', 'can_update') && (
+            <div className="flex gap-2">
+              <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo.mutate(f); e.target.value = '' }} />
+              <button type="button" onClick={() => logoInputRef.current?.click()} disabled={uploadLogo.isPending}
+                className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                {uploadLogo.isPending ? 'מעלה...' : 'העלה לוגו'}
+              </button>
+              {tenantData?.settings?.logo && (
+                <button type="button" onClick={() => deleteLogo.mutate()} disabled={deleteLogo.isPending}
+                  className="border border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 px-3 py-2 rounded-lg text-sm">
+                  הסר
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        {logoError && <p className="text-xs text-red-500 mt-2">{logoError}</p>}
+      </Card>
 
       {/* WhatsApp */}
       <Card>
@@ -786,6 +836,53 @@ function LabelsTab() {
   const [renameVal, setRenameVal]   = useState('')
   const [optsId, setOptsId]         = useState(null)
   const [optsVal, setOptsVal]       = useState('')
+  const [dragIdx, setDragIdx]       = useState(null)
+
+  // Custom record types — user-defined entities beyond the fixed 4
+  const [showTypeModal, setShowTypeModal] = useState(false)
+  const [typeDraft, setTypeDraft]   = useState({ label: '', label_singular: '', icon: RECORD_TYPE_ICONS[0] })
+  const [typeError, setTypeError]  = useState('')
+
+  const { data: recordTypes = [] } = useQuery({
+    queryKey: ['record-types'],
+    queryFn:  () => recordTypesApi.list().then(r => r.data.data),
+  })
+
+  const allEntities = [
+    ...ENTITIES,
+    ...recordTypes.map(rt => ({ id: rt.slug, label: rt.label, custom: true, recordTypeId: rt.id, recordCount: rt.records_count })),
+  ]
+
+  const createType = useMutation({
+    mutationFn: (d) => recordTypesApi.create(d),
+    onSuccess:  (res) => {
+      qc.invalidateQueries({ queryKey: ['record-types'] })
+      setShowTypeModal(false)
+      setTypeDraft({ label: '', label_singular: '', icon: RECORD_TYPE_ICONS[0] })
+      setTypeError('')
+      setEntity(res.data.data.slug)
+    },
+    onError: (err) => setTypeError(err.response?.data?.message ?? 'שגיאה ביצירת סוג הרשומה'),
+  })
+
+  const deleteType = useMutation({
+    mutationFn: (id) => recordTypesApi.destroy(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['record-types'] })
+      setEntity('leads')
+    },
+  })
+
+  const handleCreateType = (e) => {
+    e.preventDefault()
+    setTypeError('')
+    if (!typeDraft.label.trim()) return
+    createType.mutate({
+      label: typeDraft.label.trim(),
+      label_singular: typeDraft.label_singular.trim() || undefined,
+      icon: typeDraft.icon,
+    })
+  }
 
   const { data: fields = [], isLoading, error: listError } = useQuery({
     queryKey: ['custom-fields', entity],
@@ -856,6 +953,15 @@ function LabelsTab() {
     reorderField.mutate(ids)
   }
 
+  const handleDrop = (dropIdx) => {
+    if (dragIdx === null || dragIdx === dropIdx) { setDragIdx(null); return }
+    const ids = fields.map(f => f.id)
+    const [moved] = ids.splice(dragIdx, 1)
+    ids.splice(dropIdx, 0, moved)
+    reorderField.mutate(ids)
+    setDragIdx(null)
+  }
+
   const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
 
   if (listError) return (
@@ -867,24 +973,41 @@ function LabelsTab() {
   return (
     <div className="max-w-4xl">
       {/* Entity tabs */}
-      <div className="flex items-center gap-1 mb-4 bg-gray-100 dark:bg-gray-700/50 rounded-xl p-1 w-fit">
-        {ENTITIES.map(en => (
-          <button key={en.id} onClick={() => setEntity(en.id)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              entity === en.id
-                ? 'bg-white dark:bg-gray-800 text-[#2398c2] shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-            }`}>
-            {en.label}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/50 rounded-xl p-1 w-fit flex-wrap">
+          {allEntities.map(en => (
+            <button key={en.id} onClick={() => setEntity(en.id)}
+              className={`group/tab relative px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                entity === en.id
+                  ? 'bg-white dark:bg-gray-800 text-[#2398c2] shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}>
+              {en.label}
+              {en.custom && canManage && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (confirm(`למחוק את סוג הרשומה "${en.label}"? כל הרשומות והשדות שלו יימחקו לצמיתות.`)) deleteType.mutate(en.recordTypeId)
+                  }}
+                  className="mr-1.5 inline-flex opacity-0 group-hover/tab:opacity-100 text-gray-300 hover:text-red-500 transition-opacity"
+                  title="מחק סוג רשומה">×</span>
+              )}
+            </button>
+          ))}
+        </div>
+        {canManage && (
+          <button onClick={() => { setTypeError(''); setShowTypeModal(true) }}
+            className="border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-[#2398c2] hover:text-[#2398c2] px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+            + סוג רשומה
           </button>
-        ))}
+        )}
       </div>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-            שדות — {ENTITIES.find(e => e.id === entity)?.label}
+            שדות — {allEntities.find(e => e.id === entity)?.label}
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             שנה שם, הסתר וסדר כל שדה. שדות מערכת לא ניתנים למחיקה; שדות מותאמים — כן.
@@ -916,15 +1039,18 @@ function LabelsTab() {
               <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">טוען...</td></tr>
             )}
             {fields.map((f, idx) => (
-              <tr key={f.id} className={`transition-colors ${f.hidden ? 'opacity-50' : ''} ${f.is_system ? 'bg-gray-50/50 dark:bg-gray-700/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}`}>
+              <tr key={f.id}
+                draggable={canManage}
+                onDragStart={() => setDragIdx(idx)}
+                onDragOver={e => { if (canManage) e.preventDefault() }}
+                onDrop={() => canManage && handleDrop(idx)}
+                onDragEnd={() => setDragIdx(null)}
+                className={`transition-colors ${f.hidden ? 'opacity-50' : ''} ${dragIdx === idx ? 'opacity-30' : ''} ${f.is_system ? 'bg-gray-50/50 dark:bg-gray-700/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}`}>
                 {/* Reorder */}
                 <td className="px-3 py-2.5 whitespace-nowrap">
                   {canManage && (
-                    <span className="inline-flex flex-col leading-none">
-                      <button onClick={() => move(idx, -1)} disabled={idx === 0}
-                        className="text-gray-300 hover:text-[#2398c2] disabled:opacity-30 text-xs">▲</button>
-                      <button onClick={() => move(idx, 1)} disabled={idx === fields.length - 1}
-                        className="text-gray-300 hover:text-[#2398c2] disabled:opacity-30 text-xs">▼</button>
+                    <span className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#2398c2] select-none text-base leading-none" title="גרור לשינוי סדר">
+                      ⠿
                     </span>
                   )}
                 </td>
@@ -1004,7 +1130,7 @@ function LabelsTab() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                הוסף שדה — {ENTITIES.find(e => e.id === entity)?.label}
+                הוסף שדה — {allEntities.find(e => e.id === entity)?.label}
               </h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
             </div>
@@ -1060,6 +1186,63 @@ function LabelsTab() {
                   {createField.isPending ? 'שומר...' : 'צור שדה'}
                 </button>
                 <button type="button" onClick={() => setShowModal(false)}
+                  className="px-4 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm">ביטול</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create record type modal */}
+      {showTypeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowTypeModal(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">סוג רשומה חדש</h2>
+              <button onClick={() => setShowTypeModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
+            </div>
+            <form onSubmit={handleCreateType} className="px-6 py-4 space-y-4">
+              {typeError && (
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg">
+                  {typeError}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">שם (רבים) <span className="text-red-500">*</span></label>
+                <input required value={typeDraft.label} onChange={e => setTypeDraft(d => ({ ...d, label: e.target.value }))}
+                  placeholder="לדוגמה: חשבוניות מס, קבלות, רכבים..." dir="auto" lang="he"
+                  className={INPUT} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">שם (יחיד)</label>
+                <input value={typeDraft.label_singular} onChange={e => setTypeDraft(d => ({ ...d, label_singular: e.target.value }))}
+                  placeholder="לדוגמה: חשבונית מס, קבלה, רכב..." dir="auto" lang="he"
+                  className={INPUT} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">אייקון</label>
+                <div className="grid grid-cols-6 gap-2">
+                  {RECORD_TYPE_ICONS.map(icon => (
+                    <button key={icon} type="button" onClick={() => setTypeDraft(d => ({ ...d, icon }))}
+                      className={`text-lg py-2 rounded-lg border transition-colors ${
+                        typeDraft.icon === icon
+                          ? 'border-[#2398c2] bg-[#2398c2]/10'
+                          : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}>
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                לאחר היצירה תוכל להוסיף שדות משלך (בדיוק כמו ברשומות אחרות) ותופיע קישור בסרגל הניווט העליון.
+              </p>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={createType.isPending || !typeDraft.label.trim()}
+                  className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
+                  {createType.isPending ? 'יוצר...' : 'צור סוג רשומה'}
+                </button>
+                <button type="button" onClick={() => setShowTypeModal(false)}
                   className="px-4 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm">ביטול</button>
               </div>
             </form>

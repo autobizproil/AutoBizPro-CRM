@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useUploadCsv, useStartImport, useImportStatus } from '../../hooks/useImport'
+import { useQuery } from '@tanstack/react-query'
+import { useUploadCsv, useStartImport, useImportStatus, useDistinctValues } from '../../hooks/useImport'
+import { usePipeline } from '../../hooks/usePipeline'
+import { customFieldsApi } from '../../api/customFields'
 
 const FIELDS = [
   { key: 'name',   label: 'שם *',   required: true },
@@ -9,6 +12,7 @@ const FIELDS = [
   { key: 'source', label: 'מקור' },
   { key: 'notes',  label: 'הערות' },
   { key: 'created_at', label: 'נוצר בתאריך (תאריך + שעה)' },
+  { key: 'status', label: 'סטטוס / שלב' },
 ]
 
 const AUTO = {
@@ -17,7 +21,12 @@ const AUTO = {
   email:  ['אימייל', 'email', 'מייל', 'דוא"ל', 'e-mail'],
   source: ['מקור', 'source', 'ערוץ', 'מקור הגעה', 'מקור ליד', 'מאיפה', 'מקור הגעה (קישור', 'origin', 'lead source', 'referral'],
   notes:  ['הערות', 'notes', 'הערה', 'comments', 'תיאור'],
+  status: ['סטטוס', 'status', 'שלב', 'stage', 'מצב'],
+  created_at: ['נוצר בתאריך', 'תאריך יצירה', 'נוצר ב', 'created', 'creation date', 'תאריך'],
 }
+
+const CREATE_NEW = '__create__'
+const SKIP = '__skip__'
 
 const SELECT_CLS = 'flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30'
 
@@ -25,13 +34,29 @@ export default function ImportPage() {
   const [step, setStep]       = useState(1)
   const [uploaded, setUp]     = useState(null)
   const [mapping, setMapping] = useState({})
+  const [statusValues, setStatusValues]   = useState([])
+  const [statusMapping, setStatusMapping] = useState({}) // { [csvValue]: stageId | CREATE_NEW | SKIP }
+  const [newStageLabels, setNewStageLabels] = useState({}) // { [csvValue]: label } when CREATE_NEW chosen
   const [jobId, setJobId]     = useState(null)
   const [error, setError]     = useState('')
 
   const navigate = useNavigate()
   const upload = useUploadCsv()
   const start  = useStartImport()
-  const { data: job } = useImportStatus(jobId, step === 4)
+  const distinctValues = useDistinctValues()
+  const { data: pipeline } = usePipeline()
+  const { data: job } = useImportStatus(jobId, step === 5)
+
+  const { data: customFieldDefs = [] } = useQuery({
+    queryKey: ['custom-fields', 'leads'],
+    queryFn:  () => customFieldsApi.list('leads').then(r => r.data.data),
+  })
+  // Tenant's custom lead fields become extra mapping targets (e.g. "עיר", "כמות דלתות")
+  const customFields = customFieldDefs.filter(f => !f.is_system && !f.hidden)
+  const allFields = useMemo(
+    () => [...FIELDS, ...customFields.map(f => ({ key: f.name, label: f.label }))],
+    [customFields]
+  )
 
   const handleFile = async (e) => {
     const file = e.target.files[0]
@@ -41,10 +66,11 @@ export default function ImportPage() {
       const res = await upload.mutateAsync(file)
       setUp(res)
       const m = {}
-      FIELDS.forEach(f => {
+      allFields.forEach(f => {
         const hit = res.headers.find(h => {
           const hl = h.trim().toLowerCase()
-          return (AUTO[f.key] ?? []).some(a => hl === a.toLowerCase() || hl.includes(a.toLowerCase()))
+          const synonyms = AUTO[f.key] ?? [f.label.toLowerCase()]
+          return synonyms.some(a => hl === a.toLowerCase() || hl.includes(a.toLowerCase()))
         })
         if (hit) m[f.key] = hit
       })
@@ -55,18 +81,53 @@ export default function ImportPage() {
     }
   }
 
+  const handleMappingNext = async () => {
+    if (!mapping.status) { setStep(4); return }
+    setError('')
+    try {
+      const values = await distinctValues.mutateAsync({ importId: uploaded.import_id, column: mapping.status })
+      setStatusValues(values)
+      const stages = pipeline ?? []
+      const defaults = {}
+      values.forEach(v => {
+        const match = stages.find(s => s.name.trim().toLowerCase() === v.trim().toLowerCase())
+        defaults[v] = match ? match.id : CREATE_NEW
+      })
+      setStatusMapping(defaults)
+      setNewStageLabels(Object.fromEntries(values.map(v => [v, v])))
+      setStep(3)
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'שגיאה בטעינת ערכי הסטטוס')
+    }
+  }
+
   const handleStart = async () => {
     setError('')
     try {
-      const created = await start.mutateAsync({ import_id: uploaded.import_id, field_mapping: mapping })
+      const status_mapping = {}
+      if (mapping.status) {
+        statusValues.forEach(v => {
+          const choice = statusMapping[v]
+          if (choice === SKIP || choice == null) return
+          status_mapping[v] = choice === CREATE_NEW ? { create: newStageLabels[v] || v } : choice
+        })
+      }
+      const created = await start.mutateAsync({
+        import_id: uploaded.import_id,
+        field_mapping: mapping,
+        status_mapping,
+      })
       setJobId(created.id)
-      setStep(4)
+      setStep(5)
     } catch (err) {
       setError(err.response?.data?.message ?? 'שגיאה בהתחלת הייבוא')
     }
   }
 
-  const reset = () => { setStep(1); setUp(null); setMapping({}); setJobId(null); setError('') }
+  const reset = () => {
+    setStep(1); setUp(null); setMapping({}); setStatusValues([]); setStatusMapping({})
+    setNewStageLabels({}); setJobId(null); setError('')
+  }
 
   return (
     <div className="max-w-3xl">
@@ -80,7 +141,7 @@ export default function ImportPage() {
 
       {/* Steps indicator */}
       <div className="flex gap-2 mb-6">
-        {['העלאה', 'מיפוי', 'אישור', 'ייבוא'].map((s, i) => (
+        {['העלאה', 'מיפוי', 'סטטוסים', 'אישור', 'ייבוא'].map((s, i) => (
           <div key={s} className={`flex-1 text-center py-2 rounded-lg text-xs font-medium transition-colors ${
             step === i + 1 ? 'bg-[#2398c2] text-white'
             : step > i + 1 ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
@@ -107,7 +168,7 @@ export default function ImportPage() {
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">מיפוי שדות</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">התאם כל עמודה בקובץ לשדה במערכת. זוהה אוטומטית כשאפשר.</p>
           <div className="space-y-3">
-            {FIELDS.map(f => (
+            {allFields.map(f => (
               <div key={f.key} className="flex items-center gap-3">
                 <span className="w-28 text-sm text-gray-700 dark:text-gray-300">{f.label}</span>
                 <select value={mapping[f.key] ?? ''} onChange={e => setMapping(m => ({ ...m, [f.key]: e.target.value }))}
@@ -119,29 +180,65 @@ export default function ImportPage() {
             ))}
           </div>
           <div className="flex gap-2 mt-5">
-            <button disabled={!mapping.name} onClick={() => setStep(3)}
-              className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">המשך</button>
+            <button disabled={!mapping.name || distinctValues.isPending} onClick={handleMappingNext}
+              className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
+              {distinctValues.isPending ? 'טוען...' : 'המשך'}
+            </button>
             <button onClick={reset} className="text-gray-500 dark:text-gray-400 px-3 py-2 text-sm">התחל מחדש</button>
           </div>
           {!mapping.name && <p className="text-xs text-red-500 mt-2">חובה למפות לפחות את שדה "שם"</p>}
         </div>
       )}
 
-      {step === 3 && uploaded && (
+      {step === 3 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">מיפוי סטטוסים</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">לכל ערך סטטוס בקובץ, בחר לאיזה שלב קיים הוא מתאים או צור שלב חדש.</p>
+          <div className="space-y-2">
+            {statusValues.map(v => (
+              <div key={v} className="flex items-center gap-3">
+                <span className="w-40 text-sm text-gray-700 dark:text-gray-300 truncate" title={v}>{v}</span>
+                <select value={statusMapping[v] ?? SKIP}
+                  onChange={e => {
+                    const val = e.target.value
+                    setStatusMapping(m => ({ ...m, [v]: val === SKIP || val === CREATE_NEW ? val : Number(val) }))
+                  }}
+                  className={SELECT_CLS}>
+                  <option value={SKIP}>— דלג (אל תשייך לשלב) —</option>
+                  <option value={CREATE_NEW}>+ צור שלב חדש</option>
+                  {(pipeline ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                {statusMapping[v] === CREATE_NEW && (
+                  <input value={newStageLabels[v] ?? v}
+                    onChange={e => setNewStageLabels(m => ({ ...m, [v]: e.target.value }))}
+                    className={SELECT_CLS} placeholder="שם השלב החדש" />
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-5">
+            <button onClick={() => setStep(4)}
+              className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium">המשך</button>
+            <button onClick={() => setStep(2)} className="text-gray-500 dark:text-gray-400 px-3 py-2 text-sm">חזור למיפוי</button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && uploaded && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">תצוגה מקדימה</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">10 השורות הראשונות, ממופות. כפילויות טלפון ידולגו אוטומטית.</p>
           <div className="overflow-x-auto border dark:border-gray-700 rounded-lg">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700/50 border-b dark:border-gray-700">
-                <tr>{FIELDS.filter(f => mapping[f.key]).map(f => (
+                <tr>{allFields.filter(f => mapping[f.key]).map(f => (
                   <th key={f.key} className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">{f.label.replace(' *', '')}</th>
                 ))}</tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {uploaded.preview.map((row, i) => (
                   <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/40">
-                    {FIELDS.filter(f => mapping[f.key]).map(f => (
+                    {allFields.filter(f => mapping[f.key]).map(f => (
                       <td key={f.key} className="px-3 py-2 text-gray-600 dark:text-gray-400">{row[mapping[f.key]] || '—'}</td>
                     ))}
                   </tr>
@@ -154,12 +251,12 @@ export default function ImportPage() {
               className="bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
               {start.isPending ? 'מתחיל...' : 'התחל ייבוא'}
             </button>
-            <button onClick={() => setStep(2)} className="text-gray-500 dark:text-gray-400 px-3 py-2 text-sm">חזור למיפוי</button>
+            <button onClick={() => setStep(mapping.status ? 3 : 2)} className="text-gray-500 dark:text-gray-400 px-3 py-2 text-sm">חזור</button>
           </div>
         </div>
       )}
 
-      {step === 4 && (
+      {step === 5 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center shadow-sm">
           {job?.status === 'done' ? (
             <>

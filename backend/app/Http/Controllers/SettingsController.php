@@ -39,6 +39,38 @@ class SettingsController extends Controller
         return response()->json(['success' => true, 'data' => $tenant]);
     }
 
+    // Logo stored as a base64 data-URI inside tenant settings — avoids needing
+    // a public storage symlink / static-file proxy in every deployment
+    public function uploadLogo(Request $request): JsonResponse
+    {
+        $request->validate([
+            'logo' => 'required|image|mimes:png,jpg,jpeg,webp,svg|max:1024',
+        ], [
+            'logo.max'   => 'הקובץ גדול מדי — עד 1MB',
+            'logo.image' => 'יש להעלות קובץ תמונה (PNG/JPG/SVG/WebP)',
+        ]);
+
+        $file = $request->file('logo');
+        $dataUri = 'data:' . $file->getMimeType() . ';base64,' . base64_encode($file->get());
+
+        $tenant = app('current_tenant');
+        $settings = $tenant->settings ?? [];
+        $settings['logo'] = $dataUri;
+        $tenant->update(['settings' => $settings]);
+
+        return response()->json(['success' => true, 'data' => ['logo' => $dataUri]]);
+    }
+
+    public function deleteLogo(): JsonResponse
+    {
+        $tenant = app('current_tenant');
+        $settings = $tenant->settings ?? [];
+        unset($settings['logo']);
+        $tenant->update(['settings' => $settings]);
+
+        return response()->json(['success' => true, 'data' => null]);
+    }
+
     public function getLabels(): JsonResponse
     {
         $svc = app(\App\Services\SettingsService::class);

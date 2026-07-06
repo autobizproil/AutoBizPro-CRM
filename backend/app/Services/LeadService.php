@@ -35,7 +35,20 @@ class LeadService
                 ->orWhere('phone', 'like', "%$q%"));
         }
 
-        return $query->latest()->paginate(25);
+        // Sorting — whitelisted columns only; JSON path for custom fields
+        $sortable = ['name', 'phone', 'email', 'source', 'created_at', 'pipeline_stage_id', 'assigned_to'];
+        $sortBy   = $filters['sort_by'] ?? null;
+        $sortDir  = strtolower($filters['sort_dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
+        if ($sortBy && in_array($sortBy, $sortable, true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } elseif ($sortBy && str_starts_with($sortBy, 'cf_') && preg_match('/^cf_[a-z0-9_]+$/', $sortBy)) {
+            $query->orderByRaw("JSON_UNQUOTE(JSON_EXTRACT(custom_fields, ?)) {$sortDir}", ['$."' . $sortBy . '"']);
+        } else {
+            $query->latest();
+        }
+
+        return $query->paginate(25);
     }
 
     public function create(array $data): Lead

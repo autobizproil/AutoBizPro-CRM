@@ -1,6 +1,7 @@
 <?php
 namespace App\Jobs;
 use App\Models\ImportJob;
+use App\Models\PipelineStage;
 use App\Services\ImportService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -29,10 +30,25 @@ class ProcessImportJob implements ShouldQueue
         $csv->setHeaderOffset(0);
         $mapping = $job->field_mapping;
 
+        // Resolve status_mapping to concrete stage IDs, creating any new stages once up front
+        $statusMap = [];
+        $maxPosition = PipelineStage::max('position') ?? 0;
+        foreach ((array) $job->status_mapping as $csvValue => $target) {
+            if (is_array($target) && ! empty($target['create'])) {
+                $stage = PipelineStage::firstOrCreate(
+                    ['name' => $target['create']],
+                    ['position' => ++$maxPosition]
+                );
+                $statusMap[$csvValue] = $stage->id;
+            } elseif (is_numeric($target)) {
+                $statusMap[$csvValue] = (int) $target;
+            }
+        }
+
         $imported = 0; $skipped = 0; $errors = [];
         foreach ($csv->getRecords() as $i => $row) {
             try {
-                $res = $svc->importRow($row, $mapping);
+                $res = $svc->importRow($row, $mapping, $statusMap);
                 $res === 'imported' ? $imported++ : $skipped++;
             } catch (\Throwable $e) {
                 $skipped++;

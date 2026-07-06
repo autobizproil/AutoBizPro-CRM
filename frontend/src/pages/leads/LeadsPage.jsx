@@ -9,6 +9,16 @@ import { useLabels } from '../../context/LabelsContext'
 import LeadPanel from './LeadPanel'
 
 const SOURCES = ['', 'אתר', 'פייסבוק', 'גוגל', 'המלצה', 'אחר']
+
+// Fixed source badge colors — Fireberry-inspired (design system tokens/colors.css)
+const SOURCE_COLORS = {
+  'וואטסאפ': '#22c55e',
+  'טלפון':   '#8b5cf6',
+  'אתר':     '#3b82f6',
+  'פייסבוק': '#1d4ed8',
+  'גוגל':    '#ef4444',
+  'המלצה':   '#f59e0b',
+}
 const EMPTY_FORM = { name: '', phone: '', email: '', source: '', pipeline_stage_id: '', notes: '' }
 
 const ALL_COLS = [
@@ -71,6 +81,9 @@ export default function LeadsPage() {
   const { t } = useLabels()
   const [search, setSearch]       = useState('')
   const [stageFilter, setStage]   = useState('')
+  const [page, setPage]           = useState(1)
+  const [sortBy, setSortBy]       = useState('')
+  const [sortDir, setSortDir]     = useState('desc')
   const [showModal, setModal]     = useState(false)
   const [form, setForm]           = useState(EMPTY_FORM)
   const [error, setError]         = useState('')
@@ -84,7 +97,7 @@ export default function LeadsPage() {
 
   const viewFilter = SAVED_VIEWS.find(v => v.id === activeView)?.filter ?? {}
 
-  const { data, isLoading } = useLeads({ search, stage_id: stageFilter })
+  const { data, isLoading } = useLeads({ search, stage_id: stageFilter, page, sort_by: sortBy || undefined, sort_dir: sortBy ? sortDir : undefined })
   const createLead  = useCreateLead()
   const changeStage = useChangeLeadStage()
   const updateLead  = useUpdateLead()
@@ -116,12 +129,15 @@ export default function LeadsPage() {
     return true
   })
   const total = data?.total ?? 0
+  const lastPage = data?.last_page ?? 1
   const canEdit = can('leads', 'can_update')
   const navigate = useNavigate()
 
   useEffect(() => {
     localStorage.setItem('crm_leads_cols', JSON.stringify(visibleCols))
   }, [visibleCols])
+
+  useEffect(() => { setPage(1) }, [search, stageFilter, activeView])
 
   useEffect(() => {
     const handler = (e) => { if (colsRef.current && !colsRef.current.contains(e.target)) setShowCols(false) }
@@ -158,6 +174,32 @@ export default function LeadsPage() {
   }
 
   const col = (key) => visibleCols[key] !== false
+
+  // ── Column sorting ───────────────────────────────────────────────────────
+  const toggleSort = (field) => {
+    setPage(1)
+    if (sortBy === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(field)
+      setSortDir('asc')
+    }
+  }
+
+  const TH_CLS = 'px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap'
+
+  const sortableTh = (field, label, extraCls = '') => (
+    <th className={`${TH_CLS} cursor-pointer select-none hover:text-[#2398c2] ${extraCls}`}
+      onClick={() => toggleSort(field)} title="מיין לפי עמודה זו">
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <span className="inline-flex flex-col leading-[0.6] text-[9px]">
+          <span className={sortBy === field && sortDir === 'asc' ? 'text-[#2398c2]' : 'text-gray-300 dark:text-gray-600'}>▲</span>
+          <span className={sortBy === field && sortDir === 'desc' ? 'text-[#2398c2]' : 'text-gray-300 dark:text-gray-600'}>▼</span>
+        </span>
+      </span>
+    </th>
+  )
 
   // ── Inline cell editing ──────────────────────────────────────────────────
   // editCell: { id, field } — field is 'name'|'phone'|'email' or 'cf:<name>'
@@ -217,7 +259,7 @@ export default function LeadsPage() {
         <nav className="py-1">
           {SAVED_VIEWS.map(v => (
             <button key={v.id} onClick={() => setView(v.id)}
-              className={`w-full text-right px-4 py-2.5 text-sm transition-colors ${activeView === v.id ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+              className={`w-full text-right px-4 py-2 text-sm transition-colors ${activeView === v.id ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
               {v.label}
             </button>
           ))}
@@ -243,7 +285,10 @@ export default function LeadsPage() {
             {can('leads', 'can_create') && (
               <button onClick={() => navigate('/import')}
                 className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-colors">
-                📥 ייבוא CSV
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                ייבוא CSV
               </button>
             )}
             {can('leads', 'can_create') && (
@@ -257,9 +302,9 @@ export default function LeadsPage() {
 
         {/* Filters row */}
         <div className="flex gap-2 px-5 pb-3">
-          <input type="text" placeholder={`🔍  חיפוש...`}
+          <input type="text" placeholder="חיפוש שם, טלפון, אימייל..."
             value={search} onChange={e => setSearch(e.target.value)}
-            className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2] bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500" />
+            className="flex-1 max-w-[320px] border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2] bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500" />
           <select value={stageFilter} onChange={e => setStage(e.target.value)}
             className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]">
             <option value="">כל הסטטוסים</option>
@@ -289,6 +334,24 @@ export default function LeadsPage() {
           </div>
         </div>
 
+        {/* View mode tabs — Fireberry-style underline */}
+        <div className="flex gap-0 border-b border-gray-200 dark:border-gray-700 px-5">
+          <button className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px text-[#2398c2] border-[#2398c2]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+              <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+            רשימה
+          </button>
+          <button onClick={() => navigate('/pipeline')}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="10" rx="1"/>
+            </svg>
+            לוח
+          </button>
+        </div>
+
         {/* Bulk toolbar */}
         {selected.size > 0 && (
           <div className="flex items-center gap-3 mx-5 mb-2 bg-[#2398c2]/5 border border-[#2398c2]/20 rounded-lg px-4 py-2">
@@ -316,15 +379,24 @@ export default function LeadsPage() {
                     <input type="checkbox" checked={leads.length > 0 && selected.size === leads.length} onChange={toggleAll}
                       className="rounded border-gray-300 accent-[#2398c2]" />
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">{t('lead')}</th>
-                  {col('phone')       && <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">טלפון</th>}
-                  {col('email')       && <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">דוא"ל</th>}
-                  {col('stage')       && <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">סטטוס</th>}
-                  {col('source')      && <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">מקור</th>}
-                  {col('assigned_to') && <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">נציג</th>}
-                  {col('created_at')  && <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">תאריך</th>}
+                  {sortableTh('name', t('lead'))}
+                  {col('phone')       && sortableTh('phone', 'טלפון')}
+                  {col('email')       && sortableTh('email', 'דוא"ל')}
+                  {col('stage')       && sortableTh('pipeline_stage_id', 'סטטוס')}
+                  {col('source')      && sortableTh('source', 'מקור')}
+                  {col('assigned_to') && sortableTh('assigned_to', 'נציג')}
+                  {col('created_at')  && sortableTh('created_at', 'תאריך')}
                   {customFieldDefs.filter(cf => col(`cf_${cf.name}`)).map(cf => (
-                    <th key={cf.id} className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">{cf.label}</th>
+                    <th key={cf.id} className={`${TH_CLS} cursor-pointer select-none hover:text-[#2398c2]`}
+                      onClick={() => toggleSort(cf.name)} title="מיין לפי עמודה זו">
+                      <span className="inline-flex items-center gap-1">
+                        {cf.label}
+                        <span className="inline-flex flex-col leading-[0.6] text-[9px]">
+                          <span className={sortBy === cf.name && sortDir === 'asc' ? 'text-[#2398c2]' : 'text-gray-300 dark:text-gray-600'}>▲</span>
+                          <span className={sortBy === cf.name && sortDir === 'desc' ? 'text-[#2398c2]' : 'text-gray-300 dark:text-gray-600'}>▼</span>
+                        </span>
+                      </span>
+                    </th>
                   ))}
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap sticky left-0 z-20 bg-gray-50 dark:bg-gray-700 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.08)]">פעולות</th>
                 </tr>
@@ -342,12 +414,12 @@ export default function LeadsPage() {
                 {leads.map(lead => (
                   <tr key={lead.id}
                     className={`border-b border-gray-100 dark:border-gray-700 transition-colors duration-100 group ${selected.has(lead.id) ? 'bg-[#2398c2]/5 dark:bg-[#2398c2]/10' : 'hover:bg-gray-50/80 dark:hover:bg-gray-700/30'}`}>
-                    <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                    <td className="px-4 py-2" onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(lead.id)} onChange={() => toggle(lead.id)}
                         className="rounded border-gray-300 accent-[#2398c2]" />
                     </td>
                     {/* Name */}
-                    <td className="px-4 py-2.5 cursor-pointer" onClick={() => setPanelId(lead.id)}>
+                    <td className="px-4 py-2 cursor-pointer" onClick={() => setPanelId(lead.id)}>
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                           style={{ backgroundColor: lead.stage?.color ?? '#2398c2' }}>
@@ -366,12 +438,12 @@ export default function LeadsPage() {
                     </td>
                     {/* Phone */}
                     {col('phone') && (
-                      <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap" dir="ltr">
+                      <td className="px-4 py-2 text-gray-600 whitespace-nowrap" dir="ltr">
                         {isEditing(lead, 'phone')
                           ? editInput(lead, 'phone', { inputType: 'tel', dir: 'ltr' })
                           : <span className="flex items-center gap-1.5">
                               {lead.phone
-                                ? <a href={`tel:${lead.phone}`} className="text-gray-700 dark:text-gray-300 hover:text-[#2398c2]" onClick={e => e.stopPropagation()}>{lead.phone}</a>
+                                ? <a href={`tel:${lead.phone}`} className="text-[#2398c2] hover:underline" onClick={e => e.stopPropagation()}>{lead.phone}</a>
                                 : <span className="text-gray-300 dark:text-gray-600">—</span>}
                               {pencilBtn(lead, 'phone')}
                             </span>}
@@ -379,7 +451,7 @@ export default function LeadsPage() {
                     )}
                     {/* Email */}
                     {col('email') && (
-                      <td className="px-4 py-2.5 max-w-[160px]">
+                      <td className="px-4 py-2 max-w-[160px]">
                         {isEditing(lead, 'email')
                           ? editInput(lead, 'email', { inputType: 'email', dir: 'ltr' })
                           : <span className="flex items-center gap-1.5">
@@ -392,7 +464,7 @@ export default function LeadsPage() {
                     )}
                     {/* Stage — inline select */}
                     {col('stage') && (
-                      <td className="px-4 py-2.5 w-[140px] max-w-[140px] overflow-hidden" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 py-2 w-[140px] max-w-[140px] overflow-hidden" onClick={e => e.stopPropagation()}>
                         {lead.stage ? (
                           <select value={lead.pipeline_stage_id ?? ''} disabled={!canEdit}
                             onChange={e => changeStage.mutate({ leadId: lead.id, stageId: Number(e.target.value) })}
@@ -411,22 +483,33 @@ export default function LeadsPage() {
                         )}
                       </td>
                     )}
-                    {/* Source */}
+                    {/* Source — colored badge (Fireberry-style) */}
                     {col('source') && (
-                      <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
-                        {lead.source || <span className="text-gray-300 dark:text-gray-600">—</span>}
+                      <td className="px-4 py-2 text-xs whitespace-nowrap">
+                        {lead.source ? (
+                          <span className="inline-flex items-center rounded-full text-[11px] font-medium px-2.5 py-0.5 border"
+                            style={{
+                              backgroundColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}22`,
+                              color: SOURCE_COLORS[lead.source] ?? '#6b7280',
+                              borderColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}60`,
+                            }}>
+                            {lead.source}
+                          </span>
+                        ) : <span className="text-gray-300 dark:text-gray-600">—</span>}
                       </td>
                     )}
                     {/* Agent */}
                     {col('assigned_to') && (
-                      <td className="px-4 py-2.5 text-xs text-[#2398c2] whitespace-nowrap">
+                      <td className="px-4 py-2 text-xs text-[#2398c2] whitespace-nowrap">
                         {lead.assigned_user?.name ?? <span className="text-gray-300 dark:text-gray-600">—</span>}
                       </td>
                     )}
                     {/* Date */}
                     {col('created_at') && (
-                      <td className="px-4 py-2.5 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap cursor-pointer" onClick={() => setPanelId(lead.id)}>
-                        {new Date(lead.created_at).toLocaleDateString('he-IL')}
+                      <td className="px-4 py-2 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap cursor-pointer" onClick={() => setPanelId(lead.id)}>
+                        {new Date(lead.created_at).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        {' '}
+                        {new Date(lead.created_at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
                       </td>
                     )}
                     {/* Custom fields */}
@@ -435,7 +518,7 @@ export default function LeadsPage() {
                       const val = lead.custom_fields?.[cf.name]
                       const empty = val === undefined || val === null || val === ''
                       return (
-                        <td key={cf.id} className="px-4 py-2.5 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                        <td key={cf.id} className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap" onClick={e => e.stopPropagation()}>
                           {cf.field_type === 'checkbox' ? (
                             <input type="checkbox" checked={!!val} disabled={!canEdit}
                               onChange={e => saveCell(lead, field, e.target.checked)}
@@ -470,7 +553,7 @@ export default function LeadsPage() {
                       )
                     })}
                     {/* Quick actions */}
-                    <td className="px-4 py-2.5 sticky left-0 z-20 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.08)]" onClick={e => e.stopPropagation()}>
+                    <td className="px-4 py-2 sticky left-0 z-20 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.08)]" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1.5">
                         {lead.phone ? (
                           <a
@@ -482,6 +565,16 @@ export default function LeadsPage() {
                           >
                             <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
                               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                            </svg>
+                          </a>
+                        ) : (
+                          <span className="w-7 h-7" />
+                        )}
+                        {lead.phone ? (
+                          <a href={`tel:${lead.phone}`} title={`התקשר ${lead.phone}`} onClick={e => e.stopPropagation()}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-[#2398c2] hover:bg-[#2398c2]/10 transition-colors">
+                            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
                             </svg>
                           </a>
                         ) : (
@@ -499,6 +592,19 @@ export default function LeadsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {lastPage > 1 && (
+            <div className="flex items-center justify-between mt-3 text-sm text-gray-500 dark:text-gray-400">
+              <span>עמוד {page} מתוך {lastPage} · סה"כ {total} {t('leads')}</span>
+              <div className="flex gap-2">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">הקודם</button>
+                <button onClick={() => setPage(p => Math.min(lastPage, p + 1))} disabled={page >= lastPage}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">הבא</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -560,7 +666,7 @@ export default function LeadsPage() {
                   {saving ? 'שומר...' : `הוסף ${t('lead')}`}
                 </button>
                 <button type="button" onClick={() => setModal(false)}
-                  className="px-4 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm">ביטול</button>
+                  className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm">ביטול</button>
               </div>
             </form>
           </div>

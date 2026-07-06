@@ -8,7 +8,7 @@ class ImportJob extends Model
     use HasTenantScope;
     protected $fillable = [
         'tenant_id','user_id','filename','storage_path','status',
-        'total_rows','imported','skipped','field_mapping','errors',
+        'total_rows','imported','skipped','field_mapping','status_mapping','errors',
     ];
-    protected $casts = ['field_mapping' => 'array', 'errors' => 'array'];
+    protected $casts = ['field_mapping' => 'array', 'status_mapping' => 'array', 'errors' => 'array'];
 }

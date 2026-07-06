@@ -235,14 +235,14 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
               {lead.phone && (
                 <a href={`tel:${lead.phone}`}
                   className="flex-1 flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                  📞 התקשר
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> התקשר
                 </a>
               )}
               {lead.phone && (
                 <div className="flex-1 relative">
                   <button onClick={() => setShowTemplates(s => !s)}
                     className="w-full flex items-center justify-center gap-1.5 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                    💬 וואטסאפ
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> וואטסאפ
                   </button>
                   {showTemplates && (
                     <div className="absolute top-full mt-1 right-0 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 max-h-56 overflow-y-auto">
@@ -263,25 +263,25 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
               {canEdit && (
                 <button onClick={() => setShowInvoice(true)}
                   className="flex-1 flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                  🧾 חשבונית
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> חשבונית
                 </button>
               )}
               {canEdit && lead?.name && (
                 <button onClick={() => { setShowCardcom(true); cardcomCreatePage.reset() }}
                   className="flex-1 flex items-center justify-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                  💳 תשלום
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> תשלום
                 </button>
               )}
               {canEdit && (
                 <button onClick={() => { setShowYesh(true); yeshCreateInvoice.reset() }}
                   className="flex-1 flex items-center justify-center gap-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                  🧾 Yesh
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Yesh
                 </button>
               )}
               {canEdit && (
                 <button onClick={handlePdfSign}
                   className="flex-1 flex items-center justify-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                  ✍️ חתימה
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg> חתימה
                 </button>
               )}
               {canEdit && (
@@ -289,14 +289,14 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   onClick={() => clientsApi.convertLead(lead.id).then(() => toast.success('הליד הומר ללקוח!')).catch(() => toast.error('שגיאה בהמרה'))}
                   className="flex-1 flex items-center justify-center gap-1.5 bg-[#2398c2]/10 hover:bg-[#2398c2]/20 text-[#2398c2] py-2 rounded-lg text-sm font-medium transition-colors"
                   title="המר ללקוח">
-                  🏢 לקוח
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg> לקוח
                 </button>
               )}
               {canEdit && (
                 <button onClick={() => setShowTask(true)}
                   className="flex-1 flex items-center justify-center gap-1.5 bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/30 dark:hover:bg-sky-900/50 text-sky-700 dark:text-sky-300 py-2 rounded-lg text-sm font-medium transition-colors"
                   title="צור משימת מעקב">
-                  ✅ משימה
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> משימה
                 </button>
               )}
             </div>

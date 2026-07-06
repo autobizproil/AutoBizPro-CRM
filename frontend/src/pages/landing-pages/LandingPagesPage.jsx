@@ -38,8 +38,7 @@ export default function LandingPagesPage() {
   }
 
   const handlePreview = (page) => {
-    const tenant = window.location.hostname.split('.')[0]
-    const tenantSlug = tenant === 'localhost' ? 'demo' : tenant
+    const tenantSlug = window.location.hostname.split('.')[0]
     window.open(`/lp/${tenantSlug}/${page.slug}`, '_blank')
   }
 

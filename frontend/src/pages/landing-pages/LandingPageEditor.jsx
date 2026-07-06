@@ -277,8 +277,7 @@ export default function LandingPageEditor() {
 
   /* ── Preview ─────────────────────────────────────────── */
   const handlePreview = () => {
-    const tenant = window.location.hostname.split('.')[0]
-    const tenantSlug = tenant === 'localhost' ? 'demo' : tenant
+    const tenantSlug = window.location.hostname.split('.')[0]
     const pageSlug = slug || slugify(title)
     window.open(`/lp/${tenantSlug}/${pageSlug}`, '_blank')
   }

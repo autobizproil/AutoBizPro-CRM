@@ -8,4 +8,5 @@ export const importApi = {
   },
   start:  (payload) => client.post('/import/start', payload),
   status: (id) => client.get(`/import/${id}`),
+  distinctValues: (importId, column) => client.post('/import/distinct-values', { import_id: importId, column }),
 }
