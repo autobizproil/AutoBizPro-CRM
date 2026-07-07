@@ -63,26 +63,37 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
 
     // Leads
+    // Ability tiers (see AGENT_ROADMAP.md): crm:read / crm:write are issuable to agent
+    // tokens; crm:bulk / crm:delete are NEVER issuable — red-tier routes are mechanically
+    // unreachable for agents. SPA sessions carry a TransientToken (all abilities) and pass.
     Route::get('/leads', [LeadController::class, 'index'])
-        ->middleware('permission:leads,can_read');
+        ->middleware(['permission:leads,can_read', 'abilities:crm:read']);
     Route::post('/leads', [LeadController::class, 'store'])
-        ->middleware('permission:leads,can_create');
+        ->middleware(['permission:leads,can_create', 'abilities:crm:write']);
     Route::post('/leads/bulk', [LeadController::class, 'bulk'])
-        ->middleware('permission:leads,can_update');
+        ->middleware(['permission:leads,can_update', 'abilities:crm:bulk']);
     Route::delete('/leads/all/clear', [LeadController::class, 'deleteAll'])
-        ->middleware('permission:leads,can_delete');
+        ->middleware(['permission:leads,can_delete', 'abilities:crm:delete']);
     Route::get('/leads/{lead}', [LeadController::class, 'show'])
-        ->middleware('permission:leads,can_read');
+        ->middleware(['permission:leads,can_read', 'abilities:crm:read']);
     Route::put('/leads/{lead}', [LeadController::class, 'update'])
-        ->middleware('permission:leads,can_update');
+        ->middleware(['permission:leads,can_update', 'abilities:crm:write']);
     Route::delete('/leads/{lead}', [LeadController::class, 'destroy'])
-        ->middleware('permission:leads,can_delete');
+        ->middleware(['permission:leads,can_delete', 'abilities:crm:delete']);
     Route::put('/leads/{lead}/stage', [LeadController::class, 'changeStage'])
-        ->middleware('permission:leads,can_update');
+        ->middleware(['permission:leads,can_update', 'abilities:crm:write']);
     Route::get('/leads/{lead}/activities', [LeadController::class, 'activities'])
-        ->middleware('permission:leads,can_read');
+        ->middleware(['permission:leads,can_read', 'abilities:crm:read']);
     Route::post('/leads/{lead}/activities', [LeadController::class, 'storeActivity'])
-        ->middleware('permission:leads,can_create');
+        ->middleware(['permission:leads,can_create', 'abilities:crm:write']);
+
+    // Agent API tokens (issued to the per-tenant service user, never to a human)
+    Route::get('/settings/api-tokens', [\App\Http\Controllers\ApiTokenController::class, 'index'])
+        ->middleware('permission:users,can_update');
+    Route::post('/settings/api-tokens', [\App\Http\Controllers\ApiTokenController::class, 'store'])
+        ->middleware('permission:users,can_update');
+    Route::delete('/settings/api-tokens/{tokenId}', [\App\Http\Controllers\ApiTokenController::class, 'destroy'])
+        ->middleware('permission:users,can_update');
 
     // Import (CSV → leads)
     Route::post('/import/upload', [\App\Http\Controllers\ImportController::class, 'upload'])

@@ -29,6 +29,21 @@ class AuthController extends Controller
 
         $user = Auth::user();
 
+        // Service users exist only to hold agent API tokens — interactive login is never valid
+        if ($user->is_service) {
+            Auth::guard('web')->logout();
+            if ($request->hasSession()) {
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden',
+                'code'    => 403,
+            ], 403);
+        }
+
         if ($user->status === 'inactive') {
             Auth::guard('web')->logout();
             $request->session()->invalidate();

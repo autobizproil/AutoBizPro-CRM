@@ -11,11 +11,11 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasTenantScope;
 
-    protected $fillable = ['tenant_id', 'name', 'email', 'password', 'role', 'status'];
+    protected $fillable = ['tenant_id', 'name', 'email', 'password', 'role', 'status', 'is_service'];
 
     protected $hidden = ['password', 'remember_token'];
 
-    protected $casts = ['password' => 'hashed'];
+    protected $casts = ['password' => 'hashed', 'is_service' => 'boolean'];
 
     public function tenant(): BelongsTo
     {
