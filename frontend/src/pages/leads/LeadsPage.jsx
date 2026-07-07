@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useLabels } from '../../context/LabelsContext'
 import LeadPanel from './LeadPanel'
 import FilterPanel from './FilterPanel'
+import KanbanBoard from '../pipeline/KanbanBoard'
 
 const SOURCES = ['', 'אתר', 'פייסבוק', 'גוגל', 'המלצה', 'אחר']
 
@@ -92,6 +93,7 @@ export default function LeadsPage() {
   const [selected, setSelected]   = useState(new Set())
   const [panelId, setPanelId]     = useState(null)
   const [activeView, setView]     = useState('all')
+  const [viewMode, setViewMode]   = useState('list') // 'list' | 'kanban'
   const [showCols, setShowCols]   = useState(false)
   const [visibleCols, setVisCols] = useState(loadCols)
   const colsRef = useRef(null)
@@ -116,7 +118,7 @@ export default function LeadsPage() {
   const deleteAll   = useDeleteAllLeads()
 
   const { data: stages = [] } = useQuery({
-    queryKey: ['pipeline-stages'],
+    queryKey: ['pipeline'],
     queryFn: () => pipelineApi.stages().then(r => r.data.data),
   })
 
@@ -376,21 +378,29 @@ export default function LeadsPage() {
 
         {/* View mode tabs — Fireberry-style underline */}
         <div className="flex gap-0 border-b border-gray-200 dark:border-gray-700 px-5">
-          <button className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px text-[#2398c2] border-[#2398c2]">
+          <button onClick={() => setViewMode('list')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${viewMode === 'list' ? 'text-[#2398c2] border-[#2398c2]' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
               <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
               <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
             </svg>
             רשימה
           </button>
-          <button onClick={() => navigate('/pipeline')}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+          <button onClick={() => setViewMode('kanban')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${viewMode === 'kanban' ? 'text-[#2398c2] border-[#2398c2]' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="10" rx="1"/>
             </svg>
             לוח
           </button>
         </div>
+
+        {viewMode === 'kanban' ? (
+          <div className="p-5">
+            <KanbanBoard stages={stages} />
+          </div>
+        ) : (
+        <>
 
         {/* Bulk toolbar */}
         {selected.size > 0 && (
@@ -646,6 +656,8 @@ export default function LeadsPage() {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
 
       {/* Lead detail panel */}
