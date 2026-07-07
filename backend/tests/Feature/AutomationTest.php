@@ -8,7 +8,7 @@ use App\Models\Lead;
 use App\Models\Tenant;
 use App\Services\AutomationEngine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
 use App\Jobs\RunAutomationJob;
 use Tests\TestCase;
 
@@ -18,7 +18,7 @@ class AutomationTest extends TestCase
 
     public function test_automation_fires_on_lead_created(): void
     {
-        Queue::fake();
+        Bus::fake();
 
         $tenant = Tenant::create(['name' => 'Test', 'subdomain' => 'auto-test', 'status' => 'active']);
         app()->instance('current_tenant_id', $tenant->id);
@@ -37,12 +37,12 @@ class AutomationTest extends TestCase
         $engine = app(AutomationEngine::class);
         $engine->fire('lead_created', $lead);
 
-        Queue::assertPushed(RunAutomationJob::class);
+        Bus::assertDispatchedAfterResponse(RunAutomationJob::class);
     }
 
     public function test_automation_condition_blocks_wrong_source(): void
     {
-        Queue::fake();
+        Bus::fake();
 
         $tenant = Tenant::create(['name' => 'Test', 'subdomain' => 'auto-test2', 'status' => 'active']);
         app()->instance('current_tenant_id', $tenant->id);
@@ -61,7 +61,7 @@ class AutomationTest extends TestCase
         $engine = app(AutomationEngine::class);
         $engine->fire('lead_created', $lead);
 
-        Queue::assertNotPushed(RunAutomationJob::class);
+        Bus::assertNotDispatchedAfterResponse(RunAutomationJob::class);
     }
 
     public function test_form_submission_creates_lead(): void
