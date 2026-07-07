@@ -17,11 +17,15 @@ class LeadController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $leads = $this->service->list(
-            $request->only(['stage_id', 'assigned_to', 'source', 'search', 'sort_by', 'sort_dir']),
-            $request->user()->id,
-            $request->user()->role
-        );
+        $filters = $request->only(['stage_id', 'assigned_to', 'source', 'search', 'sort_by', 'sort_dir', 'date_from', 'date_to']);
+
+        // conditions arrives as a JSON-encoded string (query param), decode to array
+        if ($request->filled('conditions')) {
+            $decoded = json_decode($request->input('conditions'), true);
+            $filters['conditions'] = is_array($decoded) ? $decoded : [];
+        }
+
+        $leads = $this->service->list($filters, $request->user()->id, $request->user()->role);
 
         return response()->json(['success' => true, 'data' => $leads]);
     }

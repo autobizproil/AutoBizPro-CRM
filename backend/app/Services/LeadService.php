@@ -6,10 +6,15 @@ use App\Jobs\SendOutgoingWebhook;
 use App\Models\Lead;
 use App\Services\AutomationEngine;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class LeadService
 {
     public function __construct(private AutomationEngine $automation) {}
+
+    // System fields a filter condition may target directly (not custom_fields JSON)
+    private const FILTERABLE_FIELDS = ['name', 'phone', 'email', 'source', 'status', 'pipeline_stage_id', 'assigned_to', 'created_at'];
+    private const FILTER_OPERATORS  = ['equals', 'not_equals', 'contains', 'gt', 'gte', 'lt', 'lte', 'empty', 'not_empty'];
 
     public function list(array $filters, int $userId, string $role): LengthAwarePaginator
     {
@@ -34,6 +39,14 @@ class LeadService
                 ->orWhere('email', 'like', "%$q%")
                 ->orWhere('phone', 'like', "%$q%"));
         }
+        if (! empty($filters['date_from'])) {
+            $query->where('created_at', '>=', $filters['date_from']);
+        }
+        if (! empty($filters['date_to'])) {
+            $query->where('created_at', '<=', $filters['date_to']);
+        }
+
+        $this->applyConditions($query, $filters['conditions'] ?? []);
 
         // Sorting — whitelisted columns only; JSON path for custom fields
         $sortable = ['name', 'phone', 'email', 'source', 'created_at', 'pipeline_stage_id', 'assigned_to'];
@@ -49,6 +62,48 @@ class LeadService
         }
 
         return $query->paginate(25);
+    }
+
+    /**
+     * Apply Fireberry-style multi-condition filters.
+     * Each condition: { field, operator, value }. field is either a whitelisted
+     * system column, or 'cf_<name>' targeting the custom_fields JSON column.
+     *
+     * @param  array<int, array{field?: string, operator?: string, value?: mixed}>  $conditions
+     */
+    private function applyConditions($query, array $conditions): void
+    {
+        foreach ($conditions as $cond) {
+            $field    = $cond['field'] ?? null;
+            $operator = $cond['operator'] ?? null;
+            $value    = $cond['value'] ?? null;
+
+            if (! $field || ! in_array($operator, self::FILTER_OPERATORS, true)) {
+                continue;
+            }
+
+            $isCustom = str_starts_with((string) $field, 'cf_') && preg_match('/^cf_[a-z0-9_]+$/', $field);
+            if (! $isCustom && ! in_array($field, self::FILTERABLE_FIELDS, true)) {
+                continue;
+            }
+
+            $column = $isCustom
+                ? DB::raw("JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"" . substr($field, 3) . "\"'))")
+                : $field;
+
+            match ($operator) {
+                'equals'     => $query->where($column, '=', $value),
+                'not_equals' => $query->where($column, '!=', $value),
+                'contains'   => $query->where($column, 'like', "%{$value}%"),
+                'gt'         => $query->where($column, '>', $value),
+                'gte'        => $query->where($column, '>=', $value),
+                'lt'         => $query->where($column, '<', $value),
+                'lte'        => $query->where($column, '<=', $value),
+                'empty'      => $query->where(fn ($q) => $q->whereNull($column)->orWhere($column, '=', '')),
+                'not_empty'  => $query->where(fn ($q) => $q->whereNotNull($column)->where($column, '!=', '')),
+                default      => null,
+            };
+        }
     }
 
     public function create(array $data): Lead

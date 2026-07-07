@@ -7,6 +7,7 @@ import { customFieldsApi } from '../../api/customFields'
 import { useAuth } from '../../context/AuthContext'
 import { useLabels } from '../../context/LabelsContext'
 import LeadPanel from './LeadPanel'
+import FilterPanel from './FilterPanel'
 
 const SOURCES = ['', 'אתר', 'פייסבוק', 'גוגל', 'המלצה', 'אחר']
 
@@ -94,10 +95,20 @@ export default function LeadsPage() {
   const [showCols, setShowCols]   = useState(false)
   const [visibleCols, setVisCols] = useState(loadCols)
   const colsRef = useRef(null)
+  const [showFilter, setShowFilter] = useState(false)
+  const [advFilter, setAdvFilter]   = useState({ dateFrom: '', dateTo: '', conditions: [] })
+  const filterRef = useRef(null)
 
   const viewFilter = SAVED_VIEWS.find(v => v.id === activeView)?.filter ?? {}
+  const activeFilterCount = (advFilter.dateFrom || advFilter.dateTo ? 1 : 0) + advFilter.conditions.length
 
-  const { data, isLoading } = useLeads({ search, stage_id: stageFilter, page, sort_by: sortBy || undefined, sort_dir: sortBy ? sortDir : undefined })
+  const { data, isLoading } = useLeads({
+    search, stage_id: stageFilter, page,
+    sort_by: sortBy || undefined, sort_dir: sortBy ? sortDir : undefined,
+    date_from: advFilter.dateFrom || undefined,
+    date_to: advFilter.dateTo || undefined,
+    conditions: advFilter.conditions.length ? JSON.stringify(advFilter.conditions) : undefined,
+  })
   const createLead  = useCreateLead()
   const changeStage = useChangeLeadStage()
   const updateLead  = useUpdateLead()
@@ -137,13 +148,28 @@ export default function LeadsPage() {
     localStorage.setItem('crm_leads_cols', JSON.stringify(visibleCols))
   }, [visibleCols])
 
-  useEffect(() => { setPage(1) }, [search, stageFilter, activeView])
+  useEffect(() => { setPage(1) }, [search, stageFilter, activeView, advFilter])
 
   useEffect(() => {
-    const handler = (e) => { if (colsRef.current && !colsRef.current.contains(e.target)) setShowCols(false) }
+    const handler = (e) => {
+      if (colsRef.current && !colsRef.current.contains(e.target)) setShowCols(false)
+      if (filterRef.current && !filterRef.current.contains(e.target)) setShowFilter(false)
+    }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  const FILTER_FIELDS = [
+    { key: 'name', label: 'שם מלא' },
+    { key: 'phone', label: 'טלפון' },
+    { key: 'email', label: 'דוא"ל' },
+    { key: 'source', label: 'מקור' },
+    { key: 'status', label: 'סטטוס' },
+    { key: 'pipeline_stage_id', label: 'שלב' },
+    { key: 'assigned_to', label: 'נציג אחראי' },
+    { key: 'created_at', label: 'תאריך יצירה' },
+    ...customFieldDefs.map(cf => ({ key: `cf_${cf.name}`, label: cf.label })),
+  ]
 
   const handleDeleteAll = async () => {
     const ok = window.prompt(`פעולה בלתי הפיכה! ימחקו כל ${total} ה${t('leads')}.\nהקלד "מחק" לאישור:`)
@@ -310,6 +336,20 @@ export default function LeadsPage() {
             <option value="">כל הסטטוסים</option>
             {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
+          {/* Advanced filter panel */}
+          <div className="relative" ref={filterRef}>
+            <button onClick={() => setShowFilter(s => !s)}
+              className={`border rounded-lg px-3 py-2 text-sm flex items-center gap-1.5 transition-colors ${activeFilterCount > 0 ? 'border-[#2398c2] bg-[#2398c2]/10 text-[#2398c2]' : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300'}`}>
+              סינון ▾
+              {activeFilterCount > 0 && (
+                <span className="bg-[#2398c2] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{activeFilterCount}</span>
+              )}
+            </button>
+            {showFilter && (
+              <FilterPanel fields={FILTER_FIELDS} conditions={advFilter.conditions}
+                onApply={setAdvFilter} onClose={() => setShowFilter(false)} />
+            )}
+          </div>
           {/* Column visibility */}
           <div className="relative" ref={colsRef}>
             <button onClick={() => setShowCols(s => !s)}
