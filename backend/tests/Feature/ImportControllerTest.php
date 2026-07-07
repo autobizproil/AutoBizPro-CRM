@@ -70,7 +70,11 @@ class ImportControllerTest extends TestCase
 
         // Tenant B tries to start tenant A's import job
         [$tenantB, $adminB, $subB] = $this->admin('tenant-b');
-        $resp = $this->actingAs($adminB)->withHeaders(['X-Tenant' => $subB])
+        // Sanctum::actingAs (not plain actingAs) — attaches a real PersonalAccessToken so
+        // currentAccessToken() is never null; plain actingAs() a second time in one test
+        // leaves it null, which the ability gate correctly treats as unauthenticated.
+        \Laravel\Sanctum\Sanctum::actingAs($adminB, ['*']);
+        $resp = $this->withHeaders(['X-Tenant' => $subB])
             ->postJson('/api/import/start', [
                 'import_id'     => $importId,
                 'field_mapping' => ['name' => 'שם'],

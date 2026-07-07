@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Jobs\SendOutgoingWebhook;
 use App\Models\Lead;
 use App\Services\AutomationEngine;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -108,18 +107,16 @@ class LeadService
 
     public function create(array $data): Lead
     {
-        $lead = Lead::create($data);
+        $lead = Lead::create($data); // LeadObserver::created() fires the outgoing webhook
         $this->automation->fire('lead_created', $lead);
-        $loaded = $lead->load(['stage', 'assignedUser']);
-        $this->webhook($loaded, 'lead_created');
-        return $loaded;
+        return $lead->load(['stage', 'assignedUser']);
     }
 
     public function update(Lead $lead, array $data): Lead
     {
         $oldStageId = $lead->pipeline_stage_id;
         $oldStatus  = $lead->status;
-        $lead->update($data);
+        $lead->update($data); // LeadObserver::updated() fires the outgoing webhook
 
         if (isset($data['pipeline_stage_id']) && $data['pipeline_stage_id'] !== $oldStageId) {
             $this->automation->fire('lead_stage_changed', $lead);
@@ -129,36 +126,15 @@ class LeadService
             $this->automation->fire('lead_status_changed', $lead);
         }
 
-        $fresh = $lead->fresh(['stage', 'assignedUser']);
-
-        $event = isset($data['status']) && $data['status'] !== $oldStatus
-            ? 'status_changed'
-            : (isset($data['pipeline_stage_id']) && $data['pipeline_stage_id'] !== $oldStageId
-                ? 'stage_changed'
-                : 'lead_updated');
-
-        $this->webhook($fresh, $event);
-        return $fresh;
+        return $lead->fresh(['stage', 'assignedUser']);
     }
 
     public function changeStage(Lead $lead, int $stageId): Lead
     {
-        $lead->update(['pipeline_stage_id' => $stageId]);
+        $lead->update(['pipeline_stage_id' => $stageId]); // LeadObserver::updated() fires the outgoing webhook
         $fresh = $lead->fresh(['stage', 'assignedUser']);
         $this->automation->fire('lead_stage_changed', $fresh);
-        $this->webhook($fresh, 'stage_changed');
         return $fresh;
-    }
-
-    // Dispatch webhook after response — zero impact on request latency
-    private function webhook(Lead $lead, string $event): void
-    {
-        $hasSetting = ! empty(app(\App\Services\SettingsService::class)->get('outgoing_webhook_url'));
-        $hasEnv     = ! empty(config('services.webhook.target_url'));
-        if (! $hasSetting && ! $hasEnv) {
-            return;
-        }
-        SendOutgoingWebhook::dispatchAfterResponse($lead, $event);
     }
 
     /**

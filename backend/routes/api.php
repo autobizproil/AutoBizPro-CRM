@@ -57,35 +57,38 @@ Route::post('/pdf/sign/{tenant}/{token}', [PdfController::class, 'signatureSubmi
 Route::get('/pdf/download/{tenant}/{filename}', [PdfController::class, 'download']);
 
 // ── Protected routes ───────────────────────────────────────────────────────
-Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
+// agent.ability applies the crm:read/write/bulk/delete tiering (AGENT_ROADMAP.md)
+// to every route in this group by inferring the required ability from the HTTP
+// verb + path — not just leads. crm:bulk/crm:delete are never issuable abilities
+// (see ApiTokenController/StoreApiTokenRequest), so those routes are mechanically
+// unreachable for any agent token. SPA sessions carry Sanctum's TransientToken,
+// whose can() always returns true, so human users are unaffected.
+Route::middleware(['auth:sanctum', 'tenant', 'agent.ability'])->group(function () {
 
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
 
     // Leads
-    // Ability tiers (see AGENT_ROADMAP.md): crm:read / crm:write are issuable to agent
-    // tokens; crm:bulk / crm:delete are NEVER issuable — red-tier routes are mechanically
-    // unreachable for agents. SPA sessions carry a TransientToken (all abilities) and pass.
     Route::get('/leads', [LeadController::class, 'index'])
-        ->middleware(['permission:leads,can_read', 'abilities:crm:read']);
+        ->middleware('permission:leads,can_read');
     Route::post('/leads', [LeadController::class, 'store'])
-        ->middleware(['permission:leads,can_create', 'abilities:crm:write']);
+        ->middleware('permission:leads,can_create');
     Route::post('/leads/bulk', [LeadController::class, 'bulk'])
-        ->middleware(['permission:leads,can_update', 'abilities:crm:bulk']);
+        ->middleware('permission:leads,can_update');
     Route::delete('/leads/all/clear', [LeadController::class, 'deleteAll'])
-        ->middleware(['permission:leads,can_delete', 'abilities:crm:delete']);
+        ->middleware('permission:leads,can_delete');
     Route::get('/leads/{lead}', [LeadController::class, 'show'])
-        ->middleware(['permission:leads,can_read', 'abilities:crm:read']);
+        ->middleware('permission:leads,can_read');
     Route::put('/leads/{lead}', [LeadController::class, 'update'])
-        ->middleware(['permission:leads,can_update', 'abilities:crm:write']);
+        ->middleware('permission:leads,can_update');
     Route::delete('/leads/{lead}', [LeadController::class, 'destroy'])
-        ->middleware(['permission:leads,can_delete', 'abilities:crm:delete']);
+        ->middleware('permission:leads,can_delete');
     Route::put('/leads/{lead}/stage', [LeadController::class, 'changeStage'])
-        ->middleware(['permission:leads,can_update', 'abilities:crm:write']);
+        ->middleware('permission:leads,can_update');
     Route::get('/leads/{lead}/activities', [LeadController::class, 'activities'])
-        ->middleware(['permission:leads,can_read', 'abilities:crm:read']);
+        ->middleware('permission:leads,can_read');
     Route::post('/leads/{lead}/activities', [LeadController::class, 'storeActivity'])
-        ->middleware(['permission:leads,can_create', 'abilities:crm:write']);
+        ->middleware('permission:leads,can_create');
 
     // Agent API tokens (issued to the per-tenant service user, never to a human)
     Route::get('/settings/api-tokens', [\App\Http\Controllers\ApiTokenController::class, 'index'])

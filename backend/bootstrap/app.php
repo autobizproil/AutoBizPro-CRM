@@ -15,9 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi(); // Sanctum SPA mode
 
         $middleware->alias([
-            'tenant'     => TenantMiddleware::class,
-            'permission' => CheckPermission::class,
-            'abilities'  => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+            'tenant'        => TenantMiddleware::class,
+            'permission'    => CheckPermission::class,
+            'abilities'     => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+            'agent.ability' => \App\Http\Middleware\EnforceAgentAbility::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

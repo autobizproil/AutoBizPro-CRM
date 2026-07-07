@@ -80,7 +80,7 @@ class ImportService
         $lead = Lead::create($data);
         if ($createdAt) {
             $lead->created_at = $createdAt;
-            $lead->save();
+            $lead->saveQuietly(); // backdate only — must not re-fire the outgoing webhook
         }
         return 'imported';
     }
