@@ -11,4 +11,6 @@ export const settingsApi = {
     return client.post('/settings/logo', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
   },
   deleteLogo:   () => client.delete('/settings/logo'),
+  getPermissions:    () => client.get('/settings/permissions'),
+  updatePermissions: (permissions) => client.put('/settings/permissions', { permissions }),
 }
