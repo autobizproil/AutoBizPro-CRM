@@ -172,7 +172,7 @@ export default function RecordsPage() {
 
       {modal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={closeModal}>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 {editing ? 'עריכת רשומה' : `${type?.label_singular ?? 'רשומה'} חדשה`}
@@ -181,27 +181,29 @@ export default function RecordsPage() {
             </div>
             <form onSubmit={handleSubmit} className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
               {error && <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg">{error}</div>}
-              {fields.filter(f => !f.hidden).map(f => (
-                <div key={f.id}>
-                  <label className={LABEL}>{f.label} {f.required && <span className="text-red-500">*</span>}</label>
-                  {f.field_type === 'select' ? (
-                    <select value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required} className={INPUT}>
-                      <option value="">בחר...</option>
-                      {(f.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  ) : f.field_type === 'checkbox' ? (
-                    <input type="checkbox" checked={!!form[f.name]} onChange={setField(f.name)}
-                      className="rounded border-gray-300 accent-[#2398c2] w-5 h-5" />
-                  ) : f.field_type === 'textarea' ? (
-                    <textarea value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required} rows={2}
-                      className={INPUT + ' resize-none'} />
-                  ) : (
-                    <input type={fieldInputType(f.field_type)} value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required}
-                      dir={['number', 'date', 'datetime', 'email', 'phone', 'url'].includes(f.field_type) ? 'ltr' : 'auto'}
-                      className={INPUT} />
-                  )}
-                </div>
-              ))}
+              <div className="grid grid-cols-2 gap-3">
+                {fields.filter(f => !f.hidden).map(f => (
+                  <div key={f.id} className={f.field_type === 'textarea' ? 'col-span-2' : ''}>
+                    <label className={LABEL}>{f.label} {f.required && <span className="text-red-500">*</span>}</label>
+                    {f.field_type === 'select' ? (
+                      <select value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required} className={INPUT}>
+                        <option value="">בחר...</option>
+                        {(f.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : f.field_type === 'checkbox' ? (
+                      <input type="checkbox" checked={!!form[f.name]} onChange={setField(f.name)}
+                        className="rounded border-gray-300 accent-[#2398c2] w-5 h-5" />
+                    ) : f.field_type === 'textarea' ? (
+                      <textarea value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required} rows={2}
+                        className={INPUT + ' resize-none'} />
+                    ) : (
+                      <input type={fieldInputType(f.field_type)} value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required}
+                        dir={['number', 'date', 'datetime', 'email', 'phone', 'url'].includes(f.field_type) ? 'ltr' : 'auto'}
+                        className={INPUT} />
+                    )}
+                  </div>
+                ))}
+              </div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={createRecord.isPending || updateRecord.isPending}
                   className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
