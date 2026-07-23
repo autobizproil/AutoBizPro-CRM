@@ -12,6 +12,14 @@ function fieldInputType(fieldType) {
   return { number: 'number', date: 'date', datetime: 'datetime-local', email: 'email', phone: 'tel', url: 'url' }[fieldType] ?? 'text'
 }
 
+// Trim imported values like "1540.0000" down to "1,540" / "234.92" — only as
+// many decimals as the value actually needs, up to 2.
+function formatDisplayValue(val, fieldType) {
+  if (fieldType !== 'number') return String(val)
+  const n = Number(val)
+  return Number.isNaN(n) ? String(val) : n.toLocaleString('he-IL', { maximumFractionDigits: 2 })
+}
+
 export default function RecordsPage() {
   const { slug } = useParams()
   const navigate = useNavigate()
@@ -151,7 +159,7 @@ export default function RecordsPage() {
                     <td key={f.id} className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap max-w-[220px] truncate">
                       {empty ? <span className="text-gray-300 dark:text-gray-600">—</span>
                         : f.field_type === 'checkbox' ? (val ? '✓' : '—')
-                        : String(val)}
+                        : formatDisplayValue(val, f.field_type)}
                     </td>
                   )
                 })}
