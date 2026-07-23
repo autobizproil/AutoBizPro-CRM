@@ -963,21 +963,108 @@ function UsersTab({ can, currentUser }) {
 }
 
 // ---------------------------------------------------------------------------
-// Tab: הרשאות (Permissions) — placeholder
+// Tab: הרשאות (Permissions)
 // ---------------------------------------------------------------------------
-function PermissionsTab() {
+const PERM_ROLES   = ['admin', 'manager', 'agent']
+const PERM_MODULES = ['leads', 'contacts', 'automations', 'forms', 'users', 'reports']
+const MODULE_LABELS = {
+  leads: 'לידים', contacts: 'אנשי קשר', automations: 'אוטומציות',
+  forms: 'טפסים', users: 'משתמשים', reports: 'דוחות',
+}
+const PERM_ACTIONS = [
+  { key: 'can_create', label: 'יצירה' },
+  { key: 'can_read',   label: 'צפייה' },
+  { key: 'can_update', label: 'עדכון' },
+  { key: 'can_delete', label: 'מחיקה' },
+]
+
+// JS port of RolePermission::defaultFor (backend/app/Models/RolePermission.php) —
+// keep this truth table in sync if the backend default matrix ever changes.
+function defaultFor(role, module, action) {
+  if (role === 'admin') return true
+  if (role === 'manager') {
+    return ['can_read', 'can_create', 'can_update'].includes(action)
+      && ['leads', 'contacts', 'reports'].includes(module)
+  }
+  if (role === 'agent') {
+    return ['can_read', 'can_create'].includes(action)
+      && ['leads', 'contacts'].includes(module)
+  }
+  return false
+}
+
+function PermissionsTab({ can, currentUser }) {
+  const [matrix, setMatrix] = useState(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['permissions'],
+    queryFn:  () => settingsApi.getPermissions().then(r => r.data.data),
+  })
+
+  useEffect(() => {
+    if (!data) return
+    const seeded = {}
+    for (const role of PERM_ROLES) {
+      seeded[role] = {}
+      const overridesForRole = data[role] ?? []
+      for (const module of PERM_MODULES) {
+        const override = overridesForRole.find(o => o.module === module)
+        seeded[role][module] = {
+          can_create: override ? !!override.can_create : defaultFor(role, module, 'can_create'),
+          can_read:   override ? !!override.can_read   : defaultFor(role, module, 'can_read'),
+          can_update: override ? !!override.can_update : defaultFor(role, module, 'can_update'),
+          can_delete: override ? !!override.can_delete : defaultFor(role, module, 'can_delete'),
+        }
+      }
+    }
+    setMatrix(seeded)
+  }, [data])
+
+  const isAdmin = currentUser?.role === 'admin'
+
+  if (isLoading || !matrix) {
+    return <Card><p className="text-sm text-gray-500 dark:text-gray-400">טוען...</p></Card>
+  }
+
   return (
-    <div className="max-w-lg">
+    <div className="max-w-4xl">
       <Card>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
-            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">ניהול הרשאות</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">קבע אילו פעולות מותרות לכל תפקיד, לפי מודול.</p>
+
+        {PERM_ROLES.map(role => (
+          <div key={role} className="mb-6 last:mb-0">
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">{ROLE_LABELS[role]}</h4>
+            <table className="w-full text-sm text-right">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
+                  <th className="py-1.5 font-medium">מודול</th>
+                  {PERM_ACTIONS.map(a => (
+                    <th key={a.key} className="py-1.5 font-medium text-center">{a.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {PERM_MODULES.map(module => (
+                  <tr key={module} className="border-b border-gray-100 dark:border-gray-700/50">
+                    <td className="py-1.5 text-gray-800 dark:text-gray-100">{MODULE_LABELS[module] ?? module}</td>
+                    {PERM_ACTIONS.map(a => (
+                      <td key={a.key} className="py-1.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={matrix[role][module][a.key]}
+                          disabled={!isAdmin}
+                          onChange={() => {}}
+                          className="w-4 h-4 accent-[#2398c2] disabled:opacity-50"
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ניהול הרשאות</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">בקרוב</p>
-        </div>
+        ))}
       </Card>
     </div>
   )
@@ -1557,7 +1644,7 @@ export default function SettingsPage() {
         <ConnectionsTab integ={integ} can={can} qc={qc} tenantSubdomain={tenantSubdomain} />
       )}
       {activeTab === 'users' && <UsersTab can={can} currentUser={user} />}
-      {activeTab === 'permissions' && <PermissionsTab />}
+      {activeTab === 'permissions' && <PermissionsTab can={can} currentUser={user} />}
       {activeTab === 'labels' && <LabelsTab />}
       {activeTab === 'preferences' && (
         <PreferencesTab
