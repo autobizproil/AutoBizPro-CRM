@@ -21,7 +21,7 @@ const SOURCE_COLORS = {
   'גוגל':    '#ef4444',
   'המלצה':   '#f59e0b',
 }
-const EMPTY_FORM = { name: '', phone: '', email: '', source: '', pipeline_stage_id: '', notes: '' }
+const EMPTY_FORM = { name: '', phone: '', email: '', source: '', pipeline_stage_id: '', notes: '', custom_fields: {} }
 
 // Fallback while field definitions load (or on fetch error) — real columns
 // derive from custom_field_definitions so Settings renames/hidden/order apply.
@@ -44,6 +44,20 @@ const SYSTEM_COL_KEY = {
 
 // Backend sort whitelist uses raw column names (LeadService::$sortable)
 const SORT_FIELD = { stage: 'pipeline_stage_id' }
+
+// System defs allowed as filter conditions (LeadService::FILTERABLE_FIELDS)
+const FILTERABLE_SYSTEM = ['name', 'phone', 'email', 'source', 'pipeline_stage_id', 'assigned_to', 'created_at']
+
+// Fallback while field definitions load — mirrors FILTERABLE_SYSTEM labels
+const FALLBACK_FILTER_FIELDS = [
+  { key: 'name', label: 'שם מלא' },
+  { key: 'phone', label: 'טלפון' },
+  { key: 'email', label: 'דוא"ל' },
+  { key: 'source', label: 'מקור' },
+  { key: 'pipeline_stage_id', label: 'שלב' },
+  { key: 'assigned_to', label: 'נציג אחראי' },
+  { key: 'created_at', label: 'תאריך יצירה' },
+]
 
 // Backend requires cf_ prefix (LeadService: /^cf_[a-z0-9_]+$/); Hebrew-labeled
 // fields already carry it in name, ASCII-labeled ones don't.
@@ -196,17 +210,16 @@ export default function LeadsPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const FILTER_FIELDS = [
-    { key: 'name', label: 'שם מלא' },
-    { key: 'phone', label: 'טלפון' },
-    { key: 'email', label: 'דוא"ל' },
-    { key: 'source', label: 'מקור' },
-    { key: 'status', label: 'סטטוס' },
-    { key: 'pipeline_stage_id', label: 'שלב' },
-    { key: 'assigned_to', label: 'נציג אחראי' },
-    { key: 'created_at', label: 'תאריך יצירה' },
-    ...customFieldDefs.map(cf => ({ key: `cf_${cf.name}`, label: cf.label })),
-  ]
+  // Backend whitelist (LeadService::FILTERABLE_FIELDS) minus legacy 'status'
+  // (no field def represents it; data migrated to pipeline stages) and 'notes'
+  // (not filterable server-side).
+  const FILTER_FIELDS = defs.length
+    ? defs
+        .filter(f => !f.hidden && (!f.is_system || FILTERABLE_SYSTEM.includes(f.name)))
+        .map(f => f.is_system
+          ? { key: f.name, label: f.label }
+          : { key: `cf_${f.name}`, label: f.label })
+    : FALLBACK_FILTER_FIELDS
 
   const handleDeleteAll = async () => {
     const ok = window.prompt(`פעולה בלתי הפיכה! ימחקו כל ${total} ה${t('leads')}.\nהקלד "מחק" לאישור:`)
@@ -215,12 +228,22 @@ export default function LeadsPage() {
   }
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
+  const setCf = (name) => (e) => {
+    const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+    setForm(f => ({ ...f, custom_fields: { ...f.custom_fields, [name]: val } }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(''); setSaving(true)
     try {
-      await createLead.mutateAsync({ ...form, pipeline_stage_id: form.pipeline_stage_id || undefined })
+      // Drop untouched/empty custom values so we don't write "" into the JSON
+      const cf = Object.fromEntries(Object.entries(form.custom_fields ?? {}).filter(([, v]) => v !== '' && v !== undefined))
+      await createLead.mutateAsync({
+        ...form,
+        pipeline_stage_id: form.pipeline_stage_id || undefined,
+        custom_fields: Object.keys(cf).length ? cf : undefined,
+      })
       setForm(EMPTY_FORM); setModal(false)
     } catch (err) {
       setError(err.response?.data?.message ?? err.response?.data?.errors?.name?.[0] ?? 'שגיאה בשמירה')
@@ -310,6 +333,65 @@ export default function LeadsPage() {
       </svg>
     </button>
   )
+
+  // ── Create-modal fields from definitions ─────────────────────────────────
+  // 'name' is forced first and required (StoreLeadRequest requires it, even if
+  // hidden in Settings). assigned_to/created_at never render here — parity with
+  // the previous hardcoded modal (created_at is server-set).
+  const MODAL_INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
+  const nameDef   = defs.find(f => f.is_system && f.name === 'name')
+  const modalDefs = defs.filter(f =>
+    !f.hidden && !(f.is_system && ['name', 'assigned_to', 'created_at'].includes(f.name)))
+
+  const isWide = (f) => f.field_type === 'textarea' || (f.is_system && f.name === 'notes')
+
+  const modalField = (f) => {
+    if (f.is_system) {
+      switch (f.name) {
+        case 'phone': return (
+          <input value={form.phone} onChange={set('phone')} type="tel" placeholder="05X-XXXXXXX" className={MODAL_INPUT} />
+        )
+        case 'email': return (
+          <input value={form.email} onChange={set('email')} type="email" placeholder="email@..." className={MODAL_INPUT} />
+        )
+        case 'source': return (
+          <select value={form.source} onChange={set('source')} className={MODAL_INPUT}>
+            {SOURCES.map(s => <option key={s} value={s}>{s || `בחר ${t('source')}`}</option>)}
+          </select>
+        )
+        case 'pipeline_stage_id': return (
+          <select value={form.pipeline_stage_id} onChange={set('pipeline_stage_id')} className={MODAL_INPUT}>
+            <option value="">בחר {t('stage')}</option>
+            {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        )
+        case 'notes': return (
+          <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="הערות נוספות..." className={MODAL_INPUT + ' resize-none'} />
+        )
+        default: return null
+      }
+    }
+    const val = form.custom_fields?.[f.name] ?? ''
+    if (f.field_type === 'select') return (
+      <select value={val} onChange={setCf(f.name)} required={f.required} className={MODAL_INPUT}>
+        <option value="">בחר...</option>
+        {(f.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    )
+    if (f.field_type === 'checkbox') return (
+      <input type="checkbox" checked={!!val} onChange={setCf(f.name)}
+        className="rounded border-gray-300 accent-[#2398c2] w-5 h-5" />
+    )
+    if (f.field_type === 'textarea') return (
+      <textarea value={val} onChange={setCf(f.name)} required={f.required} rows={2} className={MODAL_INPUT + ' resize-none'} />
+    )
+    return (
+      <input type={{ number: 'number', date: 'date', datetime: 'datetime-local', email: 'email', phone: 'tel', url: 'url' }[f.field_type] ?? 'text'}
+        value={val} onChange={setCf(f.name)} required={f.required}
+        dir={['number', 'date', 'datetime', 'email', 'phone', 'url'].includes(f.field_type) ? 'ltr' : 'auto'}
+        className={MODAL_INPUT} />
+    )
+  }
 
   // One cell renderer per column key — content unchanged from the previous
   // hardcoded sequence; dispatching by dynamicCols preserves Settings order.
@@ -698,43 +780,21 @@ export default function LeadsPage() {
             <form onSubmit={handleSubmit} className="px-6 py-4 space-y-3">
               {error && <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg">{error}</div>}
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">שם <span className="text-red-400">*</span></label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  {nameDef?.label ?? 'שם'} <span className="text-red-400">*</span>
+                </label>
                 <input required value={form.name} onChange={set('name')} placeholder={`שם ה${t('lead')}`}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
+                  className={MODAL_INPUT} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">טלפון</label>
-                  <input value={form.phone} onChange={set('phone')} type="tel" placeholder="05X-XXXXXXX"
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">אימייל</label>
-                  <input value={form.email} onChange={set('email')} type="email" placeholder="email@..."
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t('source')}</label>
-                  <select value={form.source} onChange={set('source')}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]">
-                    {SOURCES.map(s => <option key={s} value={s}>{s || `בחר ${t('source')}`}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t('stage')}</label>
-                  <select value={form.pipeline_stage_id} onChange={set('pipeline_stage_id')}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]">
-                    <option value="">בחר {t('stage')}</option>
-                    {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">הערות</label>
-                <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="הערות נוספות..."
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
+                {modalDefs.map(f => (
+                  <div key={f.id} className={isWide(f) ? 'col-span-2' : ''}>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      {f.label} {f.required && <span className="text-red-400">*</span>}
+                    </label>
+                    {modalField(f)}
+                  </div>
+                ))}
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={saving}
