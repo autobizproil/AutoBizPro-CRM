@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 use App\Models\Lead;
+use App\Models\Record;
 use League\Csv\Reader;
 
 class ImportService
@@ -81,6 +82,36 @@ class ImportService
         if ($createdAt) {
             $lead->created_at = $createdAt;
             $lead->saveQuietly(); // backdate only — must not re-fire the outgoing webhook
+        }
+        return 'imported';
+    }
+
+    // mapping: ['title'=>'csvCol', '<custom field name>'=>'csvCol', ..., 'created_at'=>'csvCol' (optional, overrides timestamp)]
+    public function importRecordRow(array $row, array $mapping, int $recordTypeId, ?int $createdBy = null): string
+    {
+        $data = [];
+        $createdAtRaw = null;
+        foreach ($mapping as $field => $csvCol) {
+            if (! $csvCol || ! isset($row[$csvCol])) continue;
+            $value = trim($row[$csvCol]);
+            if ($field === 'created_at') { $createdAtRaw = $value; continue; }
+            if ($value !== '') $data[$field] = $value;
+        }
+        if (empty($data['title'])) return 'skipped';
+
+        $record = Record::create([
+            'tenant_id'      => app('current_tenant_id'),
+            'record_type_id' => $recordTypeId,
+            'data'           => $data,
+            'created_by'     => $createdBy,
+        ]);
+
+        if ($createdAtRaw) {
+            $createdAt = self::parseDate($createdAtRaw);
+            if ($createdAt) {
+                $record->created_at = $createdAt;
+                $record->saveQuietly();
+            }
         }
         return 'imported';
     }

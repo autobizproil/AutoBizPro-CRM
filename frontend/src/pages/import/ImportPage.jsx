@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useUploadCsv, useStartImport, useImportStatus, useDistinctValues } from '../../hooks/useImport'
 import { usePipeline } from '../../hooks/usePipeline'
 import { customFieldsApi } from '../../api/customFields'
+import { recordTypesApi } from '../../api/recordTypes'
 
 const FIELDS = [
   { key: 'name',   label: 'שם *',   required: true },
@@ -31,6 +32,10 @@ const SKIP = '__skip__'
 const SELECT_CLS = 'flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30'
 
 export default function ImportPage() {
+  const [searchParams] = useSearchParams()
+  const entity = searchParams.get('entity') || 'leads'
+  const isLeads = entity === 'leads'
+
   const [step, setStep]       = useState(1)
   const [uploaded, setUp]     = useState(null)
   const [mapping, setMapping] = useState({})
@@ -47,16 +52,33 @@ export default function ImportPage() {
   const { data: pipeline } = usePipeline()
   const { data: job } = useImportStatus(jobId, step === 5)
 
-  const { data: customFieldDefs = [] } = useQuery({
-    queryKey: ['custom-fields', 'leads'],
-    queryFn:  () => customFieldsApi.list('leads').then(r => r.data.data),
+  const { data: recordTypes = [] } = useQuery({
+    queryKey: ['record-types'],
+    queryFn:  () => recordTypesApi.list().then(r => r.data.data),
+    enabled: !isLeads,
   })
-  // Tenant's custom lead fields become extra mapping targets (e.g. "עיר", "כמות דלתות")
-  const customFields = customFieldDefs.filter(f => !f.is_system && !f.hidden)
-  const allFields = useMemo(
-    () => [...FIELDS, ...customFields.map(f => ({ key: f.name, label: f.label }))],
-    [customFields]
-  )
+  const recordType = recordTypes.find(t => t.slug === entity)
+
+  const { data: customFieldDefs = [] } = useQuery({
+    queryKey: ['custom-fields', entity],
+    queryFn:  () => customFieldsApi.list(entity).then(r => r.data.data),
+  })
+
+  // Leads: system fields are hardcoded (tuned labels/synonyms) + tenant's custom lead
+  // fields as extra targets. Record types: every field definition is a mapping target,
+  // since there's no separate hardcoded list — plus a synthetic "created_at" target.
+  const allFields = useMemo(() => {
+    if (isLeads) {
+      const customFields = customFieldDefs.filter(f => !f.is_system && !f.hidden)
+      return [...FIELDS, ...customFields.map(f => ({ key: f.name, label: f.label }))]
+    }
+    const fields = customFieldDefs.filter(f => !f.hidden).map(f => ({
+      key: f.name, label: f.name === 'title' ? `${f.label} *` : f.label, required: f.name === 'title',
+    }))
+    return [...fields, { key: 'created_at', label: 'נוצר בתאריך (תאריך + שעה)' }]
+  }, [isLeads, customFieldDefs])
+
+  const requiredKey = isLeads ? 'name' : 'title'
 
   const handleFile = async (e) => {
     const file = e.target.files[0]
@@ -82,7 +104,7 @@ export default function ImportPage() {
   }
 
   const handleMappingNext = async () => {
-    if (!mapping.status) { setStep(4); return }
+    if (!isLeads || !mapping.status) { setStep(4); return }
     setError('')
     try {
       const values = await distinctValues.mutateAsync({ importId: uploaded.import_id, column: mapping.status })
@@ -114,6 +136,7 @@ export default function ImportPage() {
       }
       const created = await start.mutateAsync({
         import_id: uploaded.import_id,
+        entity,
         field_mapping: mapping,
         status_mapping,
       })
@@ -135,13 +158,15 @@ export default function ImportPage() {
         <button onClick={() => navigate(-1)} className="text-sm text-[#2398c2] hover:underline flex items-center gap-1 mb-3">
           ← חזור
         </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">ייבוא לידים מ-CSV</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">העלה קובץ מ-Fireberry, מפה שדות, וייבא בקלות</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          ייבוא {isLeads ? 'לידים' : recordType?.label ?? 'רשומות'} מ-CSV
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">העלה קובץ, מפה שדות, וייבא בקלות</p>
       </div>
 
       {/* Steps indicator */}
       <div className="flex gap-2 mb-6">
-        {['העלאה', 'מיפוי', 'סטטוסים', 'אישור', 'ייבוא'].map((s, i) => (
+        {(isLeads ? ['העלאה', 'מיפוי', 'סטטוסים', 'אישור', 'ייבוא'] : ['העלאה', 'מיפוי', 'אישור', 'ייבוא']).map((s, i) => (
           <div key={s} className={`flex-1 text-center py-2 rounded-lg text-xs font-medium transition-colors ${
             step === i + 1 ? 'bg-[#2398c2] text-white'
             : step > i + 1 ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'

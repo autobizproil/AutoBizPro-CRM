@@ -195,7 +195,7 @@ function GeneralTab({ tenantData, can, qc }) {
 
       {/* WhatsApp */}
       <Card>
-        <h3 className="font-semibold text-gray-800 mb-1">WhatsApp (GREEN-API)</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">WhatsApp (GREEN-API)</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הגדר ספק WhatsApp לשליחת הודעות אוטומטיות.</p>
         <form onSubmit={handleSave} className="space-y-4">
           <div>
@@ -340,7 +340,7 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
 
       {/* Green Invoice */}
       <Card>
-        <h3 className="font-semibold text-gray-800 mb-1">&#x1F9FE; Green Invoice (חשבוניות)</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">&#x1F9FE; Green Invoice (חשבוניות)</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הזן את מפתחות ה-API מ-Green Invoice &#x2192; הגדרות &#x2192; API. לאחר מכן ניתן להפיק חשבוניות ישירות מכרטיס ליד.</p>
         <form onSubmit={(e) => { e.preventDefault(); saveInteg.mutate() }} className="space-y-4">
           <div>
@@ -377,7 +377,7 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
       {/* WhatsApp (GREEN-API) — connection details only; provider settings live in General */}
       {/* Cardcom */}
       <Card>
-        <h3 className="font-semibold text-gray-800 mb-1">&#x1F4B3; Cardcom (סליקה)</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">&#x1F4B3; Cardcom (סליקה)</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הזן את פרטי ה-API של Cardcom כדי לאפשר שליחת עמודי תשלום ישירות מכרטיס ליד.</p>
         <form onSubmit={(e) => { e.preventDefault(); saveCardcom.mutate() }} className="space-y-4">
           <div>
@@ -411,7 +411,7 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
 
       {/* Yesh Invoice */}
       <Card>
-        <h3 className="font-semibold text-gray-800 mb-1">&#x1F9FE; Yesh Invoice (חשבוניות)</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">&#x1F9FE; Yesh Invoice (חשבוניות)</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הזן את מפתחות ה-API של Yesh Invoice להפקת חשבוניות ישירות מכרטיס ליד.</p>
         <form onSubmit={(e) => { e.preventDefault(); saveYesh.mutate() }} className="space-y-4">
           <div>
@@ -443,7 +443,7 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
       {/* PayCall */}
       <Card>
         <div className="flex items-center justify-between mb-1">
-          <h3 className="font-semibold text-gray-800">&#x1F4DE; PayCall — מרכזייה טלפונית</h3>
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100">&#x1F4DE; PayCall — מרכזייה טלפונית</h3>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500">{paycallEnabled ? 'פעיל' : 'כבוי'}</span>
             <ToggleSwitch

@@ -112,12 +112,20 @@ export default function RecordsPage() {
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{total} רשומות</p>
         </div>
-        {canCreate && (
-          <button onClick={openCreate}
-            className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
-            <span className="text-lg leading-none">+</span> {type?.label_singular ?? 'רשומה'} חדשה
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canCreate && (
+            <button onClick={() => navigate(`/import?entity=${slug}`)}
+              className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-colors">
+              📥 ייבוא CSV
+            </button>
+          )}
+          {canCreate && (
+            <button onClick={openCreate}
+              className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
+              <span className="text-lg leading-none">+</span> {type?.label_singular ?? 'רשומה'} חדשה
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-4">
