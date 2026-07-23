@@ -856,6 +856,17 @@ function UsersTab({ can, currentUser }) {
     queryFn:  () => usersApi.list().then(r => r.data.data),
   })
 
+  const updateRole = useMutation({
+    mutationFn: ({ id, role }) => usersApi.update(id, { role }),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['users'] }),
+  })
+
+  const toggleStatus = useMutation({
+    mutationFn: ({ id, status }) =>
+      status === 'active' ? usersApi.update(id, { status: 'active' }) : usersApi.deactivate(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  })
+
   const canCreate = can('users', 'can_create')
   const canUpdate = can('users', 'can_update')
 
@@ -887,22 +898,54 @@ function UsersTab({ can, currentUser }) {
               </tr>
             </thead>
             <tbody>
-              {(users ?? []).map(u => (
-                <tr key={u.id} className="border-b border-gray-100 dark:border-gray-700/50">
-                  <td className="py-2 text-gray-800 dark:text-gray-100">{u.name}</td>
-                  <td className="py-2 text-gray-600 dark:text-gray-300" dir="ltr">{u.email}</td>
-                  <td className="py-2 text-gray-700 dark:text-gray-300">{ROLE_LABELS[u.role] ?? u.role}</td>
-                  <td className="py-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      u.status === 'active'
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                        : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-                    }`}>
-                      {u.status === 'active' ? 'פעיל' : 'לא פעיל'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {(users ?? []).map(u => {
+                const isSelf = u.id === currentUser?.id
+                return (
+                  <tr key={u.id} className="border-b border-gray-100 dark:border-gray-700/50">
+                    <td className="py-2 text-gray-800 dark:text-gray-100">{u.name}</td>
+                    <td className="py-2 text-gray-600 dark:text-gray-300" dir="ltr">{u.email}</td>
+                    <td className="py-2">
+                      {currentUser?.role === 'admin' ? (
+                        <select
+                          value={u.role}
+                          disabled={isSelf}
+                          onChange={e => updateRole.mutate({ id: u.id, role: e.target.value })}
+                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-2 py-1 text-xs disabled:opacity-50"
+                        >
+                          <option value="admin">{ROLE_LABELS.admin}</option>
+                          <option value="manager">{ROLE_LABELS.manager}</option>
+                          <option value="agent">{ROLE_LABELS.agent}</option>
+                        </select>
+                      ) : (
+                        <span className="text-gray-700 dark:text-gray-300">{ROLE_LABELS[u.role] ?? u.role}</span>
+                      )}
+                    </td>
+                    <td className="py-2">
+                      {canUpdate ? (
+                        <button
+                          disabled={isSelf}
+                          onClick={() => toggleStatus.mutate({ id: u.id, status: u.status === 'active' ? 'inactive' : 'active' })}
+                          className={`px-2 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
+                            u.status === 'active'
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                              : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                          }`}
+                        >
+                          {u.status === 'active' ? 'פעיל' : 'לא פעיל'}
+                        </button>
+                      ) : (
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          u.status === 'active'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                        }`}>
+                          {u.status === 'active' ? 'פעיל' : 'לא פעיל'}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
