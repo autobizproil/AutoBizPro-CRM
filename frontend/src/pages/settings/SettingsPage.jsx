@@ -994,6 +994,7 @@ function defaultFor(role, module, action) {
 }
 
 function PermissionsTab({ can, currentUser }) {
+  const qc = useQueryClient()
   const [matrix, setMatrix] = useState(null)
 
   const { data, isLoading } = useQuery({
@@ -1019,6 +1020,29 @@ function PermissionsTab({ can, currentUser }) {
     }
     setMatrix(seeded)
   }, [data])
+
+  const save = useMutation({
+    mutationFn: () => {
+      const permissions = []
+      for (const role of PERM_ROLES) {
+        for (const module of PERM_MODULES) {
+          permissions.push({ role, module, ...matrix[role][module] })
+        }
+      }
+      return settingsApi.updatePermissions(permissions)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['permissions'] }),
+  })
+
+  function toggle(role, module, action) {
+    setMatrix(prev => ({
+      ...prev,
+      [role]: {
+        ...prev[role],
+        [module]: { ...prev[role][module], [action]: !prev[role][module][action] },
+      },
+    }))
+  }
 
   const isAdmin = currentUser?.role === 'admin'
 
@@ -1054,7 +1078,7 @@ function PermissionsTab({ can, currentUser }) {
                           type="checkbox"
                           checked={matrix[role][module][a.key]}
                           disabled={!isAdmin}
-                          onChange={() => {}}
+                          onChange={() => toggle(role, module, a.key)}
                           className="w-4 h-4 accent-[#2398c2] disabled:opacity-50"
                         />
                       </td>
@@ -1065,6 +1089,24 @@ function PermissionsTab({ can, currentUser }) {
             </table>
           </div>
         ))}
+
+        {isAdmin && (
+          <div className="pt-2">
+            <button
+              onClick={() => save.mutate()}
+              disabled={save.isPending}
+              className="bg-[#2398c2] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1d7fa3] disabled:opacity-50 transition-colors duration-150"
+            >
+              {save.isPending ? 'שומר...' : 'שמור'}
+            </button>
+            {save.isSuccess && <span className="text-green-600 dark:text-green-400 text-sm mr-3">✓ נשמר</span>}
+            {save.isError && (
+              <div className="text-sm px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700 mt-2">
+                {save.error?.response?.data?.message ?? 'שגיאה בשמירה'}
+              </div>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   )
