@@ -115,3 +115,14 @@ User tested with the real 5,732-row Fireberry CSV. Issues found and fixed:
 8. **Settings drag-and-drop reorder** — replaced ▲▼ buttons with HTML5 drag (⠿ handle, row dims while dragging); verified in browser.
 
 All verified live in Chrome against the real 5,563-lead dataset. **Remember: restart the queue worker after backend changes.**
+
+## 9. State snapshot — 2026-07-13
+
+- Branch `master`, last commit `6bb3d392` (webhook coverage gap, global agent-ability tiers, real queueing). Before it: master-plan roadmap docs, project CLAUDE.md (schema law + git discipline), agent API tokens + signed outgoing webhooks, AutomationTest fixes + retroactive SCHEMA_DB mirror.
+- **Work queue = 5 uncommitted PLAN-*.md at repo root** (2026-07-12): automation-engine-depth, field-driven-lead-ui (= Phase 3 from §6), records-module-parity, scheduler-time-triggers, webhook-delivery-log-kill-switch. Ranking not recorded in the files — confirm order with user before starting.
+- §6 "Next steps" partially superseded: Phase 3 → PLAN-field-driven-lead-ui; record-types ask → PLAN-records-module-parity.
+
+## 10. Workflow change — 2026-07-13 (permanent)
+
+- 4 unused `tasky-*` custom agents + `honest-advisor`/`security-sweep` project skills archived to `~/.claude/archive/` (zero invocations in 30 days). Restore = move back.
+- File-based workflow: reference paths, no giant chat pastes. Respond to user in Hebrew.
