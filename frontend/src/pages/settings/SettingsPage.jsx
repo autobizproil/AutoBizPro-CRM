@@ -774,8 +774,82 @@ function OutgoingWebhookCard({ integ, qc, can }) {
 // ---------------------------------------------------------------------------
 const ROLE_LABELS = { admin: 'מנהל', manager: 'מנג\'ר', agent: 'נציג' }
 
+function CreateUserModal({ onClose, onCreated }) {
+  const [name, setName]         = useState('')
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole]         = useState('agent')
+  const [error, setError]       = useState('')
+
+  const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
+
+  const create = useMutation({
+    mutationFn: () => usersApi.create({ name, email, password, role }),
+    onSuccess:  () => onCreated(),
+    onError: (err) => setError(
+      err.response?.data?.message
+      ?? Object.values(err.response?.data?.errors ?? {})[0]?.[0]
+      ?? 'שגיאה ביצירת המשתמש'),
+  })
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4" dir="rtl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">משתמש חדש</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">&times;</button>
+        </div>
+        <form
+          onSubmit={e => { e.preventDefault(); setError(''); create.mutate() }}
+          className="px-6 py-4 space-y-3"
+        >
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">שם</label>
+            <input value={name} onChange={e => setName(e.target.value)} required className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">אימייל</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required dir="ltr" className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סיסמה</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} dir="ltr" className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">תפקיד</label>
+            <select value={role} onChange={e => setRole(e.target.value)} className={INPUT}>
+              <option value="admin">{ROLE_LABELS.admin}</option>
+              <option value="manager">{ROLE_LABELS.manager}</option>
+              <option value="agent">{ROLE_LABELS.agent}</option>
+            </select>
+          </div>
+          {error && (
+            <div className="text-sm px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700">
+              {error}
+            </div>
+          )}
+          <div className="flex items-center gap-2 pt-2">
+            <button type="submit" disabled={create.isPending}
+              className="bg-[#2398c2] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1d7fa3] disabled:opacity-50 transition-colors duration-150">
+              {create.isPending ? 'יוצר...' : 'צור משתמש'}
+            </button>
+            <button type="button" onClick={onClose}
+              className="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+              ביטול
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function UsersTab({ can, currentUser }) {
   const qc = useQueryClient()
+  const [showCreate, setShowCreate] = useState(false)
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
@@ -790,6 +864,14 @@ function UsersTab({ can, currentUser }) {
       <Card>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-gray-800 dark:text-gray-100">ניהול משתמשים</h3>
+          {canCreate && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="bg-[#2398c2] text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[#1d7fa3] transition-colors duration-150"
+            >
+              + משתמש חדש
+            </button>
+          )}
         </div>
 
         {isLoading && <p className="text-sm text-gray-500 dark:text-gray-400">טוען...</p>}
@@ -825,6 +907,13 @@ function UsersTab({ can, currentUser }) {
           </table>
         )}
       </Card>
+
+      {showCreate && (
+        <CreateUserModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['users'] }) }}
+        />
+      )}
     </div>
   )
 }
