@@ -869,6 +869,7 @@ function UsersTab({ can, currentUser }) {
 
   const canCreate = can('users', 'can_create')
   const canUpdate = can('users', 'can_update')
+  const canDeactivate = can('users', 'can_delete')
 
   return (
     <div className="max-w-3xl">
@@ -921,7 +922,7 @@ function UsersTab({ can, currentUser }) {
                       )}
                     </td>
                     <td className="py-2">
-                      {canUpdate ? (
+                      {(u.status === 'active' ? canDeactivate : canUpdate) ? (
                         <button
                           disabled={isSelf}
                           onClick={() => toggleStatus.mutate({ id: u.id, status: u.status === 'active' ? 'inactive' : 'active' })}
