@@ -16,6 +16,14 @@ export function useCreateAutomation() {
   })
 }
 
+export function useUpdateAutomation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }) => automationsApi.update(id, data).then(r => r.data.data),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['automations'] }),
+  })
+}
+
 export function useToggleAutomation() {
   const qc = useQueryClient()
   return useMutation({

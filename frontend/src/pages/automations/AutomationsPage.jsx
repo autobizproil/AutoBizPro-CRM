@@ -2,7 +2,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import client from '../../api/client'
 import { pipelineApi } from '../../api/pipeline'
-import { useAutomations, useCreateAutomation, useToggleAutomation, useDeleteAutomation } from '../../hooks/useAutomations'
+import { useAutomations, useCreateAutomation, useUpdateAutomation, useToggleAutomation, useDeleteAutomation } from '../../hooks/useAutomations'
 import { useAuth } from '../../context/AuthContext'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -71,8 +71,10 @@ export default function AutomationsPage() {
   const toggle  = useToggleAutomation()
   const remove  = useDeleteAutomation()
   const create  = useCreateAutomation()
+  const update  = useUpdateAutomation()
 
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const [name, setName]           = useState('')
   const [trigger, setTrigger]     = useState('lead_created')
   const [actions, setActions]     = useState([{ type: 'create_activity', activity_type: 'note', title: '' }])
@@ -85,9 +87,19 @@ export default function AutomationsPage() {
   const automations = Array.isArray(data) ? data : (data?.data ?? [])
 
   function closeModal() {
-    setShowModal(false); setName(''); setTrigger('lead_created')
+    setShowModal(false); setEditingId(null); setName(''); setTrigger('lead_created')
     setActions([{ type: 'create_activity', activity_type: 'note', title: '' }])
     setConds([]); setError('')
+  }
+
+  function openEdit(auto) {
+    setEditingId(auto.id)
+    setName(auto.name)
+    setTrigger(auto.trigger_type)
+    setActions(auto.actions?.length ? auto.actions : [{ type: 'create_activity', activity_type: 'note', title: '' }])
+    setConds(auto.conditions ?? [])
+    setError('')
+    setShowModal(true)
   }
 
   // Actions
@@ -106,10 +118,18 @@ export default function AutomationsPage() {
     setError('')
     if (!name.trim()) return setError('שם האוטומציה חובה')
     if (!actions.length) return setError('חובה פעולה אחת לפחות')
-    create.mutate(
-      { name, trigger_type: trigger, actions, conditions, active: true },
-      { onSuccess: closeModal, onError: (er) => setError(er.response?.data?.message ?? 'שגיאה ביצירה') }
-    )
+    const onError = (er) => setError(er.response?.data?.message ?? 'שגיאה בשמירה')
+    if (editingId) {
+      update.mutate(
+        { id: editingId, data: { name, trigger_type: trigger, actions, conditions } },
+        { onSuccess: closeModal, onError }
+      )
+    } else {
+      create.mutate(
+        { name, trigger_type: trigger, actions, conditions, active: true },
+        { onSuccess: closeModal, onError }
+      )
+    }
   }
 
   return (
@@ -152,6 +172,9 @@ export default function AutomationsPage() {
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   {can('automations', 'can_update') && (
+                    <button onClick={() => openEdit(auto)} className="text-gray-400 hover:text-[#2398c2] text-xs">ערוך</button>
+                  )}
+                  {can('automations', 'can_update') && (
                     <button dir="ltr" onClick={() => toggle.mutate(auto.id)}
                       className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#2398c2]/40 ${auto.active ? 'bg-[#2398c2]' : 'bg-gray-200 dark:bg-gray-600'}`}>
                       <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${auto.active ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -182,7 +205,7 @@ export default function AutomationsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={closeModal}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">אוטומציה חדשה</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{editingId ? 'עריכת אוטומציה' : 'אוטומציה חדשה'}</h2>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
             </div>
 
@@ -303,9 +326,9 @@ export default function AutomationsPage() {
               </div>
 
               <div className="flex gap-2 pt-1 border-t border-gray-100 dark:border-gray-700">
-                <button type="submit" disabled={create.isPending}
+                <button type="submit" disabled={create.isPending || update.isPending}
                   className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
-                  {create.isPending ? 'שומר...' : 'צור אוטומציה'}
+                  {(create.isPending || update.isPending) ? 'שומר...' : (editingId ? 'שמור שינויים' : 'צור אוטומציה')}
                 </button>
                 <button type="button" onClick={closeModal} className="px-4 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm">ביטול</button>
               </div>
