@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Lead;
+use App\Services\AutomationEngine;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -134,11 +135,28 @@ class LeadService
             $query->where('assigned_to', $userId);
         }
 
+        // change_stage needs per-lead automation firing, which a mass query-builder
+        // update skips entirely (Eloquent model events don't fire on it) — so this
+        // branch can't be a one-line match() arm like the others.
+        if ($action === 'change_stage') {
+            $stageId = (int) $value;
+            $changedIds = (clone $query)->where('pipeline_stage_id', '!=', $stageId)->pluck('id');
+            $count = $query->update(['pipeline_stage_id' => $stageId]);
+
+            if ($changedIds->isNotEmpty()) {
+                $automation = app(AutomationEngine::class);
+                Lead::whereIn('id', $changedIds)->get()->each(
+                    fn (Lead $lead) => $automation->fire('lead_stage_changed', $lead)
+                );
+            }
+
+            return $count;
+        }
+
         return match ($action) {
-            'change_stage' => $query->update(['pipeline_stage_id' => (int) $value]),
-            'assign'       => $query->update(['assigned_to' => (int) $value]),
-            'delete'       => $query->delete(), // soft delete
-            default        => 0,
+            'assign' => $query->update(['assigned_to' => (int) $value]),
+            'delete' => $query->delete(), // soft delete
+            default  => 0,
         };
     }
 }

@@ -114,6 +114,8 @@ class ClientController extends Controller
             'custom_fields'  => $lead->custom_fields,
         ]);
 
+        app(AutomationEngine::class)->fire('client_created', $client);
+
         return response()->json(['success' => true, 'data' => $client->load(['assignedUser'])], 201);
     }
 }

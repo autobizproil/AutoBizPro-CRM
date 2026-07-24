@@ -64,6 +64,41 @@ class AutomationTest extends TestCase
         Bus::assertNotDispatchedAfterResponse(RunAutomationJob::class);
     }
 
+    public function test_client_created_automation_fires_on_lead_conversion(): void
+    {
+        // ClientController::convertLead is a separate creation path from
+        // ClientController::store — both must fire client_created, not just store().
+        Bus::fake();
+
+        $tenant = Tenant::create(['name' => 'Test', 'subdomain' => 'convert-test', 'status' => 'active']);
+        $admin  = \App\Models\User::create([
+            'tenant_id' => $tenant->id,
+            'name'      => 'Admin',
+            'email'     => 'admin@convert-test.test',
+            'password'  => bcrypt('password'),
+            'role'      => 'admin',
+        ]);
+        app()->instance('current_tenant_id', $tenant->id);
+
+        Automation::create([
+            'tenant_id'    => $tenant->id,
+            'name'         => 'New client',
+            'trigger_type' => 'client_created',
+            'conditions'   => [],
+            'actions'      => [['type' => 'add_tag', 'tag' => 'converted']],
+            'active'       => true,
+        ]);
+
+        $lead = Lead::create(['tenant_id' => $tenant->id, 'name' => 'Convert Me']);
+
+        $response = $this->actingAs($admin)
+            ->withHeaders(['X-Tenant' => 'convert-test'])
+            ->postJson('/api/clients/convert-lead', ['lead_id' => $lead->id]);
+
+        $response->assertStatus(201);
+        Bus::assertDispatchedAfterResponse(RunAutomationJob::class);
+    }
+
     public function test_form_submission_creates_lead(): void
     {
         $tenant = Tenant::create(['name' => 'Test', 'subdomain' => 'form-test', 'status' => 'active']);
