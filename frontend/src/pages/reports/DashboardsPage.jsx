@@ -69,7 +69,7 @@ function saveBoards(boards) {
 
 // ── Inline-rename board button ────────────────────────────────────────────────
 
-function BoardItem({ board, isActive, onClick, onRename }) {
+function BoardItem({ board, isActive, onClick, onRename, onDelete, onDuplicate, canDelete }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft]     = useState(board.name)
   const inputRef              = useRef(null)
@@ -108,18 +108,34 @@ function BoardItem({ board, isActive, onClick, onRename }) {
   }
 
   return (
-    <button
-      onClick={onClick}
-      onDoubleClick={startEdit}
-      title="לחץ פעמיים לשינוי שם"
-      className={`w-full text-right px-4 py-2.5 text-sm transition-colors ${
-        isActive
-          ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium'
-          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+    <div
+      className={`group flex items-center gap-1 px-2 transition-colors ${
+        isActive ? 'bg-[#2398c2]/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
       }`}
     >
-      {board.name}
-    </button>
+      <button
+        onClick={onClick}
+        onDoubleClick={startEdit}
+        title="לחץ פעמיים לשינוי שם"
+        className={`flex-1 text-right py-2.5 text-sm truncate ${
+          isActive ? 'text-[#2398c2] font-medium' : 'text-gray-600 dark:text-gray-400'
+        }`}
+      >
+        {board.name}
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDuplicate(board.id) }}
+        title="שכפל לוח"
+        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-[#2398c2] text-xs flex-shrink-0 transition-opacity"
+      >⧉</button>
+      {canDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(board.id) }}
+          title="מחק לוח"
+          className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 text-base leading-none flex-shrink-0 transition-opacity"
+        >×</button>
+      )}
+    </div>
   )
 }
 
@@ -151,6 +167,31 @@ export default function DashboardsPage() {
 
   function renameBoard(id, name) {
     setBoards(prev => prev.map(b => b.id === id ? { ...b, name } : b))
+  }
+
+  function deleteBoard(id) {
+    const board = boards.find(b => b.id === id)
+    if (!board) return
+    if (boards.length <= 1) { toast.error('חייב להישאר לפחות לוח אחד'); return }
+    if (!confirm(`למחוק את הלוח "${board.name}"? הפעולה אינה הפיכה.`)) return
+    setBoards(prev => {
+      const next = prev.filter(b => b.id !== id)
+      if (activeBoardId === id) setActive(next[0].id)
+      return next
+    })
+  }
+
+  function duplicateBoard(id) {
+    const board = boards.find(b => b.id === id)
+    if (!board) return
+    const copy = {
+      ...board,
+      id: makeId(),
+      name: `${board.name} (עותק)`,
+      widgets: board.widgets.map(w => ({ ...w, id: makeId() })),
+    }
+    setBoards(prev => [...prev, copy])
+    setActive(copy.id)
   }
 
   // ── Widget CRUD ─────────────────────────────────────────────────────────────
@@ -294,6 +335,9 @@ export default function DashboardsPage() {
               isActive={board.id === activeBoardId}
               onClick={() => setActive(board.id)}
               onRename={renameBoard}
+              onDelete={deleteBoard}
+              onDuplicate={duplicateBoard}
+              canDelete={boards.length > 1}
             />
           ))}
         </nav>

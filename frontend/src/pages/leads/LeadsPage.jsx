@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { Fragment, useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLeads, useCreateLead, useChangeLeadStage, useUpdateLead, useBulkLeadAction, useDeleteAllLeads } from '../../hooks/useLeads'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { pipelineApi } from '../../api/pipeline'
 import { customFieldsApi } from '../../api/customFields'
 import { useAuth } from '../../context/AuthContext'
@@ -21,9 +21,11 @@ const SOURCE_COLORS = {
   'גוגל':    '#ef4444',
   'המלצה':   '#f59e0b',
 }
-const EMPTY_FORM = { name: '', phone: '', email: '', source: '', pipeline_stage_id: '', notes: '' }
+const EMPTY_FORM = { name: '', phone: '', email: '', source: '', pipeline_stage_id: '', notes: '', custom_fields: {} }
 
-const ALL_COLS = [
+// Fallback while field definitions load (or on fetch error) — real columns
+// derive from custom_field_definitions so Settings renames/hidden/order apply.
+const FALLBACK_COLS = [
   { key: 'name',        label: 'שם מלא',       always: true },
   { key: 'phone',       label: 'טלפון',         always: false },
   { key: 'email',       label: 'דוא"ל',         always: false },
@@ -33,6 +35,35 @@ const ALL_COLS = [
   { key: 'created_at',  label: 'תאריך יצירה',   always: false },
 ]
 
+// System field def name → existing table column key. 'notes' intentionally
+// absent — it renders in the panel/modal, never as a table column.
+const SYSTEM_COL_KEY = {
+  name: 'name', phone: 'phone', email: 'email', source: 'source',
+  pipeline_stage_id: 'stage', assigned_to: 'assigned_to', created_at: 'created_at',
+}
+
+// Backend sort whitelist uses raw column names (LeadService::$sortable)
+const SORT_FIELD = { stage: 'pipeline_stage_id' }
+
+// System defs allowed as filter conditions (LeadService::FILTERABLE_FIELDS)
+const FILTERABLE_SYSTEM = ['name', 'phone', 'email', 'source', 'pipeline_stage_id', 'assigned_to', 'created_at']
+
+// Fallback while field definitions load — mirrors FILTERABLE_SYSTEM labels
+const FALLBACK_FILTER_FIELDS = [
+  { key: 'name', label: 'שם מלא' },
+  { key: 'phone', label: 'טלפון' },
+  { key: 'email', label: 'דוא"ל' },
+  { key: 'source', label: 'מקור' },
+  { key: 'pipeline_stage_id', label: 'שלב' },
+  { key: 'assigned_to', label: 'נציג אחראי' },
+  { key: 'created_at', label: 'תאריך יצירה' },
+]
+
+// Backend requires cf_ prefix (LeadService: /^cf_[a-z0-9_]+$/); Hebrew-labeled
+// fields already carry it in name, ASCII-labeled ones don't.
+// TODO: Backend Debt - LeadService matches /^cf_/, but DB JSON paths for ASCII fields lack the prefix. Needs Backend alignment.
+const cfSortField = (name) => name.startsWith('cf_') ? name : `cf_${name}`
+
 const DEFAULT_VISIBLE = { name: true, phone: true, email: true, stage: true, source: true, assigned_to: true, created_at: true }
 
 const SAVED_VIEWS = [
@@ -40,7 +71,7 @@ const SAVED_VIEWS = [
   { id: 'no_agent', label: 'ללא נציג',  filter: { no_agent: true } },
 ]
 
-const COLS_VERSION = 'v3'
+const COLS_VERSION = 'v4' // v4: keys now derive from field definitions
 function loadCols() {
   try {
     const saved = JSON.parse(localStorage.getItem('crm_leads_cols') || 'null')
@@ -96,7 +127,52 @@ export default function LeadsPage() {
   const [viewMode, setViewMode]   = useState('list') // 'list' | 'kanban'
   const [showCols, setShowCols]   = useState(false)
   const [visibleCols, setVisCols] = useState(loadCols)
+  const [colDragIdx, setColDragIdx] = useState(null)
   const colsRef = useRef(null)
+  const qc = useQueryClient()
+  const reorderCols = useMutation({
+    mutationFn: (ids) => customFieldsApi.reorder('leads', ids),
+    // Optimistic: reorder the cached field defs immediately so the columns
+    // visually move on drop instead of waiting for the round-trip.
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: ['custom-fields', 'leads'] })
+      const previous = qc.getQueryData(['custom-fields', 'leads'])
+      if (previous) {
+        const byId = new Map(previous.map(d => [d.id, d]))
+        const reordered = ids.map((id, i) => ({ ...byId.get(id), sort_order: i })).filter(Boolean)
+        qc.setQueryData(['custom-fields', 'leads'], reordered)
+      }
+      return { previous }
+    },
+    onError: (_err, _ids, ctx) => {
+      if (ctx?.previous) qc.setQueryData(['custom-fields', 'leads'], ctx.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['custom-fields', 'leads'] }),
+  })
+
+  // Reorders only the draggable (non-pinned, non-hidden) fields shown in the
+  // columns dropdown, while leaving 'name' and backend-hidden fields exactly
+  // where they already are in the full per-tenant field order.
+  function handleColDrop(dropIdx) {
+    if (colDragIdx === null || colDragIdx === dropIdx) { setColDragIdx(null); return }
+    const draggableDefs = defs.filter(d => {
+      if (d.is_system) {
+        const key = SYSTEM_COL_KEY[d.name]
+        return key && key !== 'name' && !d.hidden
+      }
+      return !d.hidden
+    })
+    const reordered = draggableDefs.map(d => d.id)
+    const [moved] = reordered.splice(colDragIdx, 1)
+    reordered.splice(dropIdx, 0, moved)
+
+    const draggableIds = new Set(draggableDefs.map(d => d.id))
+    let cursor = 0
+    const fullIds = defs.map(d => draggableIds.has(d.id) ? reordered[cursor++] : d.id)
+
+    reorderCols.mutate(fullIds)
+    setColDragIdx(null)
+  }
   const [showFilter, setShowFilter] = useState(false)
   const [advFilter, setAdvFilter]   = useState({ dateFrom: '', dateTo: '', conditions: [] })
   const filterRef = useRef(null)
@@ -127,13 +203,31 @@ export default function LeadsPage() {
     queryFn:  () => customFieldsApi.list('leads').then(r => r.data.data),
     staleTime: 1000 * 60 * 5,
   })
-  const customFieldDefs = (cfData ?? []).filter(f => !f.is_system && !f.hidden)
+  const defs = useMemo(
+    () => (cfData ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
+    [cfData],
+  )
+  const customFieldDefs = defs.filter(f => !f.is_system && !f.hidden)
 
-  // Merge static + custom columns
-  const dynamicCols = [
-    ...ALL_COLS,
-    ...customFieldDefs.map(cf => ({ key: `cf_${cf.name}`, label: cf.label, always: false, cfName: cf.name })),
-  ]
+  // One ordered column list from field definitions: label renames, hidden and
+  // sort_order from Settings → הגדרות רשומות apply here. System and custom
+  // columns interleave by sort_order.
+  const dynamicCols = useMemo(() => {
+    if (!cfData) return FALLBACK_COLS // defs loading / fetch error — stable layout
+    const cols = []
+    for (const f of defs) {
+      if (f.is_system) {
+        const key = SYSTEM_COL_KEY[f.name]
+        if (!key) continue
+        // 'name' is the row anchor (panel opener) — rename applies, hidden ignored
+        if (f.hidden && key !== 'name') continue
+        cols.push({ key, label: f.label, always: key === 'name' })
+      } else if (!f.hidden) {
+        cols.push({ key: `cf_${f.name}`, label: f.label, always: false, cfName: f.name, def: f })
+      }
+    }
+    return cols.length ? cols : FALLBACK_COLS
+  }, [cfData, defs])
 
   const allLeads = data?.data ?? []
   const leads = allLeads.filter(l => {
@@ -161,17 +255,16 @@ export default function LeadsPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const FILTER_FIELDS = [
-    { key: 'name', label: 'שם מלא' },
-    { key: 'phone', label: 'טלפון' },
-    { key: 'email', label: 'דוא"ל' },
-    { key: 'source', label: 'מקור' },
-    { key: 'status', label: 'סטטוס' },
-    { key: 'pipeline_stage_id', label: 'שלב' },
-    { key: 'assigned_to', label: 'נציג אחראי' },
-    { key: 'created_at', label: 'תאריך יצירה' },
-    ...customFieldDefs.map(cf => ({ key: `cf_${cf.name}`, label: cf.label })),
-  ]
+  // Backend whitelist (LeadService::FILTERABLE_FIELDS) minus legacy 'status'
+  // (no field def represents it; data migrated to pipeline stages) and 'notes'
+  // (not filterable server-side).
+  const FILTER_FIELDS = defs.length
+    ? defs
+        .filter(f => !f.hidden && (!f.is_system || FILTERABLE_SYSTEM.includes(f.name)))
+        .map(f => f.is_system
+          ? { key: f.name, label: f.label }
+          : { key: `cf_${f.name}`, label: f.label })
+    : FALLBACK_FILTER_FIELDS
 
   const handleDeleteAll = async () => {
     const ok = window.prompt(`פעולה בלתי הפיכה! ימחקו כל ${total} ה${t('leads')}.\nהקלד "מחק" לאישור:`)
@@ -180,12 +273,22 @@ export default function LeadsPage() {
   }
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
+  const setCf = (name) => (e) => {
+    const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+    setForm(f => ({ ...f, custom_fields: { ...f.custom_fields, [name]: val } }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(''); setSaving(true)
     try {
-      await createLead.mutateAsync({ ...form, pipeline_stage_id: form.pipeline_stage_id || undefined })
+      // Drop untouched/empty custom values so we don't write "" into the JSON
+      const cf = Object.fromEntries(Object.entries(form.custom_fields ?? {}).filter(([, v]) => v !== '' && v !== undefined))
+      await createLead.mutateAsync({
+        ...form,
+        pipeline_stage_id: form.pipeline_stage_id || undefined,
+        custom_fields: Object.keys(cf).length ? cf : undefined,
+      })
       setForm(EMPTY_FORM); setModal(false)
     } catch (err) {
       setError(err.response?.data?.message ?? err.response?.data?.errors?.name?.[0] ?? 'שגיאה בשמירה')
@@ -276,6 +379,201 @@ export default function LeadsPage() {
     </button>
   )
 
+  // ── Create-modal fields from definitions ─────────────────────────────────
+  // 'name' is forced first and required (StoreLeadRequest requires it, even if
+  // hidden in Settings). assigned_to/created_at never render here — parity with
+  // the previous hardcoded modal (created_at is server-set).
+  const MODAL_INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
+  const nameDef   = defs.find(f => f.is_system && f.name === 'name')
+  const modalDefs = defs.filter(f =>
+    !f.hidden && !(f.is_system && ['name', 'assigned_to', 'created_at'].includes(f.name)))
+
+  const isWide = (f) => f.field_type === 'textarea' || (f.is_system && f.name === 'notes')
+
+  const modalField = (f) => {
+    if (f.is_system) {
+      switch (f.name) {
+        case 'phone': return (
+          <input value={form.phone} onChange={set('phone')} type="tel" placeholder="05X-XXXXXXX" className={MODAL_INPUT} />
+        )
+        case 'email': return (
+          <input value={form.email} onChange={set('email')} type="email" placeholder="email@..." className={MODAL_INPUT} />
+        )
+        case 'source': return (
+          <select value={form.source} onChange={set('source')} className={MODAL_INPUT}>
+            {SOURCES.map(s => <option key={s} value={s}>{s || `בחר ${t('source')}`}</option>)}
+          </select>
+        )
+        case 'pipeline_stage_id': return (
+          <select value={form.pipeline_stage_id} onChange={set('pipeline_stage_id')} className={MODAL_INPUT}>
+            <option value="">בחר {t('stage')}</option>
+            {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        )
+        case 'notes': return (
+          <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="הערות נוספות..." className={MODAL_INPUT + ' resize-none'} />
+        )
+        default: return null
+      }
+    }
+    const val = form.custom_fields?.[f.name] ?? ''
+    if (f.field_type === 'select') return (
+      <select value={val} onChange={setCf(f.name)} required={f.required} className={MODAL_INPUT}>
+        <option value="">בחר...</option>
+        {(f.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    )
+    if (f.field_type === 'checkbox') return (
+      <input type="checkbox" checked={!!val} onChange={setCf(f.name)}
+        className="rounded border-gray-300 accent-[#2398c2] w-5 h-5" />
+    )
+    if (f.field_type === 'textarea') return (
+      <textarea value={val} onChange={setCf(f.name)} required={f.required} rows={2} className={MODAL_INPUT + ' resize-none'} />
+    )
+    return (
+      <input type={{ number: 'number', date: 'date', datetime: 'datetime-local', email: 'email', phone: 'tel', url: 'url' }[f.field_type] ?? 'text'}
+        value={val} onChange={setCf(f.name)} required={f.required}
+        dir={['number', 'date', 'datetime', 'email', 'phone', 'url'].includes(f.field_type) ? 'ltr' : 'auto'}
+        className={MODAL_INPUT} />
+    )
+  }
+
+  // One cell renderer per column key — content unchanged from the previous
+  // hardcoded sequence; dispatching by dynamicCols preserves Settings order.
+  const renderCell = (lead, c) => {
+    switch (c.key) {
+      case 'name': return (
+        <td key={c.key} className="px-4 py-2 cursor-pointer" onClick={() => setPanelId(lead.id)}>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+              style={{ backgroundColor: lead.stage?.color ?? '#2398c2' }}>
+              {lead.name?.trim()
+                ? lead.name.trim()[0].toUpperCase()
+                : <svg className="w-3.5 h-3.5 opacity-80" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
+              }
+            </div>
+            {isEditing(lead, 'name')
+              ? editInput(lead, 'name')
+              : <>
+                  <span className="font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">{lead.name}</span>
+                  {pencilBtn(lead, 'name')}
+                </>}
+          </div>
+        </td>
+      )
+      case 'phone': return (
+        <td key={c.key} className="px-4 py-2 text-gray-600 whitespace-nowrap" dir="ltr">
+          {isEditing(lead, 'phone')
+            ? editInput(lead, 'phone', { inputType: 'tel', dir: 'ltr' })
+            : <span className="flex items-center gap-1.5">
+                {lead.phone
+                  ? <a href={`tel:${lead.phone}`} className="text-[#2398c2] hover:underline" onClick={e => e.stopPropagation()}>{lead.phone}</a>
+                  : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                {pencilBtn(lead, 'phone')}
+              </span>}
+        </td>
+      )
+      case 'email': return (
+        <td key={c.key} className="px-4 py-2 max-w-[160px]">
+          {isEditing(lead, 'email')
+            ? editInput(lead, 'email', { inputType: 'email', dir: 'ltr' })
+            : <span className="flex items-center gap-1.5">
+                {lead.email
+                  ? <span className="text-gray-600 dark:text-gray-400 truncate text-xs" dir="ltr">{lead.email}</span>
+                  : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                {pencilBtn(lead, 'email')}
+              </span>}
+        </td>
+      )
+      case 'stage': return (
+        <td key={c.key} className="px-4 py-2 w-[140px] max-w-[140px] overflow-hidden" onClick={e => e.stopPropagation()}>
+          {lead.stage ? (
+            <select value={lead.pipeline_stage_id ?? ''} disabled={!canEdit}
+              onChange={e => changeStage.mutate({ leadId: lead.id, stageId: Number(e.target.value) })}
+              className="inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 border cursor-pointer disabled:cursor-default appearance-none max-w-[130px] truncate"
+              style={{ backgroundColor: `${lead.stage.color}22`, color: lead.stage.color, borderColor: `${lead.stage.color}60` }}>
+              <option value="" className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">ללא שלב</option>
+              {stages.map(s => <option key={s.id} value={s.id} className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">{s.name}</option>)}
+            </select>
+          ) : (
+            <select value="" disabled={!canEdit}
+              onChange={e => changeStage.mutate({ leadId: lead.id, stageId: Number(e.target.value) })}
+              className="inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-pointer appearance-none">
+              <option value="" className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">ללא שלב</option>
+              {stages.map(s => <option key={s.id} value={s.id} className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">{s.name}</option>)}
+            </select>
+          )}
+        </td>
+      )
+      case 'source': return (
+        <td key={c.key} className="px-4 py-2 text-xs whitespace-nowrap">
+          {lead.source ? (
+            <span className="inline-flex items-center rounded-full text-[11px] font-medium px-2.5 py-0.5 border"
+              style={{
+                backgroundColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}22`,
+                color: SOURCE_COLORS[lead.source] ?? '#6b7280',
+                borderColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}60`,
+              }}>
+              {lead.source}
+            </span>
+          ) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+        </td>
+      )
+      case 'assigned_to': return (
+        <td key={c.key} className="px-4 py-2 text-xs text-[#2398c2] whitespace-nowrap">
+          {lead.assigned_user?.name ?? <span className="text-gray-300 dark:text-gray-600">—</span>}
+        </td>
+      )
+      case 'created_at': return (
+        <td key={c.key} className="px-4 py-2 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap cursor-pointer" onClick={() => setPanelId(lead.id)}>
+          {new Date(lead.created_at).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+          {' '}
+          {new Date(lead.created_at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
+        </td>
+      )
+      default: { // custom field column — c.def is the field definition
+        const cf = c.def
+        const field = `cf:${cf.name}`
+        const val = lead.custom_fields?.[cf.name]
+        const empty = val === undefined || val === null || val === ''
+        return (
+          <td key={c.key} className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap" onClick={e => e.stopPropagation()}>
+            {cf.field_type === 'checkbox' ? (
+              <input type="checkbox" checked={!!val} disabled={!canEdit}
+                onChange={e => saveCell(lead, field, e.target.checked)}
+                className="rounded border-gray-300 accent-[#2398c2] cursor-pointer" />
+            ) : cf.field_type === 'select' ? (
+              isEditing(lead, field) ? (
+                <select autoFocus value={draft}
+                  onChange={e => saveCell(lead, field, e.target.value)}
+                  onBlur={() => setEditCell(null)}
+                  className="border border-[#2398c2] rounded-md px-2 py-1 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none">
+                  <option value="">—</option>
+                  {(cf.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  {empty ? <span className="text-gray-300 dark:text-gray-600">—</span> : String(val)}
+                  {pencilBtn(lead, field)}
+                </span>
+              )
+            ) : isEditing(lead, field) ? (
+              editInput(lead, field, {
+                inputType: { number: 'number', date: 'date', email: 'email', phone: 'tel', url: 'url' }[cf.field_type] ?? 'text',
+                dir: ['number', 'date', 'email', 'phone', 'url'].includes(cf.field_type) ? 'ltr' : 'auto',
+              })
+            ) : (
+              <span className="flex items-center gap-1.5">
+                {empty ? <span className="text-gray-300 dark:text-gray-600">—</span> : String(val)}
+                {pencilBtn(lead, field)}
+              </span>
+            )}
+          </td>
+        )
+      }
+    }
+  }
+
   return (
     <div className="flex gap-0 -m-6 min-h-screen" dir="rtl">
 
@@ -360,16 +658,29 @@ export default function LeadsPage() {
             </button>
             {showCols && (
               <div className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-20 p-3 w-52 max-h-72 overflow-y-auto">
-                {dynamicCols.filter(c => !c.always).map(c => (
-                  <label key={c.key} className="flex items-center gap-2 py-1.5 cursor-pointer hover:text-[#2398c2]">
-                    <input type="checkbox" checked={visibleCols[c.key] !== false}
-                      onChange={e => setVisCols(v => ({ ...v, [c.key]: e.target.checked }))}
-                      className="rounded border-gray-300 accent-[#2398c2]" />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {c.label}
-                      {c.cfName && <span className="text-xs text-gray-400 mr-1">*</span>}
-                    </span>
-                  </label>
+                {dynamicCols.filter(c => !c.always).map((c, idx) => (
+                  <div key={c.key}
+                    draggable={canEdit}
+                    onDragStart={() => setColDragIdx(idx)}
+                    onDragOver={e => { if (canEdit) e.preventDefault() }}
+                    onDrop={() => canEdit && handleColDrop(idx)}
+                    onDragEnd={() => setColDragIdx(null)}
+                    className={`flex items-center gap-2 py-1.5 rounded transition-opacity ${colDragIdx === idx ? 'opacity-30' : ''}`}>
+                    {canEdit && (
+                      <span className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#2398c2] select-none text-sm leading-none" title="גרור לשינוי סדר">
+                        ⠿
+                      </span>
+                    )}
+                    <label className="flex items-center gap-2 cursor-pointer hover:text-[#2398c2] flex-1 min-w-0">
+                      <input type="checkbox" checked={visibleCols[c.key] !== false}
+                        onChange={e => setVisCols(v => ({ ...v, [c.key]: e.target.checked }))}
+                        className="rounded border-gray-300 accent-[#2398c2] flex-shrink-0" />
+                      <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                        {c.label}
+                        {c.cfName && <span className="text-xs text-gray-400 mr-1">*</span>}
+                      </span>
+                    </label>
+                  </div>
                 ))}
               </div>
             )}
@@ -429,34 +740,20 @@ export default function LeadsPage() {
                     <input type="checkbox" checked={leads.length > 0 && selected.size === leads.length} onChange={toggleAll}
                       className="rounded border-gray-300 accent-[#2398c2]" />
                   </th>
-                  {sortableTh('name', t('lead'))}
-                  {col('phone')       && sortableTh('phone', 'טלפון')}
-                  {col('email')       && sortableTh('email', 'דוא"ל')}
-                  {col('stage')       && sortableTh('pipeline_stage_id', 'סטטוס')}
-                  {col('source')      && sortableTh('source', 'מקור')}
-                  {col('assigned_to') && sortableTh('assigned_to', 'נציג')}
-                  {col('created_at')  && sortableTh('created_at', 'תאריך')}
-                  {customFieldDefs.filter(cf => col(`cf_${cf.name}`)).map(cf => (
-                    <th key={cf.id} className={`${TH_CLS} cursor-pointer select-none hover:text-[#2398c2]`}
-                      onClick={() => toggleSort(cf.name)} title="מיין לפי עמודה זו">
-                      <span className="inline-flex items-center gap-1">
-                        {cf.label}
-                        <span className="inline-flex flex-col leading-[0.6] text-[9px]">
-                          <span className={sortBy === cf.name && sortDir === 'asc' ? 'text-[#2398c2]' : 'text-gray-300 dark:text-gray-600'}>▲</span>
-                          <span className={sortBy === cf.name && sortDir === 'desc' ? 'text-[#2398c2]' : 'text-gray-300 dark:text-gray-600'}>▼</span>
-                        </span>
-                      </span>
-                    </th>
+                  {dynamicCols.filter(c => c.always || col(c.key)).map(c => (
+                    <Fragment key={c.key}>
+                      {sortableTh(c.cfName ? cfSortField(c.cfName) : (SORT_FIELD[c.key] ?? c.key), c.label)}
+                    </Fragment>
                   ))}
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap sticky left-0 z-20 bg-gray-50 dark:bg-gray-700 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.08)]">פעולות</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading && (
-                  <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">טוען...</td></tr>
+                  <tr><td colSpan={dynamicCols.length + 2} className="px-4 py-8 text-center text-gray-400">טוען...</td></tr>
                 )}
                 {!isLoading && leads.length === 0 && (
-                  <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-400">
+                  <tr><td colSpan={dynamicCols.length + 2} className="px-4 py-12 text-center text-gray-400">
                     <div className="text-3xl mb-2">👥</div>
                     <div>אין {t('leads')} {activeView !== 'all' ? 'בתצוגה זו' : 'עדיין'}</div>
                   </td></tr>
@@ -468,140 +765,7 @@ export default function LeadsPage() {
                       <input type="checkbox" checked={selected.has(lead.id)} onChange={() => toggle(lead.id)}
                         className="rounded border-gray-300 accent-[#2398c2]" />
                     </td>
-                    {/* Name */}
-                    <td className="px-4 py-2 cursor-pointer" onClick={() => setPanelId(lead.id)}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                          style={{ backgroundColor: lead.stage?.color ?? '#2398c2' }}>
-                          {lead.name?.trim()
-                            ? lead.name.trim()[0].toUpperCase()
-                            : <svg className="w-3.5 h-3.5 opacity-80" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
-                          }
-                        </div>
-                        {isEditing(lead, 'name')
-                          ? editInput(lead, 'name')
-                          : <>
-                              <span className="font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">{lead.name}</span>
-                              {pencilBtn(lead, 'name')}
-                            </>}
-                      </div>
-                    </td>
-                    {/* Phone */}
-                    {col('phone') && (
-                      <td className="px-4 py-2 text-gray-600 whitespace-nowrap" dir="ltr">
-                        {isEditing(lead, 'phone')
-                          ? editInput(lead, 'phone', { inputType: 'tel', dir: 'ltr' })
-                          : <span className="flex items-center gap-1.5">
-                              {lead.phone
-                                ? <a href={`tel:${lead.phone}`} className="text-[#2398c2] hover:underline" onClick={e => e.stopPropagation()}>{lead.phone}</a>
-                                : <span className="text-gray-300 dark:text-gray-600">—</span>}
-                              {pencilBtn(lead, 'phone')}
-                            </span>}
-                      </td>
-                    )}
-                    {/* Email */}
-                    {col('email') && (
-                      <td className="px-4 py-2 max-w-[160px]">
-                        {isEditing(lead, 'email')
-                          ? editInput(lead, 'email', { inputType: 'email', dir: 'ltr' })
-                          : <span className="flex items-center gap-1.5">
-                              {lead.email
-                                ? <span className="text-gray-600 dark:text-gray-400 truncate text-xs" dir="ltr">{lead.email}</span>
-                                : <span className="text-gray-300 dark:text-gray-600">—</span>}
-                              {pencilBtn(lead, 'email')}
-                            </span>}
-                      </td>
-                    )}
-                    {/* Stage — inline select */}
-                    {col('stage') && (
-                      <td className="px-4 py-2 w-[140px] max-w-[140px] overflow-hidden" onClick={e => e.stopPropagation()}>
-                        {lead.stage ? (
-                          <select value={lead.pipeline_stage_id ?? ''} disabled={!canEdit}
-                            onChange={e => changeStage.mutate({ leadId: lead.id, stageId: Number(e.target.value) })}
-                            className="inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 border cursor-pointer disabled:cursor-default appearance-none max-w-[130px] truncate"
-                            style={{ backgroundColor: `${lead.stage.color}22`, color: lead.stage.color, borderColor: `${lead.stage.color}60` }}>
-                            <option value="" className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">ללא שלב</option>
-                            {stages.map(s => <option key={s.id} value={s.id} className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">{s.name}</option>)}
-                          </select>
-                        ) : (
-                          <select value="" disabled={!canEdit}
-                            onChange={e => changeStage.mutate({ leadId: lead.id, stageId: Number(e.target.value) })}
-                            className="inline-flex items-center rounded-full text-xs font-medium px-2.5 py-0.5 border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-pointer appearance-none">
-                            <option value="" className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">ללא שלב</option>
-                            {stages.map(s => <option key={s.id} value={s.id} className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">{s.name}</option>)}
-                          </select>
-                        )}
-                      </td>
-                    )}
-                    {/* Source — colored badge (Fireberry-style) */}
-                    {col('source') && (
-                      <td className="px-4 py-2 text-xs whitespace-nowrap">
-                        {lead.source ? (
-                          <span className="inline-flex items-center rounded-full text-[11px] font-medium px-2.5 py-0.5 border"
-                            style={{
-                              backgroundColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}22`,
-                              color: SOURCE_COLORS[lead.source] ?? '#6b7280',
-                              borderColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}60`,
-                            }}>
-                            {lead.source}
-                          </span>
-                        ) : <span className="text-gray-300 dark:text-gray-600">—</span>}
-                      </td>
-                    )}
-                    {/* Agent */}
-                    {col('assigned_to') && (
-                      <td className="px-4 py-2 text-xs text-[#2398c2] whitespace-nowrap">
-                        {lead.assigned_user?.name ?? <span className="text-gray-300 dark:text-gray-600">—</span>}
-                      </td>
-                    )}
-                    {/* Date */}
-                    {col('created_at') && (
-                      <td className="px-4 py-2 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap cursor-pointer" onClick={() => setPanelId(lead.id)}>
-                        {new Date(lead.created_at).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                        {' '}
-                        {new Date(lead.created_at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                    )}
-                    {/* Custom fields */}
-                    {customFieldDefs.filter(cf => col(`cf_${cf.name}`)).map(cf => {
-                      const field = `cf:${cf.name}`
-                      const val = lead.custom_fields?.[cf.name]
-                      const empty = val === undefined || val === null || val === ''
-                      return (
-                        <td key={cf.id} className="px-4 py-2 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                          {cf.field_type === 'checkbox' ? (
-                            <input type="checkbox" checked={!!val} disabled={!canEdit}
-                              onChange={e => saveCell(lead, field, e.target.checked)}
-                              className="rounded border-gray-300 accent-[#2398c2] cursor-pointer" />
-                          ) : cf.field_type === 'select' ? (
-                            isEditing(lead, field) ? (
-                              <select autoFocus value={draft}
-                                onChange={e => saveCell(lead, field, e.target.value)}
-                                onBlur={() => setEditCell(null)}
-                                className="border border-[#2398c2] rounded-md px-2 py-1 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none">
-                                <option value="">—</option>
-                                {(cf.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
-                              </select>
-                            ) : (
-                              <span className="flex items-center gap-1.5">
-                                {empty ? <span className="text-gray-300 dark:text-gray-600">—</span> : String(val)}
-                                {pencilBtn(lead, field)}
-                              </span>
-                            )
-                          ) : isEditing(lead, field) ? (
-                            editInput(lead, field, {
-                              inputType: { number: 'number', date: 'date', email: 'email', phone: 'tel', url: 'url' }[cf.field_type] ?? 'text',
-                              dir: ['number', 'date', 'email', 'phone', 'url'].includes(cf.field_type) ? 'ltr' : 'auto',
-                            })
-                          ) : (
-                            <span className="flex items-center gap-1.5">
-                              {empty ? <span className="text-gray-300 dark:text-gray-600">—</span> : String(val)}
-                              {pencilBtn(lead, field)}
-                            </span>
-                          )}
-                        </td>
-                      )
-                    })}
+                    {dynamicCols.filter(c => c.always || col(c.key)).map(c => renderCell(lead, c))}
                     {/* Quick actions */}
                     <td className="px-4 py-2 sticky left-0 z-20 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.08)]" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1.5">
@@ -674,43 +838,21 @@ export default function LeadsPage() {
             <form onSubmit={handleSubmit} className="px-6 py-4 space-y-3">
               {error && <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg">{error}</div>}
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">שם <span className="text-red-400">*</span></label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  {nameDef?.label ?? 'שם'} <span className="text-red-400">*</span>
+                </label>
                 <input required value={form.name} onChange={set('name')} placeholder={`שם ה${t('lead')}`}
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
+                  className={MODAL_INPUT} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">טלפון</label>
-                  <input value={form.phone} onChange={set('phone')} type="tel" placeholder="05X-XXXXXXX"
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">אימייל</label>
-                  <input value={form.email} onChange={set('email')} type="email" placeholder="email@..."
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t('source')}</label>
-                  <select value={form.source} onChange={set('source')}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]">
-                    {SOURCES.map(s => <option key={s} value={s}>{s || `בחר ${t('source')}`}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t('stage')}</label>
-                  <select value={form.pipeline_stage_id} onChange={set('pipeline_stage_id')}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]">
-                    <option value="">בחר {t('stage')}</option>
-                    {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">הערות</label>
-                <textarea value={form.notes} onChange={set('notes')} rows={2} placeholder="הערות נוספות..."
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]" />
+                {modalDefs.map(f => (
+                  <div key={f.id} className={isWide(f) ? 'col-span-2' : ''}>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      {f.label} {f.required && <span className="text-red-400">*</span>}
+                    </label>
+                    {modalField(f)}
+                  </div>
+                ))}
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={saving}

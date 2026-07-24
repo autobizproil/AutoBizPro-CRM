@@ -1,4 +1,5 @@
-import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
 import { usePreferences } from '../../context/PreferencesContext'
@@ -7,13 +8,18 @@ import { tasksApi } from '../../api/tasks'
 import { settingsApi } from '../../api/settings'
 import { recordTypesApi } from '../../api/recordTypes'
 
-const nav = [
-  { to: '/dashboard',    labelKey: 'dashboard'    },
-  { to: '/reports',      labelKey: 'reports'      },
+// Top-level, always visible — keep this to ~5 so the bar never overflows.
+const PRIMARY_NAV = [
   { to: '/leads',        labelKey: 'leads'        },
   { to: '/clients',      labelKey: 'clients'      },
-  { to: '/tasks',        labelKey: 'tasks', badge: 'tasks' },
   { to: '/contacts',     labelKey: 'contacts'     },
+  { to: '/tasks',        labelKey: 'tasks', badge: 'tasks' },
+  { to: '/reports',      labelKey: 'reports'      },
+]
+
+// Everything else lives behind the "עוד" dropdown.
+const MORE_NAV = [
+  { to: '/dashboard',    labelKey: 'dashboard'    },
   { to: '/pipeline',     labelKey: 'pipeline'     },
   { to: '/automations',  labelKey: 'automations'  },
   { to: '/forms',        labelKey: 'forms'        },
@@ -24,7 +30,17 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const { lang } = usePreferences()
   const navigate = useNavigate()
+  const location = useLocation()
   const tr = (key) => translations[lang]?.[key] ?? key
+
+  const [showMore, setShowMore] = useState(false)
+  const moreRef = useRef(null)
+  useEffect(() => {
+    const handler = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setShowMore(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+  useEffect(() => { setShowMore(false) }, [location.pathname])
 
   const { data: taskCounts } = useQuery({
     queryKey: ['task-counts'],
@@ -60,12 +76,11 @@ export default function Layout() {
           ) : (
             <div className="w-8 h-8 rounded-lg bg-[#2398c2] flex items-center justify-center text-white font-bold text-sm">A</div>
           )}
-          <span className="font-bold text-gray-800 dark:text-gray-100 text-[15px] hidden sm:inline" style={{ fontFamily: "'Poppins','Inter',sans-serif" }}>{tenant?.name ?? 'AutoBizPro'}</span>
         </Link>
 
         {/* Nav items — centered */}
-        <nav className="flex items-center gap-0.5 flex-1 justify-center overflow-x-auto">
-          {nav.map(({ to, labelKey, badge }) => {
+        <nav className="flex items-center gap-0.5 flex-1 justify-center">
+          {PRIMARY_NAV.map(({ to, labelKey, badge }) => {
             const count = badge ? badges[badge] : 0
             return (
               <NavLink
@@ -89,22 +104,61 @@ export default function Layout() {
               </NavLink>
             )
           })}
-          {customNav.map(({ to, label, icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `relative px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                  isActive
-                    ? 'bg-[#2398c2]/10 text-[#2398c2]'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
-                }`
-              }
+
+          {/* "עוד" — every other fixed page + all custom record types, grouped */}
+          <div className="relative" ref={moreRef}>
+            <button
+              onClick={() => setShowMore(s => !s)}
+              className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors flex items-center gap-1 ${
+                showMore
+                  ? 'bg-[#2398c2]/10 text-[#2398c2]'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
+              }`}
               style={{ fontSize: '13px' }}
             >
-              {icon && <span className="ml-1">{icon}</span>}{label}
-            </NavLink>
-          ))}
+              עוד <span className="text-[10px]">▾</span>
+            </button>
+            {showMore && (
+              <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-40 py-1.5 w-48 max-h-[70vh] overflow-y-auto" dir="rtl">
+                {MORE_NAV.map(({ to, labelKey }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) =>
+                      `block px-4 py-2 text-sm transition-colors ${
+                        isActive
+                          ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`
+                    }
+                  >
+                    {tr(labelKey)}
+                  </NavLink>
+                ))}
+                {customNav.length > 0 && (
+                  <>
+                    <div className="my-1.5 border-t border-gray-100 dark:border-gray-700" />
+                    <div className="px-4 py-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">רשומות מותאמות</div>
+                    {customNav.map(({ to, label, icon }) => (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        className={({ isActive }) =>
+                          `block px-4 py-2 text-sm transition-colors truncate ${
+                            isActive
+                              ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          }`
+                        }
+                      >
+                        {icon && <span className="ml-1">{icon}</span>}{label}
+                      </NavLink>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </nav>
 
         {/* Tools — last child = far left in RTL */}
@@ -132,7 +186,7 @@ export default function Layout() {
           </button>
           <div
             title={user?.name}
-            className="w-8 h-8 rounded-full bg-[#2398c2]/20 flex items-center justify-center text-[13px] font-bold text-[#2398c2] flex-shrink-0 cursor-default mr-1"
+            className="w-8 h-8 rounded-full bg-[#2398c2]/20 flex items-center justify-center text-[13px] font-bold text-[#2398c2] flex-shrink-0 cursor-default ml-1"
           >
             {user?.name?.[0] ?? 'U'}
           </div>

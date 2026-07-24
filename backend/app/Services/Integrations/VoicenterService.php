@@ -4,6 +4,7 @@ namespace App\Services\Integrations;
 
 use App\Models\Activity;
 use App\Models\Lead;
+use App\Services\AutomationEngine;
 use App\Services\PhoneNormalizer;
 use App\Services\SettingsService;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,7 @@ class VoicenterService
     public function __construct(
         private SettingsService $settings,
         private PhoneNormalizer $normalizer,
+        private AutomationEngine $automation,
     ) {}
 
     public function processWebhook(array $payload, int $tenantId): void
@@ -94,5 +96,9 @@ class VoicenterService
             'type'        => 'call',
             'body'        => $body,
         ]);
+
+        if ($direction === 'inbound') {
+            $this->automation->fire('call_received', $lead);
+        }
     }
 }

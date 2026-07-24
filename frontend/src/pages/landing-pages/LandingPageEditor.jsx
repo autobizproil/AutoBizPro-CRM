@@ -89,7 +89,7 @@ function BlockEditor({ block, onChange }) {
     return (
       <div className="space-y-3">
         <Field label="כתובת תמונה (URL)">
-          <input className={inputCls} placeholder="https://..." value={block.url || ''} onChange={set('url')} />
+          <input className={inputCls} placeholder="https://..." value={block.url || ''} onChange={set('url')} dir="ltr" />
         </Field>
         <Field label="טקסט חלופי (alt)">
           <input className={inputCls} value={block.alt || ''} onChange={set('alt')} />
@@ -111,7 +111,7 @@ function BlockEditor({ block, onChange }) {
           <input className={inputCls} value={block.button_label || ''} onChange={set('button_label')} />
         </Field>
         <Field label="קישור כפתור">
-          <input className={inputCls} placeholder="https://..." value={block.button_url || ''} onChange={set('button_url')} />
+          <input className={inputCls} placeholder="https://..." value={block.button_url || ''} onChange={set('button_url')} dir="ltr" />
         </Field>
         <Field label="צבע כפתור">
           <input type="color" className="h-9 w-full rounded border border-gray-300 cursor-pointer"

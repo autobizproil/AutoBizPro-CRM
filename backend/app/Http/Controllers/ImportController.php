@@ -3,6 +3,7 @@ namespace App\Http\Controllers;
 use App\Jobs\ProcessImportJob;
 use App\Models\CustomFieldDefinition;
 use App\Models\ImportJob;
+use App\Models\RecordType;
 use App\Services\ImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,10 +44,10 @@ class ImportController extends Controller
     public function start(Request $request): JsonResponse
     {
         $request->validate([
-            'import_id'          => 'required|integer',
-            'field_mapping'      => 'required|array',
-            'field_mapping.name' => 'required|string',
-            'status_mapping'     => 'nullable|array',
+            'import_id'      => 'required|integer',
+            'entity'         => 'nullable|string',
+            'field_mapping'  => 'required|array',
+            'status_mapping' => 'nullable|array',
         ]);
 
         // Scope strictly to the current tenant + uploader
@@ -56,24 +57,67 @@ class ImportController extends Controller
             ->where('status', 'uploaded')
             ->firstOrFail();
 
-        // Whitelist mapping keys to known lead fields + this tenant's custom lead fields
-        // (validate() would strip un-ruled sub-keys, so take the full input then filter explicitly)
-        $allowed = ['name', 'phone', 'email', 'source', 'notes', 'created_at', 'status'];
-        $allowed = array_merge($allowed, CustomFieldDefinition::where('entity', 'leads')
-            ->where('is_system', false)
-            ->pluck('name')
-            ->all());
-        $mapping = array_intersect_key(
-            $request->input('field_mapping', []),
-            array_flip($allowed)
-        );
+        $entity = $request->input('entity', 'leads');
 
-        // status_mapping: {csvValue: stageId} or {csvValue: {create: "label"}}
-        $job->update([
-            'status'         => 'pending',
-            'field_mapping'  => $mapping,
-            'status_mapping' => $request->input('status_mapping', []),
-        ]);
+        if ($entity === 'leads') {
+            $request->validate(['field_mapping.name' => 'required|string']);
+
+            // Whitelist mapping keys to known lead fields + this tenant's custom lead fields
+            // (validate() would strip un-ruled sub-keys, so take the full input then filter explicitly)
+            $allowed = ['name', 'phone', 'email', 'source', 'notes', 'created_at', 'status'];
+            $allowed = array_merge($allowed, CustomFieldDefinition::where('entity', 'leads')
+                ->where('is_system', false)
+                ->pluck('name')
+                ->all());
+            $mapping = array_intersect_key($request->input('field_mapping', []), array_flip($allowed));
+
+            $job->update([
+                'entity'         => 'leads',
+                'status'         => 'pending',
+                'field_mapping'  => $mapping,
+                'status_mapping' => $request->input('status_mapping', []),
+            ]);
+        } elseif (in_array($entity, ['contacts', 'clients'], true)) {
+            $request->validate(['field_mapping.name' => 'required|string']);
+
+            $systemFields = $entity === 'contacts'
+                ? ['name', 'phone', 'email', 'company', 'role', 'notes', 'created_at']
+                : ['name', 'phone', 'email', 'company', 'source', 'notes', 'created_at'];
+            $allowed = array_merge($systemFields, CustomFieldDefinition::where('tenant_id', app('current_tenant_id'))
+                ->where('entity', $entity)
+                ->where('is_system', false)
+                ->pluck('name')
+                ->all());
+            $mapping = array_intersect_key($request->input('field_mapping', []), array_flip($allowed));
+
+            $job->update([
+                'entity'         => $entity,
+                'status'         => 'pending',
+                'field_mapping'  => $mapping,
+                'status_mapping' => [],
+            ]);
+        } else {
+            $recordType = RecordType::where('tenant_id', app('current_tenant_id'))
+                ->where('slug', $entity)
+                ->firstOrFail();
+
+            $request->validate(['field_mapping.title' => 'required|string']);
+
+            // Whitelist mapping keys to this record type's own field definitions
+            $allowed = CustomFieldDefinition::where('tenant_id', app('current_tenant_id'))
+                ->where('entity', $entity)
+                ->pluck('name')
+                ->all();
+            $mapping = array_intersect_key($request->input('field_mapping', []), array_flip($allowed));
+
+            $job->update([
+                'entity'         => $entity,
+                'record_type_id' => $recordType->id,
+                'status'         => 'pending',
+                'field_mapping'  => $mapping,
+                'status_mapping' => [],
+            ]);
+        }
 
         ProcessImportJob::dispatch($job->id);
         return response()->json(['success' => true, 'data' => $job], 201);

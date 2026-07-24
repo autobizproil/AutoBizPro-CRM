@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useContacts, useCreateContact, useDeleteContact } from '../../hooks/useContacts'
 import { useAuth } from '../../context/AuthContext'
+import { usePreferences } from '../../context/PreferencesContext'
+import { translations } from '../../i18n/translations'
 
 function CopyEmailBtn({ email, className = '' }) {
   const [copied, setCopied] = useState(false)
@@ -19,7 +22,9 @@ const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:
 const LABEL = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
 
 export default function ContactsPage() {
+  const navigate            = useNavigate()
   const { can }             = useAuth()
+  const { lang }            = usePreferences()
   const [search, setSearch] = useState('')
   const [modal, setModal]   = useState(false)
   const [form, setForm]     = useState(EMPTY)
@@ -34,6 +39,7 @@ export default function ContactsPage() {
   const total    = data?.total ?? 0
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+  const tr = (key) => translations[lang]?.[key] ?? key
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -51,17 +57,23 @@ export default function ContactsPage() {
   }
 
   return (
-    <div>
+    <div dir={lang === 'he' ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">אנשי קשר</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{total} אנשי קשר</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{tr('contacts')}</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{total} {tr('contacts')}</p>
         </div>
         {can('contacts', 'can_create') && (
-          <button onClick={() => setModal(true)}
-            className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
-            <span className="text-lg leading-none">+</span> איש קשר חדש
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/import?entity=contacts')}
+              className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-colors">
+              📥 ייבוא CSV
+            </button>
+            <button onClick={() => setModal(true)}
+              className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
+              <span className="text-lg leading-none">+</span> איש קשר חדש
+            </button>
+          </div>
         )}
       </div>
 
@@ -107,12 +119,12 @@ export default function ContactsPage() {
                     <span className="font-medium text-gray-900 dark:text-gray-100">{c.name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400" dir="ltr">
                   {c.phone
                     ? <a href={`tel:${c.phone}`} className="hover:text-[#2398c2]">{c.phone}</a>
                     : <span className="text-gray-300 dark:text-gray-600">—</span>}
                 </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400" dir="ltr">
                   {c.email
                     ? <CopyEmailBtn email={c.email} />
                     : <span className="text-gray-300 dark:text-gray-600">—</span>}
@@ -150,11 +162,11 @@ export default function ContactsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={LABEL}>טלפון</label>
-                  <input value={form.phone} onChange={set('phone')} type="tel" placeholder="05X-XXXXXXX" className={INPUT} />
+                  <input value={form.phone} onChange={set('phone')} type="tel" placeholder="05X-XXXXXXX" className={INPUT} dir="ltr" />
                 </div>
                 <div>
                   <label className={LABEL}>אימייל</label>
-                  <input value={form.email} onChange={set('email')} type="email" placeholder="email@..." className={INPUT} />
+                  <input value={form.email} onChange={set('email')} type="email" placeholder="email@..." className={INPUT} dir="ltr" />
                 </div>
               </div>
 

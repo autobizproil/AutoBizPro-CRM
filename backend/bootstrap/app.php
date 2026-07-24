@@ -5,6 +5,7 @@ use App\Http\Middleware\TenantMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Support\Arr;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -27,10 +28,17 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (\Illuminate\Validation\ValidationException $e, $request) {
+            $errors = $e->errors();
+            // Surface the first field-specific message (e.g. a custom unique-email
+            // message) instead of always the generic string — frontends across the
+            // app pick `message` before falling back to `errors`, so a fixed generic
+            // string here silently masked every field-specific validation message.
+            $message = ! empty($errors) ? Arr::first(Arr::flatten($errors)) : 'שגיאת ולידציה';
+
             return response()->json([
                 'success' => false,
-                'message' => 'שגיאת ולידציה',
-                'errors'  => $e->errors(),
+                'message' => $message,
+                'errors'  => $errors,
                 'code'    => 422,
             ], 422);
         });

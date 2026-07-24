@@ -37,6 +37,7 @@ function presetToRange(id) {
 
 export default function FilterPanel({ fields, conditions, onApply, onClose }) {
   const [preset, setPreset]         = useState('')
+  // Initialize states with props to allow external control, but use local state for editing
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo]     = useState('')
   const [rows, setRows]             = useState(conditions.length ? conditions : [{ field: fields[0]?.key ?? '', operator: 'equals', value: '' }])
@@ -66,7 +67,7 @@ export default function FilterPanel({ fields, conditions, onApply, onClose }) {
   }
 
   return (
-    <div className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-30 p-4 w-[420px] max-h-[70vh] overflow-y-auto">
+    <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-30 p-4 w-[420px] max-h-[70vh] overflow-y-auto">
       <div className="mb-4">
         <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">טווח תאריכים</div>
         <div className="flex flex-wrap gap-1.5">
@@ -80,9 +81,9 @@ export default function FilterPanel({ fields, conditions, onApply, onClose }) {
         {preset === 'custom' && (
           <div className="flex gap-2 mt-2">
             <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-              className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+              className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" dir="ltr" />
             <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-              className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+              className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" dir="ltr" />
           </div>
         )}
       </div>

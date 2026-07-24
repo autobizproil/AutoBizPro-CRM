@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import client from '../../api/client'
 import { settingsApi } from '../../api/settings'
+import { usersApi } from '../../api/users'
 import { integrationsApi } from '../../api/integrations'
 import { customFieldsApi, FIELD_TYPE_LABELS, ENTITIES, CREATABLE_TYPES } from '../../api/customFields'
 import { recordTypesApi, RECORD_TYPE_ICONS } from '../../api/recordTypes'
@@ -13,6 +14,7 @@ import { translations } from '../../i18n/translations'
 // Toggle switch component — pill-shaped, brand-blue when on
 // ---------------------------------------------------------------------------
 function ToggleSwitch({ checked, onChange, disabled = false }) {
+  // Always LTR for consistent switch animation
   return (
     <button
       type="button"
@@ -100,7 +102,7 @@ function SaveRow({ isPending, isSuccess, isError, errorMsg, onTest, testPending,
 // ---------------------------------------------------------------------------
 // Tab: כללי (General) — tenant settings + WhatsApp
 // ---------------------------------------------------------------------------
-function GeneralTab({ tenantData, can, qc }) {
+function GeneralTab({ tenantData, can, qc, tr }) {
   const [whatsappProvider, setWhatsappProvider] = useState('')
   const [whatsappApiKey, setWhatsappApiKey]     = useState('')
   const [logoError, setLogoError]               = useState('')
@@ -149,15 +151,15 @@ function GeneralTab({ tenantData, can, qc }) {
       {/* Business info display */}
       {tenantData && (
         <Card>
-          <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">פרטי עסק</h3>
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">{tr('business_info')}</h3>
           <div className="space-y-3">
             <div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">שם עסק</p>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{tr('business_name')}</p>
               <p className="text-sm text-gray-800 dark:text-gray-100">{tenantData.name ?? '—'}</p>
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Subdomain</p>
-              <p className="text-sm text-gray-800 font-mono">{tenantData.subdomain ?? '—'}</p>
+              <p className="text-sm text-gray-800 font-mono" dir="ltr">{tenantData.subdomain ?? '—'}</p>
             </div>
           </div>
         </Card>
@@ -165,13 +167,13 @@ function GeneralTab({ tenantData, can, qc }) {
 
       {/* Logo */}
       <Card>
-        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">לוגו העסק</h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">מוצג בסרגל העליון במקום לוגו ברירת המחדל. PNG/JPG/WebP עד 1MB.</p>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">{tr('business_logo')}</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">{tr('business_logo_description')}</p>
         <div className="flex items-center gap-4">
           <div className="w-20 h-14 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
             {tenantData?.settings?.logo
-              ? <img src={tenantData.settings.logo} alt="לוגו" className="max-h-12 max-w-[72px] object-contain" />
-              : <span className="text-xs text-gray-400">אין לוגו</span>}
+              ? <img src={tenantData.settings.logo} alt={tenantData?.name ?? tr('logo')} className="max-h-12 max-w-[72px] object-contain" />
+              : <span className="text-xs text-gray-400">{tr('no_logo')}</span>}
           </div>
           {can('users', 'can_update') && (
             <div className="flex gap-2">
@@ -179,12 +181,12 @@ function GeneralTab({ tenantData, can, qc }) {
                 onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo.mutate(f); e.target.value = '' }} />
               <button type="button" onClick={() => logoInputRef.current?.click()} disabled={uploadLogo.isPending}
                 className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                {uploadLogo.isPending ? 'מעלה...' : 'העלה לוגו'}
+                {uploadLogo.isPending ? tr('uploading') : tr('upload_logo')}
               </button>
               {tenantData?.settings?.logo && (
                 <button type="button" onClick={() => deleteLogo.mutate()} disabled={deleteLogo.isPending}
                   className="border border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 px-3 py-2 rounded-lg text-sm">
-                  הסר
+                  {tr('remove')}
                 </button>
               )}
             </div>
@@ -195,17 +197,17 @@ function GeneralTab({ tenantData, can, qc }) {
 
       {/* WhatsApp */}
       <Card>
-        <h3 className="font-semibold text-gray-800 mb-1">WhatsApp (GREEN-API)</h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הגדר ספק WhatsApp לשליחת הודעות אוטומטיות.</p>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">WhatsApp (GREEN-API)</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">{tr('whatsapp_integration_description')}</p>
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ספק</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{tr('provider')}</label>
             <select
               value={whatsappProvider}
               onChange={e => setWhatsappProvider(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
             >
-              <option value="">בחר ספק...</option>
+              <option value="">{tr('select_provider')}...</option>
               <option value="360dialog">360dialog</option>
               <option value="ultramsg">UltraMsg</option>
               <option value="twilio">Twilio</option>
@@ -219,7 +221,8 @@ function GeneralTab({ tenantData, can, qc }) {
               value={whatsappApiKey}
               onChange={e => setWhatsappApiKey(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
-              placeholder="הכנס API key..."
+              placeholder={tr('enter_api_key')}
+              dir="ltr"
             />
           </div>
           {can('users', 'can_update') && (
@@ -340,7 +343,7 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
 
       {/* Green Invoice */}
       <Card>
-        <h3 className="font-semibold text-gray-800 mb-1">&#x1F9FE; Green Invoice (חשבוניות)</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">&#x1F9FE; Green Invoice (חשבוניות)</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הזן את מפתחות ה-API מ-Green Invoice &#x2192; הגדרות &#x2192; API. לאחר מכן ניתן להפיק חשבוניות ישירות מכרטיס ליד.</p>
         <form onSubmit={(e) => { e.preventDefault(); saveInteg.mutate() }} className="space-y-4">
           <div>
@@ -377,7 +380,7 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
       {/* WhatsApp (GREEN-API) — connection details only; provider settings live in General */}
       {/* Cardcom */}
       <Card>
-        <h3 className="font-semibold text-gray-800 mb-1">&#x1F4B3; Cardcom (סליקה)</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">&#x1F4B3; Cardcom (סליקה)</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הזן את פרטי ה-API של Cardcom כדי לאפשר שליחת עמודי תשלום ישירות מכרטיס ליד.</p>
         <form onSubmit={(e) => { e.preventDefault(); saveCardcom.mutate() }} className="space-y-4">
           <div>
@@ -411,7 +414,7 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
 
       {/* Yesh Invoice */}
       <Card>
-        <h3 className="font-semibold text-gray-800 mb-1">&#x1F9FE; Yesh Invoice (חשבוניות)</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">&#x1F9FE; Yesh Invoice (חשבוניות)</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הזן את מפתחות ה-API של Yesh Invoice להפקת חשבוניות ישירות מכרטיס ליד.</p>
         <form onSubmit={(e) => { e.preventDefault(); saveYesh.mutate() }} className="space-y-4">
           <div>
@@ -443,7 +446,7 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
       {/* PayCall */}
       <Card>
         <div className="flex items-center justify-between mb-1">
-          <h3 className="font-semibold text-gray-800">&#x1F4DE; PayCall — מרכזייה טלפונית</h3>
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100">&#x1F4DE; PayCall — מרכזייה טלפונית</h3>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500">{paycallEnabled ? 'פעיל' : 'כבוי'}</span>
             <ToggleSwitch
@@ -769,42 +772,343 @@ function OutgoingWebhookCard({ integ, qc, can }) {
 }
 
 // ---------------------------------------------------------------------------
-// Tab: משתמשים (Users) — placeholder
+// Tab: משתמשים (Users)
 // ---------------------------------------------------------------------------
-function UsersTab() {
+const ROLE_LABELS = { admin: 'מנהל', manager: 'מנג\'ר', agent: 'נציג' }
+
+function CreateUserModal({ onClose, onCreated }) {
+  const [name, setName]         = useState('')
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole]         = useState('agent')
+  const [error, setError]       = useState('')
+
+  const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
+
+  const create = useMutation({
+    mutationFn: () => usersApi.create({ name, email, password, role }),
+    onSuccess:  () => onCreated(),
+    onError: (err) => setError(
+      err.response?.data?.message
+      ?? Object.values(err.response?.data?.errors ?? {})[0]?.[0]
+      ?? 'שגיאה ביצירת המשתמש'),
+  })
+
   return (
-    <div className="max-w-lg">
-      <Card>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
-            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ניהול משתמשים</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">בקרוב</p>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4" dir="rtl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">משתמש חדש</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">&times;</button>
         </div>
+        <form
+          onSubmit={e => { e.preventDefault(); setError(''); create.mutate() }}
+          className="px-6 py-4 space-y-3"
+        >
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">שם</label>
+            <input value={name} onChange={e => setName(e.target.value)} required className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">אימייל</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required dir="ltr" className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סיסמה</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} dir="ltr" className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">תפקיד</label>
+            <select value={role} onChange={e => setRole(e.target.value)} className={INPUT}>
+              <option value="admin">{ROLE_LABELS.admin}</option>
+              <option value="manager">{ROLE_LABELS.manager}</option>
+              <option value="agent">{ROLE_LABELS.agent}</option>
+            </select>
+          </div>
+          {error && (
+            <div className="text-sm px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700">
+              {error}
+            </div>
+          )}
+          <div className="flex items-center gap-2 pt-2">
+            <button type="submit" disabled={create.isPending}
+              className="bg-[#2398c2] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1d7fa3] disabled:opacity-50 transition-colors duration-150">
+              {create.isPending ? 'יוצר...' : 'צור משתמש'}
+            </button>
+            <button type="button" onClick={onClose}
+              className="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+              ביטול
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function UsersTab({ can, currentUser }) {
+  const qc = useQueryClient()
+  const [showCreate, setShowCreate] = useState(false)
+
+  const { data: users, isLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn:  () => usersApi.list().then(r => r.data.data),
+  })
+
+  const updateRole = useMutation({
+    mutationFn: ({ id, role }) => usersApi.update(id, { role }),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['users'] }),
+  })
+
+  const toggleStatus = useMutation({
+    mutationFn: ({ id, status }) =>
+      status === 'active' ? usersApi.update(id, { status: 'active' }) : usersApi.deactivate(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  })
+
+  const canCreate = can('users', 'can_create')
+  const canUpdate = can('users', 'can_update')
+  const canDeactivate = can('users', 'can_delete')
+
+  return (
+    <div className="max-w-3xl">
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100">ניהול משתמשים</h3>
+          {canCreate && (
+            <button
+              onClick={() => setShowCreate(true)}
+              className="bg-[#2398c2] text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[#1d7fa3] transition-colors duration-150"
+            >
+              + משתמש חדש
+            </button>
+          )}
+        </div>
+
+        {isLoading && <p className="text-sm text-gray-500 dark:text-gray-400">טוען...</p>}
+
+        {!isLoading && (
+          <table className="w-full text-sm text-right">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
+                <th className="py-2 font-medium">שם</th>
+                <th className="py-2 font-medium">אימייל</th>
+                <th className="py-2 font-medium">תפקיד</th>
+                <th className="py-2 font-medium">סטטוס</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(users ?? []).map(u => {
+                const isSelf = u.id === currentUser?.id
+                return (
+                  <tr key={u.id} className="border-b border-gray-100 dark:border-gray-700/50">
+                    <td className="py-2 text-gray-800 dark:text-gray-100">{u.name}</td>
+                    <td className="py-2 text-gray-600 dark:text-gray-300" dir="ltr">{u.email}</td>
+                    <td className="py-2">
+                      {currentUser?.role === 'admin' ? (
+                        <select
+                          value={u.role}
+                          disabled={isSelf}
+                          onChange={e => updateRole.mutate({ id: u.id, role: e.target.value })}
+                          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-2 py-1 text-xs disabled:opacity-50"
+                        >
+                          <option value="admin">{ROLE_LABELS.admin}</option>
+                          <option value="manager">{ROLE_LABELS.manager}</option>
+                          <option value="agent">{ROLE_LABELS.agent}</option>
+                        </select>
+                      ) : (
+                        <span className="text-gray-700 dark:text-gray-300">{ROLE_LABELS[u.role] ?? u.role}</span>
+                      )}
+                    </td>
+                    <td className="py-2">
+                      {(u.status === 'active' ? canDeactivate : canUpdate) ? (
+                        <button
+                          disabled={isSelf}
+                          onClick={() => toggleStatus.mutate({ id: u.id, status: u.status === 'active' ? 'inactive' : 'active' })}
+                          className={`px-2 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
+                            u.status === 'active'
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                              : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                          }`}
+                        >
+                          {u.status === 'active' ? 'פעיל' : 'לא פעיל'}
+                        </button>
+                      ) : (
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          u.status === 'active'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                        }`}>
+                          {u.status === 'active' ? 'פעיל' : 'לא פעיל'}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </Card>
+
+      {showCreate && (
+        <CreateUserModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['users'] }) }}
+        />
+      )}
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Tab: הרשאות (Permissions) — placeholder
+// Tab: הרשאות (Permissions)
 // ---------------------------------------------------------------------------
-function PermissionsTab() {
+const PERM_ROLES   = ['admin', 'manager', 'agent']
+const PERM_MODULES = ['leads', 'contacts', 'automations', 'forms', 'users', 'reports']
+const MODULE_LABELS = {
+  leads: 'לידים', contacts: 'אנשי קשר', automations: 'אוטומציות',
+  forms: 'טפסים', users: 'משתמשים', reports: 'דוחות',
+}
+const PERM_ACTIONS = [
+  { key: 'can_create', label: 'יצירה' },
+  { key: 'can_read',   label: 'צפייה' },
+  { key: 'can_update', label: 'עדכון' },
+  { key: 'can_delete', label: 'מחיקה' },
+]
+
+// JS port of RolePermission::defaultFor (backend/app/Models/RolePermission.php) —
+// keep this truth table in sync if the backend default matrix ever changes.
+function defaultFor(role, module, action) {
+  if (role === 'admin') return true
+  if (role === 'manager') {
+    return ['can_read', 'can_create', 'can_update'].includes(action)
+      && ['leads', 'contacts', 'reports'].includes(module)
+  }
+  if (role === 'agent') {
+    return ['can_read', 'can_create'].includes(action)
+      && ['leads', 'contacts'].includes(module)
+  }
+  return false
+}
+
+function PermissionsTab({ can, currentUser }) {
+  const qc = useQueryClient()
+  const [matrix, setMatrix] = useState(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['permissions'],
+    queryFn:  () => settingsApi.getPermissions().then(r => r.data.data),
+  })
+
+  useEffect(() => {
+    if (!data) return
+    const seeded = {}
+    for (const role of PERM_ROLES) {
+      seeded[role] = {}
+      const overridesForRole = data[role] ?? []
+      for (const module of PERM_MODULES) {
+        const override = overridesForRole.find(o => o.module === module)
+        seeded[role][module] = {
+          can_create: override ? !!override.can_create : defaultFor(role, module, 'can_create'),
+          can_read:   override ? !!override.can_read   : defaultFor(role, module, 'can_read'),
+          can_update: override ? !!override.can_update : defaultFor(role, module, 'can_update'),
+          can_delete: override ? !!override.can_delete : defaultFor(role, module, 'can_delete'),
+        }
+      }
+    }
+    setMatrix(seeded)
+  }, [data])
+
+  const save = useMutation({
+    mutationFn: () => {
+      const permissions = []
+      for (const role of PERM_ROLES) {
+        for (const module of PERM_MODULES) {
+          permissions.push({ role, module, ...matrix[role][module] })
+        }
+      }
+      return settingsApi.updatePermissions(permissions)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['permissions'] }),
+  })
+
+  function toggle(role, module, action) {
+    setMatrix(prev => ({
+      ...prev,
+      [role]: {
+        ...prev[role],
+        [module]: { ...prev[role][module], [action]: !prev[role][module][action] },
+      },
+    }))
+  }
+
+  const isAdmin = currentUser?.role === 'admin'
+
+  if (isLoading || !matrix) {
+    return <Card><p className="text-sm text-gray-500 dark:text-gray-400">טוען...</p></Card>
+  }
+
   return (
-    <div className="max-w-lg">
+    <div className="max-w-4xl">
       <Card>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
-            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">ניהול הרשאות</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">קבע אילו פעולות מותרות לכל תפקיד, לפי מודול.</p>
+
+        {PERM_ROLES.map(role => (
+          <div key={role} className="mb-6 last:mb-0">
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">{ROLE_LABELS[role]}</h4>
+            <table className="w-full text-sm text-right">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
+                  <th className="py-1.5 font-medium">מודול</th>
+                  {PERM_ACTIONS.map(a => (
+                    <th key={a.key} className="py-1.5 font-medium text-center">{a.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {PERM_MODULES.map(module => (
+                  <tr key={module} className="border-b border-gray-100 dark:border-gray-700/50">
+                    <td className="py-1.5 text-gray-800 dark:text-gray-100">{MODULE_LABELS[module] ?? module}</td>
+                    {PERM_ACTIONS.map(a => (
+                      <td key={a.key} className="py-1.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={matrix[role][module][a.key]}
+                          disabled={!isAdmin}
+                          onChange={() => toggle(role, module, a.key)}
+                          className="w-4 h-4 accent-[#2398c2] disabled:opacity-50"
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ניהול הרשאות</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">בקרוב</p>
-        </div>
+        ))}
+
+        {isAdmin && (
+          <div className="pt-2">
+            <button
+              onClick={() => save.mutate()}
+              disabled={save.isPending}
+              className="bg-[#2398c2] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1d7fa3] disabled:opacity-50 transition-colors duration-150"
+            >
+              {save.isPending ? 'שומר...' : 'שמור'}
+            </button>
+            {save.isSuccess && <span className="text-green-600 dark:text-green-400 text-sm mr-3">✓ נשמר</span>}
+            {save.isError && (
+              <div className="text-sm px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700 mt-2">
+                {save.error?.response?.data?.message ?? 'שגיאה בשמירה'}
+              </div>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   )
@@ -1333,7 +1637,7 @@ function PreferencesTab({ lang, theme, fontSize, setLang, setTheme, setFontSize,
 // Root component
 // ---------------------------------------------------------------------------
 export default function SettingsPage() {
-  const { can }    = useAuth()
+  const { can, user } = useAuth()
   const qc         = useQueryClient()
   const { theme, lang, fontSize, setTheme, setLang, setFontSize } = usePreferences()
   const tr = (key) => translations[lang]?.[key] ?? key
@@ -1378,13 +1682,13 @@ export default function SettingsPage() {
 
       {/* Tab panels */}
       {activeTab === 'general' && (
-        <GeneralTab tenantData={tenantData} can={can} qc={qc} />
+        <GeneralTab tenantData={tenantData} can={can} qc={qc} tr={tr} />
       )}
       {activeTab === 'connections' && (
         <ConnectionsTab integ={integ} can={can} qc={qc} tenantSubdomain={tenantSubdomain} />
       )}
-      {activeTab === 'users' && <UsersTab />}
-      {activeTab === 'permissions' && <PermissionsTab />}
+      {activeTab === 'users' && <UsersTab can={can} currentUser={user} />}
+      {activeTab === 'permissions' && <PermissionsTab can={can} currentUser={user} />}
       {activeTab === 'labels' && <LabelsTab />}
       {activeTab === 'preferences' && (
         <PreferencesTab

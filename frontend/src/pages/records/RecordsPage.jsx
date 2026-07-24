@@ -12,10 +12,23 @@ function fieldInputType(fieldType) {
   return { number: 'number', date: 'date', datetime: 'datetime-local', email: 'email', phone: 'tel', url: 'url' }[fieldType] ?? 'text'
 }
 
+// Trim imported values like "1540.0000" down to "1,540" / "234.92" — only as
+// many decimals as the value actually needs, up to 2.
+function formatDisplayValue(val, fieldType) {
+  if (fieldType !== 'number') return String(val)
+  const n = Number(val)
+  return Number.isNaN(n) ? String(val) : n.toLocaleString('he-IL', { maximumFractionDigits: 2 })
+}
+
+import { usePreferences } from '../../context/PreferencesContext'
+import { translations } from '../../i18n/translations'
+
 export default function RecordsPage() {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { can } = useAuth()
+  const { lang } = usePreferences()
+  const tr = (key) => translations[lang]?.[key] ?? key
   const qc = useQueryClient()
 
   const [search, setSearch] = useState('')
@@ -96,20 +109,28 @@ export default function RecordsPage() {
   }
 
   return (
-    <div>
+    <div dir={lang === 'he' ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {type?.icon && <span className="ml-2">{type.icon}</span>}{type?.label ?? '...'}
+            {type?.icon && <span className="ml-2">{type.icon}</span>}{type?.label ?? tr('records_loading')}
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{total} רשומות</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{total} {tr('records')}</p>
         </div>
-        {canCreate && (
-          <button onClick={openCreate}
-            className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
-            <span className="text-lg leading-none">+</span> {type?.label_singular ?? 'רשומה'} חדשה
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canCreate && (
+            <button onClick={() => navigate(`/import?entity=${slug}`)}
+              className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-colors">
+              📥 ייבוא CSV
+            </button>
+          )}
+          {canCreate && (
+            <button onClick={openCreate}
+              className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm">
+              <span className="text-lg leading-none">+</span> {type?.label_singular ?? 'רשומה'} חדשה
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-4">
@@ -125,20 +146,20 @@ export default function RecordsPage() {
               {visibleFields.map(f => (
                 <th key={f.id} className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{f.label}</th>
               ))}
-              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">נוצר</th>
+              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{tr('created_at')}</th>
               <th className="px-4 py-3 w-10"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {isLoading && (
-              <tr><td colSpan={visibleFields.length + 2} className="py-8 text-center text-gray-400 dark:text-gray-500">טוען...</td></tr>
+              <tr><td colSpan={visibleFields.length + 2} className="py-8 text-center text-gray-400 dark:text-gray-500">{tr('loading')}...</td></tr>
             )}
             {!isLoading && records.length === 0 && (
               <tr><td colSpan={visibleFields.length + 2} className="py-12 text-center text-gray-400 dark:text-gray-500">
                 <div className="text-3xl mb-2">{type?.icon ?? '📄'}</div>
-                <div>אין רשומות עדיין</div>
+                <div>{tr('no_records_yet')}</div>
                 {canCreate && (
-                  <button onClick={openCreate} className="mt-3 text-[#2398c2] hover:underline text-sm">+ הוסף ראשונה</button>
+                  <button onClick={openCreate} className="mt-3 text-[#2398c2] hover:underline text-sm">+ {tr('add_first_record')}</button>
                 )}
               </td></tr>
             )}
@@ -148,14 +169,15 @@ export default function RecordsPage() {
                   const val = r.data?.[f.name]
                   const empty = val === undefined || val === null || val === ''
                   return (
-                    <td key={f.id} className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap max-w-[220px] truncate">
+                    <td key={f.id} className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap max-w-[220px] truncate"
+                      dir={['number', 'date', 'datetime', 'email', 'phone', 'url'].includes(f.field_type) ? 'ltr' : 'auto'}>
                       {empty ? <span className="text-gray-300 dark:text-gray-600">—</span>
                         : f.field_type === 'checkbox' ? (val ? '✓' : '—')
-                        : String(val)}
+                        : formatDisplayValue(val, f.field_type)}
                     </td>
                   )
                 })}
-                <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">
+                <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap" dir="ltr">
                   {new Date(r.created_at).toLocaleDateString('he-IL')}
                 </td>
                 <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
@@ -172,7 +194,7 @@ export default function RecordsPage() {
 
       {modal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={closeModal}>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 {editing ? 'עריכת רשומה' : `${type?.label_singular ?? 'רשומה'} חדשה`}
@@ -181,27 +203,29 @@ export default function RecordsPage() {
             </div>
             <form onSubmit={handleSubmit} className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
               {error && <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg">{error}</div>}
-              {fields.filter(f => !f.hidden).map(f => (
-                <div key={f.id}>
-                  <label className={LABEL}>{f.label} {f.required && <span className="text-red-500">*</span>}</label>
-                  {f.field_type === 'select' ? (
-                    <select value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required} className={INPUT}>
-                      <option value="">בחר...</option>
-                      {(f.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  ) : f.field_type === 'checkbox' ? (
-                    <input type="checkbox" checked={!!form[f.name]} onChange={setField(f.name)}
-                      className="rounded border-gray-300 accent-[#2398c2] w-5 h-5" />
-                  ) : f.field_type === 'textarea' ? (
-                    <textarea value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required} rows={2}
-                      className={INPUT + ' resize-none'} />
-                  ) : (
-                    <input type={fieldInputType(f.field_type)} value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required}
-                      dir={['number', 'date', 'datetime', 'email', 'phone', 'url'].includes(f.field_type) ? 'ltr' : 'auto'}
-                      className={INPUT} />
-                  )}
-                </div>
-              ))}
+              <div className="grid grid-cols-2 gap-3">
+                {fields.filter(f => !f.hidden).map(f => (
+                  <div key={f.id} className={f.field_type === 'textarea' ? 'col-span-2' : ''}>
+                    <label className={LABEL}>{f.label} {f.required && <span className="text-red-500">*</span>}</label>
+                    {f.field_type === 'select' ? (
+                      <select value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required} className={INPUT}>
+                        <option value="">בחר...</option>
+                        {(f.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : f.field_type === 'checkbox' ? (
+                      <input type="checkbox" checked={!!form[f.name]} onChange={setField(f.name)}
+                        className="rounded border-gray-300 accent-[#2398c2] w-5 h-5" />
+                    ) : f.field_type === 'textarea' ? (
+                      <textarea value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required} rows={2}
+                        className={INPUT + ' resize-none'} />
+                    ) : (
+                      <input type={fieldInputType(f.field_type)} value={form[f.name] ?? ''} onChange={setField(f.name)} required={f.required}
+                        dir={['number', 'date', 'datetime', 'email', 'phone', 'url'].includes(f.field_type) ? 'ltr' : 'auto'}
+                        className={INPUT} />
+                    )}
+                  </div>
+                ))}
+              </div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={createRecord.isPending || updateRecord.isPending}
                   className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">

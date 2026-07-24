@@ -9,8 +9,6 @@ use Illuminate\Support\Facades\DB;
 
 class LeadService
 {
-    public function __construct(private AutomationEngine $automation) {}
-
     // System fields a filter condition may target directly (not custom_fields JSON)
     private const FILTERABLE_FIELDS = ['name', 'phone', 'email', 'source', 'status', 'pipeline_stage_id', 'assigned_to', 'created_at'];
     private const FILTER_OPERATORS  = ['equals', 'not_equals', 'contains', 'gt', 'gte', 'lt', 'lte', 'empty', 'not_empty'];
@@ -107,34 +105,20 @@ class LeadService
 
     public function create(array $data): Lead
     {
-        $lead = Lead::create($data); // LeadObserver::created() fires the outgoing webhook
-        $this->automation->fire('lead_created', $lead);
+        $lead = Lead::create($data); // LeadObserver::created() fires the outgoing webhook + lead_created automations
         return $lead->load(['stage', 'assignedUser']);
     }
 
     public function update(Lead $lead, array $data): Lead
     {
-        $oldStageId = $lead->pipeline_stage_id;
-        $oldStatus  = $lead->status;
-        $lead->update($data); // LeadObserver::updated() fires the outgoing webhook
-
-        if (isset($data['pipeline_stage_id']) && $data['pipeline_stage_id'] !== $oldStageId) {
-            $this->automation->fire('lead_stage_changed', $lead);
-        }
-
-        if (isset($data['status']) && $data['status'] !== $oldStatus) {
-            $this->automation->fire('lead_status_changed', $lead);
-        }
-
+        $lead->update($data); // LeadObserver::updated() fires the outgoing webhook + stage/status-changed automations
         return $lead->fresh(['stage', 'assignedUser']);
     }
 
     public function changeStage(Lead $lead, int $stageId): Lead
     {
-        $lead->update(['pipeline_stage_id' => $stageId]); // LeadObserver::updated() fires the outgoing webhook
-        $fresh = $lead->fresh(['stage', 'assignedUser']);
-        $this->automation->fire('lead_stage_changed', $fresh);
-        return $fresh;
+        $lead->update(['pipeline_stage_id' => $stageId]); // LeadObserver::updated() fires the outgoing webhook + lead_stage_changed automations
+        return $lead->fresh(['stage', 'assignedUser']);
     }
 
     /**
@@ -151,11 +135,28 @@ class LeadService
             $query->where('assigned_to', $userId);
         }
 
+        // change_stage needs per-lead automation firing, which a mass query-builder
+        // update skips entirely (Eloquent model events don't fire on it) — so this
+        // branch can't be a one-line match() arm like the others.
+        if ($action === 'change_stage') {
+            $stageId = (int) $value;
+            $changedIds = (clone $query)->where('pipeline_stage_id', '!=', $stageId)->pluck('id');
+            $count = $query->update(['pipeline_stage_id' => $stageId]);
+
+            if ($changedIds->isNotEmpty()) {
+                $automation = app(AutomationEngine::class);
+                Lead::whereIn('id', $changedIds)->get()->each(
+                    fn (Lead $lead) => $automation->fire('lead_stage_changed', $lead)
+                );
+            }
+
+            return $count;
+        }
+
         return match ($action) {
-            'change_stage' => $query->update(['pipeline_stage_id' => (int) $value]),
-            'assign'       => $query->update(['assigned_to' => (int) $value]),
-            'delete'       => $query->delete(), // soft delete
-            default        => 0,
+            'assign' => $query->update(['assigned_to' => (int) $value]),
+            'delete' => $query->delete(), // soft delete
+            default  => 0,
         };
     }
 }

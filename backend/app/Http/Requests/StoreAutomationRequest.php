@@ -12,7 +12,7 @@ class StoreAutomationRequest extends FormRequest
     {
         return [
             'name'         => 'required|string|max:255',
-            'trigger_type' => 'required|string|in:lead_created,lead_stage_changed,lead_status_changed,form_submitted,contact_created,client_created,call_received,whatsapp_received,scheduled',
+            'trigger_type' => 'required|string|in:lead_created,lead_stage_changed,form_submitted,contact_created,client_created,call_received,whatsapp_received',
             'conditions'   => 'nullable|array',
             'actions'      => 'required|array|min:1',
             'actions.*.type' => 'required|string',
