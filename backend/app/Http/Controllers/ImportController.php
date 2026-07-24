@@ -103,11 +103,13 @@ class ImportController extends Controller
 
             $request->validate(['field_mapping.title' => 'required|string']);
 
-            // Whitelist mapping keys to this record type's own field definitions
+            // Whitelist mapping keys to this record type's own field definitions,
+            // plus 'created_at' which ImportService::importRecordRow special-cases for backdating
             $allowed = CustomFieldDefinition::where('tenant_id', app('current_tenant_id'))
                 ->where('entity', $entity)
                 ->pluck('name')
                 ->all();
+            $allowed[] = 'created_at';
             $mapping = array_intersect_key($request->input('field_mapping', []), array_flip($allowed));
 
             $job->update([

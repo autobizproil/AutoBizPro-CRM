@@ -19,7 +19,7 @@ class AuthController extends Controller
             'password.required' => 'סיסמה היא שדה חובה',
         ]);
 
-        if (! Auth::attempt($credentials)) {
+        if (! Auth::attempt($credentials, true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'אימייל או סיסמה שגויים',
