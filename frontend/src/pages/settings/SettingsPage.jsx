@@ -8,7 +8,6 @@ import { customFieldsApi, FIELD_TYPE_LABELS, ENTITIES, CREATABLE_TYPES } from '.
 import { recordTypesApi, RECORD_TYPE_ICONS } from '../../api/recordTypes'
 import { useAuth } from '../../context/AuthContext'
 import { usePreferences } from '../../context/PreferencesContext'
-import { usePreferences } from '../../context/PreferencesContext'
 import { translations } from '../../i18n/translations'
 
 // ---------------------------------------------------------------------------
