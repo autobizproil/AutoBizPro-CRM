@@ -133,7 +133,7 @@ export default function ClientsPage() {
                 </td>
                 <td className="px-4 py-3 text-gray-700 dark:text-gray-300 max-w-[160px] truncate">
                   {c.email
-                    ? <a href={`mailto:${c.email}`} className="hover:text-[#2398c2] truncate block">{c.email}</a>
+                    ? <a href={`mailto:${c.email}`} className="hover:text-[#2398c2] truncate block" dir="ltr">{c.email}</a>
                     : <span className="text-gray-300 dark:text-gray-600">—</span>}
                 </td>
                 <td className="px-4 py-3 text-gray-700 dark:text-gray-300 text-sm">

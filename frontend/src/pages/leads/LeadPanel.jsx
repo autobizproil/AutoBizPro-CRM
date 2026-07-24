@@ -233,7 +233,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
             {/* Quick actions */}
             <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-2 flex-wrap">
               {lead.phone && (
-                <a href={`tel:${lead.phone}`}
+                <a href={`tel:${lead.phone}`} dir="ltr"
                   className="flex-1 flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 rounded-lg text-sm font-medium transition-colors">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> התקשר
                 </a>
@@ -245,7 +245,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> וואטסאפ
                   </button>
                   {showTemplates && (
-                    <div className="absolute top-full mt-1 right-0 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 max-h-56 overflow-y-auto">
+                    <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 max-h-56 overflow-y-auto w-48">
                       <button onClick={() => sendWhatsapp(null)}
                         className="w-full text-right px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">הודעה ריקה</button>
                       {templates.map(t => (

@@ -20,6 +20,7 @@ const LABEL = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
 
 export default function ContactsPage() {
   const { can }             = useAuth()
+  const { lang }            = usePreferences()
   const [search, setSearch] = useState('')
   const [modal, setModal]   = useState(false)
   const [form, setForm]     = useState(EMPTY)
@@ -34,6 +35,7 @@ export default function ContactsPage() {
   const total    = data?.total ?? 0
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+  const tr = (key) => translations[lang]?.[key] ?? key
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -51,11 +53,11 @@ export default function ContactsPage() {
   }
 
   return (
-    <div>
+    <div dir={lang === 'he' ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">אנשי קשר</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{total} אנשי קשר</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{tr('contacts')}</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{total} {tr('contacts')}</p>
         </div>
         {can('contacts', 'can_create') && (
           <button onClick={() => setModal(true)}
@@ -107,12 +109,12 @@ export default function ContactsPage() {
                     <span className="font-medium text-gray-900 dark:text-gray-100">{c.name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400" dir="ltr">
                   {c.phone
                     ? <a href={`tel:${c.phone}`} className="hover:text-[#2398c2]">{c.phone}</a>
                     : <span className="text-gray-300 dark:text-gray-600">—</span>}
                 </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400" dir="ltr">
                   {c.email
                     ? <CopyEmailBtn email={c.email} />
                     : <span className="text-gray-300 dark:text-gray-600">—</span>}

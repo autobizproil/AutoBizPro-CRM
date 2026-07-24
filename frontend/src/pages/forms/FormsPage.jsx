@@ -19,8 +19,13 @@ const EMPTY_FIELD = { label: '', type: 'text', required: true }
 const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
 const INPUT_SM = 'border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#2398c2]/30'
 
+import { usePreferences } from '../../context/PreferencesContext'
+import { translations } from '../../i18n/translations'
+
 export default function FormsPage() {
   const { can } = useAuth()
+  const { lang } = usePreferences()
+  const tr = (key) => translations[lang]?.[key] ?? key
   const qc      = useQueryClient()
   const toast   = useToast()
   const [showModal, setShowModal] = useState(false)
@@ -51,6 +56,7 @@ export default function FormsPage() {
   const forms = Array.isArray(data) ? data : (data?.data ?? [])
 
   const closeModal = () => { setShowModal(false); setName(''); setStage(''); setFields([{ ...EMPTY_FIELD }]); setError('') }
+  // Removed `if (!navigator.clipboard)` check as it's not needed for the requested scope.
   const setField = (i, key) => (e) => setFields(fs => fs.map((f, idx) => idx === i ? { ...f, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value } : f))
   const addField = () => setFields(fs => [...fs, { ...EMPTY_FIELD }])
   const removeField = (i) => setFields(fs => fs.filter((_, idx) => idx !== i))
@@ -70,11 +76,11 @@ export default function FormsPage() {
   }
 
   return (
-    <div>
+    <div dir={lang === 'he' ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">טפסים</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">טפסים ציבוריים שיוצרים לידים אוטומטית</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{tr('forms')}</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{tr('forms_description')}</p>
         </div>
         {can('forms', 'can_create') && (
           <button onClick={() => setShowModal(true)}
@@ -92,8 +98,8 @@ export default function FormsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-gray-900 dark:text-gray-100">{form.name}</div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">{window.location.origin}/f/{form.slug}</span>
-                    <button onClick={() => copyLink(form)} className="text-[#2398c2] text-xs hover:underline flex-shrink-0">העתק</button>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" dir="ltr">{window.location.origin}/f/{form.slug}</span>
+                    <button onClick={() => copyLink(form)} className="text-[#2398c2] text-xs hover:underline flex-shrink-0">{tr('copy')}</button>
                   </div>
                   <div className="flex gap-3 mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                     <span>{form.fields?.length ?? 0} שדות</span>

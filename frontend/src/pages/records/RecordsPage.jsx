@@ -20,10 +20,15 @@ function formatDisplayValue(val, fieldType) {
   return Number.isNaN(n) ? String(val) : n.toLocaleString('he-IL', { maximumFractionDigits: 2 })
 }
 
+import { usePreferences } from '../../context/PreferencesContext'
+import { translations } from '../../i18n/translations'
+
 export default function RecordsPage() {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { can } = useAuth()
+  const { lang } = usePreferences()
+  const tr = (key) => translations[lang]?.[key] ?? key
   const qc = useQueryClient()
 
   const [search, setSearch] = useState('')
@@ -104,13 +109,13 @@ export default function RecordsPage() {
   }
 
   return (
-    <div>
+    <div dir={lang === 'he' ? 'rtl' : 'ltr'}>
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {type?.icon && <span className="ml-2">{type.icon}</span>}{type?.label ?? '...'}
+            {type?.icon && <span className="ml-2">{type.icon}</span>}{type?.label ?? tr('records_loading')}
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{total} רשומות</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{total} {tr('records')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
@@ -141,20 +146,20 @@ export default function RecordsPage() {
               {visibleFields.map(f => (
                 <th key={f.id} className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{f.label}</th>
               ))}
-              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">נוצר</th>
+              <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{tr('created_at')}</th>
               <th className="px-4 py-3 w-10"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {isLoading && (
-              <tr><td colSpan={visibleFields.length + 2} className="py-8 text-center text-gray-400 dark:text-gray-500">טוען...</td></tr>
+              <tr><td colSpan={visibleFields.length + 2} className="py-8 text-center text-gray-400 dark:text-gray-500">{tr('loading')}...</td></tr>
             )}
             {!isLoading && records.length === 0 && (
               <tr><td colSpan={visibleFields.length + 2} className="py-12 text-center text-gray-400 dark:text-gray-500">
                 <div className="text-3xl mb-2">{type?.icon ?? '📄'}</div>
-                <div>אין רשומות עדיין</div>
+                <div>{tr('no_records_yet')}</div>
                 {canCreate && (
-                  <button onClick={openCreate} className="mt-3 text-[#2398c2] hover:underline text-sm">+ הוסף ראשונה</button>
+                  <button onClick={openCreate} className="mt-3 text-[#2398c2] hover:underline text-sm">+ {tr('add_first_record')}</button>
                 )}
               </td></tr>
             )}
@@ -164,14 +169,15 @@ export default function RecordsPage() {
                   const val = r.data?.[f.name]
                   const empty = val === undefined || val === null || val === ''
                   return (
-                    <td key={f.id} className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap max-w-[220px] truncate">
+                    <td key={f.id} className="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap max-w-[220px] truncate"
+                      dir={['number', 'date', 'datetime', 'email', 'phone', 'url'].includes(f.field_type) ? 'ltr' : 'auto'}>
                       {empty ? <span className="text-gray-300 dark:text-gray-600">—</span>
                         : f.field_type === 'checkbox' ? (val ? '✓' : '—')
                         : formatDisplayValue(val, f.field_type)}
                     </td>
                   )
                 })}
-                <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap">
+                <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs whitespace-nowrap" dir="ltr">
                   {new Date(r.created_at).toLocaleDateString('he-IL')}
                 </td>
                 <td className="px-4 py-3" onClick={e => e.stopPropagation()}>

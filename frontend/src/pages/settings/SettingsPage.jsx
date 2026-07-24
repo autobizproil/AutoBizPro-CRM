@@ -8,12 +8,14 @@ import { customFieldsApi, FIELD_TYPE_LABELS, ENTITIES, CREATABLE_TYPES } from '.
 import { recordTypesApi, RECORD_TYPE_ICONS } from '../../api/recordTypes'
 import { useAuth } from '../../context/AuthContext'
 import { usePreferences } from '../../context/PreferencesContext'
+import { usePreferences } from '../../context/PreferencesContext'
 import { translations } from '../../i18n/translations'
 
 // ---------------------------------------------------------------------------
 // Toggle switch component — pill-shaped, brand-blue when on
 // ---------------------------------------------------------------------------
 function ToggleSwitch({ checked, onChange, disabled = false }) {
+  // Always LTR for consistent switch animation
   return (
     <button
       type="button"
@@ -150,15 +152,15 @@ function GeneralTab({ tenantData, can, qc }) {
       {/* Business info display */}
       {tenantData && (
         <Card>
-          <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">פרטי עסק</h3>
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">{tr('business_info')}</h3>
           <div className="space-y-3">
             <div>
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">שם עסק</p>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{tr('business_name')}</p>
               <p className="text-sm text-gray-800 dark:text-gray-100">{tenantData.name ?? '—'}</p>
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Subdomain</p>
-              <p className="text-sm text-gray-800 font-mono">{tenantData.subdomain ?? '—'}</p>
+              <p className="text-sm text-gray-800 font-mono" dir="ltr">{tenantData.subdomain ?? '—'}</p>
             </div>
           </div>
         </Card>
@@ -166,13 +168,13 @@ function GeneralTab({ tenantData, can, qc }) {
 
       {/* Logo */}
       <Card>
-        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">לוגו העסק</h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">מוצג בסרגל העליון במקום לוגו ברירת המחדל. PNG/JPG/WebP עד 1MB.</p>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">{tr('business_logo')}</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">{tr('business_logo_description')}</p>
         <div className="flex items-center gap-4">
           <div className="w-20 h-14 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
             {tenantData?.settings?.logo
-              ? <img src={tenantData.settings.logo} alt="לוגו" className="max-h-12 max-w-[72px] object-contain" />
-              : <span className="text-xs text-gray-400">אין לוגו</span>}
+              ? <img src={tenantData.settings.logo} alt={tenantData?.name ?? tr('logo')} className="max-h-12 max-w-[72px] object-contain" />
+              : <span className="text-xs text-gray-400">{tr('no_logo')}</span>}
           </div>
           {can('users', 'can_update') && (
             <div className="flex gap-2">
@@ -180,12 +182,12 @@ function GeneralTab({ tenantData, can, qc }) {
                 onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo.mutate(f); e.target.value = '' }} />
               <button type="button" onClick={() => logoInputRef.current?.click()} disabled={uploadLogo.isPending}
                 className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                {uploadLogo.isPending ? 'מעלה...' : 'העלה לוגו'}
+                {uploadLogo.isPending ? tr('uploading') : tr('upload_logo')}
               </button>
               {tenantData?.settings?.logo && (
                 <button type="button" onClick={() => deleteLogo.mutate()} disabled={deleteLogo.isPending}
                   className="border border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 px-3 py-2 rounded-lg text-sm">
-                  הסר
+                  {tr('remove')}
                 </button>
               )}
             </div>
@@ -197,16 +199,16 @@ function GeneralTab({ tenantData, can, qc }) {
       {/* WhatsApp */}
       <Card>
         <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">WhatsApp (GREEN-API)</h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">הגדר ספק WhatsApp לשליחת הודעות אוטומטיות.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">{tr('whatsapp_integration_description')}</p>
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ספק</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{tr('provider')}</label>
             <select
               value={whatsappProvider}
               onChange={e => setWhatsappProvider(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
             >
-              <option value="">בחר ספק...</option>
+              <option value="">{tr('select_provider')}...</option>
               <option value="360dialog">360dialog</option>
               <option value="ultramsg">UltraMsg</option>
               <option value="twilio">Twilio</option>
@@ -220,7 +222,8 @@ function GeneralTab({ tenantData, can, qc }) {
               value={whatsappApiKey}
               onChange={e => setWhatsappApiKey(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
-              placeholder="הכנס API key..."
+              placeholder={tr('enter_api_key')}
+              dir="ltr"
             />
           </div>
           {can('users', 'can_update') && (

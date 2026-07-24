@@ -186,7 +186,7 @@ export default function Layout() {
           </button>
           <div
             title={user?.name}
-            className="w-8 h-8 rounded-full bg-[#2398c2]/20 flex items-center justify-center text-[13px] font-bold text-[#2398c2] flex-shrink-0 cursor-default mr-1"
+            className="w-8 h-8 rounded-full bg-[#2398c2]/20 flex items-center justify-center text-[13px] font-bold text-[#2398c2] flex-shrink-0 cursor-default ml-1"
           >
             {user?.name?.[0] ?? 'U'}
           </div>
