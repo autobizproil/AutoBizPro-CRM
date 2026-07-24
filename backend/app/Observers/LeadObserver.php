@@ -13,9 +13,17 @@ class LeadObserver
     // Eloquent (LeadService, Facebook/Voicenter/WhatsApp/Paycall integrations,
     // CSV import, public forms), closing the gap where only LeadService's
     // manual call sites used to notify external agents. Internal automation
-    // triggers (lead_created/lead_stage_changed/lead_status_changed) are
-    // fired here too, for the same reason — LeadService's own fire() calls
-    // used to miss every one of those bypass paths.
+    // triggers (lead_created/lead_stage_changed) are fired here too, for the
+    // same reason — LeadService's own fire() calls used to miss every one of
+    // those bypass paths.
+    //
+    // Re-entrancy note: an automation's own `change_stage` action
+    // (RunAutomationJob::executeAction) updates pipeline_stage_id, which
+    // re-enters this observer and can fire another lead_stage_changed
+    // automation. Eloquent's dirty-check means a same-value update fires
+    // nothing, so this can't trivially infinite-loop, but a chain of
+    // distinct stage-changing automations can cascade. No guard exists —
+    // if that becomes a real scenario, add one here.
     public function created(Lead $lead): void
     {
         $this->dispatch($lead, 'lead_created');
@@ -32,12 +40,8 @@ class LeadObserver
 
         $this->dispatch($lead, $event);
 
-        $automation = app(AutomationEngine::class);
         if ($lead->wasChanged('pipeline_stage_id')) {
-            $automation->fire('lead_stage_changed', $lead);
-        }
-        if ($lead->wasChanged('status')) {
-            $automation->fire('lead_status_changed', $lead);
+            app(AutomationEngine::class)->fire('lead_stage_changed', $lead);
         }
     }
 
