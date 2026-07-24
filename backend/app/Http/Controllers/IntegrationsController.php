@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Activity;
 use App\Models\Lead;
 use App\Models\Tenant;
+use App\Services\AutomationEngine;
 use App\Services\Integrations\CardcomService;
 use App\Services\Integrations\FacebookLeadAdsService;
 use App\Services\Integrations\GoogleSheetsService;
@@ -280,6 +281,8 @@ class IntegrationsController extends Controller
                 'body'        => '📥 ' . $text,
             ]);
         }
+
+        app(AutomationEngine::class)->fire('whatsapp_received', $lead);
 
         return response()->json(['success' => true]);
     }

@@ -12,15 +12,19 @@ class NotificationService
 {
     public function sendEmail(int $tenantId, array $action, array $context): void
     {
-        $to       = $context['email'] ?? null;
-        $template = $action['template'] ?? 'default';
+        $to = $context['email'] ?? null;
 
         if (! $to) {
             return;
         }
 
-        Mail::raw("Template: $template\n\n" . json_encode($context), function ($msg) use ($to, $template) {
-            $msg->to($to)->subject("CRM: $template");
+        // subject/body are already interpolated by RunAutomationJob::executeAction
+        // before this is called — send exactly what the automation configured.
+        $subject = $action['subject'] ?? 'הודעה מהמערכת';
+        $body    = $action['body'] ?? '';
+
+        Mail::raw($body, function ($msg) use ($to, $subject) {
+            $msg->to($to)->subject($subject);
         });
     }
 

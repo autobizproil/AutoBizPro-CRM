@@ -3,14 +3,11 @@
 namespace App\Services;
 
 use App\Models\Lead;
-use App\Services\AutomationEngine;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class LeadService
 {
-    public function __construct(private AutomationEngine $automation) {}
-
     // System fields a filter condition may target directly (not custom_fields JSON)
     private const FILTERABLE_FIELDS = ['name', 'phone', 'email', 'source', 'status', 'pipeline_stage_id', 'assigned_to', 'created_at'];
     private const FILTER_OPERATORS  = ['equals', 'not_equals', 'contains', 'gt', 'gte', 'lt', 'lte', 'empty', 'not_empty'];
@@ -107,34 +104,20 @@ class LeadService
 
     public function create(array $data): Lead
     {
-        $lead = Lead::create($data); // LeadObserver::created() fires the outgoing webhook
-        $this->automation->fire('lead_created', $lead);
+        $lead = Lead::create($data); // LeadObserver::created() fires the outgoing webhook + lead_created automations
         return $lead->load(['stage', 'assignedUser']);
     }
 
     public function update(Lead $lead, array $data): Lead
     {
-        $oldStageId = $lead->pipeline_stage_id;
-        $oldStatus  = $lead->status;
-        $lead->update($data); // LeadObserver::updated() fires the outgoing webhook
-
-        if (isset($data['pipeline_stage_id']) && $data['pipeline_stage_id'] !== $oldStageId) {
-            $this->automation->fire('lead_stage_changed', $lead);
-        }
-
-        if (isset($data['status']) && $data['status'] !== $oldStatus) {
-            $this->automation->fire('lead_status_changed', $lead);
-        }
-
+        $lead->update($data); // LeadObserver::updated() fires the outgoing webhook + stage/status-changed automations
         return $lead->fresh(['stage', 'assignedUser']);
     }
 
     public function changeStage(Lead $lead, int $stageId): Lead
     {
-        $lead->update(['pipeline_stage_id' => $stageId]); // LeadObserver::updated() fires the outgoing webhook
-        $fresh = $lead->fresh(['stage', 'assignedUser']);
-        $this->automation->fire('lead_stage_changed', $fresh);
-        return $fresh;
+        $lead->update(['pipeline_stage_id' => $stageId]); // LeadObserver::updated() fires the outgoing webhook + lead_stage_changed automations
+        return $lead->fresh(['stage', 'assignedUser']);
     }
 
     /**
