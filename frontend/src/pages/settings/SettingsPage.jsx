@@ -102,7 +102,7 @@ function SaveRow({ isPending, isSuccess, isError, errorMsg, onTest, testPending,
 // ---------------------------------------------------------------------------
 // Tab: כללי (General) — tenant settings + WhatsApp
 // ---------------------------------------------------------------------------
-function GeneralTab({ tenantData, can, qc }) {
+function GeneralTab({ tenantData, can, qc, tr }) {
   const [whatsappProvider, setWhatsappProvider] = useState('')
   const [whatsappApiKey, setWhatsappApiKey]     = useState('')
   const [logoError, setLogoError]               = useState('')
@@ -1682,7 +1682,7 @@ export default function SettingsPage() {
 
       {/* Tab panels */}
       {activeTab === 'general' && (
-        <GeneralTab tenantData={tenantData} can={can} qc={qc} />
+        <GeneralTab tenantData={tenantData} can={can} qc={qc} tr={tr} />
       )}
       {activeTab === 'connections' && (
         <ConnectionsTab integ={integ} can={can} qc={qc} tenantSubdomain={tenantSubdomain} />
