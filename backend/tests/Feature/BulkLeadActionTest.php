@@ -88,7 +88,7 @@ class BulkLeadActionTest extends TestCase
         Lead::create(['tenant_id' => $other->id, 'name' => 'Foreign']);
 
         $resp = $this->actingAs($admin)->withHeaders(['X-Tenant' => $sub])
-            ->deleteJson('/api/leads/all/clear');
+            ->deleteJson('/api/entities/leads/all');
 
         $resp->assertOk();
         $this->assertSame(2, $resp->json('data.deleted'));
@@ -105,7 +105,7 @@ class BulkLeadActionTest extends TestCase
         Lead::create(['tenant_id' => $tenant->id, 'name' => 'A']);
 
         $resp = $this->actingAs($manager)->withHeaders(['X-Tenant' => $sub])
-            ->deleteJson('/api/leads/all/clear');
+            ->deleteJson('/api/entities/leads/all');
 
         $resp->assertStatus(403);
         app()->instance('current_tenant_id', $tenant->id);
