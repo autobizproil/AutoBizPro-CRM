@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useContacts, useCreateContact, useDeleteContact } from '../../hooks/useContacts'
 import { useAuth } from '../../context/AuthContext'
+import { usePreferences } from '../../context/PreferencesContext'
+import { translations } from '../../i18n/translations'
 
 function CopyEmailBtn({ email, className = '' }) {
   const [copied, setCopied] = useState(false)
