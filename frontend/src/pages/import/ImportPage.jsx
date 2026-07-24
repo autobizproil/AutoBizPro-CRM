@@ -6,15 +6,39 @@ import { usePipeline } from '../../hooks/usePipeline'
 import { customFieldsApi } from '../../api/customFields'
 import { recordTypesApi } from '../../api/recordTypes'
 
-const FIELDS = [
-  { key: 'name',   label: 'שם *',   required: true },
-  { key: 'phone',  label: 'טלפון' },
-  { key: 'email',  label: 'אימייל' },
-  { key: 'source', label: 'מקור' },
-  { key: 'notes',  label: 'הערות' },
-  { key: 'created_at', label: 'נוצר בתאריך (תאריך + שעה)' },
-  { key: 'status', label: 'סטטוס / שלב' },
-]
+const ENTITY_LABELS = { leads: 'לידים', contacts: 'אנשי קשר', clients: 'לקוחות' }
+
+// System (hardcoded, non-RecordType) entities — each has its own fixed field list,
+// unlike generic Record Types where every field comes from custom_field_definitions.
+const SYSTEM_ENTITY_FIELDS = {
+  leads: [
+    { key: 'name',   label: 'שם *',   required: true },
+    { key: 'phone',  label: 'טלפון' },
+    { key: 'email',  label: 'אימייל' },
+    { key: 'source', label: 'מקור' },
+    { key: 'notes',  label: 'הערות' },
+    { key: 'created_at', label: 'נוצר בתאריך (תאריך + שעה)' },
+    { key: 'status', label: 'סטטוס / שלב' },
+  ],
+  contacts: [
+    { key: 'name',    label: 'שם *', required: true },
+    { key: 'phone',   label: 'טלפון' },
+    { key: 'email',   label: 'אימייל' },
+    { key: 'company', label: 'חברה' },
+    { key: 'role',    label: 'תפקיד' },
+    { key: 'notes',   label: 'הערות' },
+    { key: 'created_at', label: 'נוצר בתאריך (תאריך + שעה)' },
+  ],
+  clients: [
+    { key: 'name',    label: 'שם *', required: true },
+    { key: 'phone',   label: 'טלפון' },
+    { key: 'email',   label: 'אימייל' },
+    { key: 'company', label: 'חברה' },
+    { key: 'source',  label: 'מקור' },
+    { key: 'notes',   label: 'הערות' },
+    { key: 'created_at', label: 'נוצר בתאריך (תאריך + שעה)' },
+  ],
+}
 
 const AUTO = {
   name:   ['שם', 'name', 'שם מלא', 'full name', 'שם פרטי'],
@@ -35,6 +59,7 @@ export default function ImportPage() {
   const [searchParams] = useSearchParams()
   const entity = searchParams.get('entity') || 'leads'
   const isLeads = entity === 'leads'
+  const isSystemEntity = Object.prototype.hasOwnProperty.call(SYSTEM_ENTITY_FIELDS, entity)
 
   const [step, setStep]       = useState(1)
   const [uploaded, setUp]     = useState(null)
@@ -55,7 +80,7 @@ export default function ImportPage() {
   const { data: recordTypes = [] } = useQuery({
     queryKey: ['record-types'],
     queryFn:  () => recordTypesApi.list().then(r => r.data.data),
-    enabled: !isLeads,
+    enabled: !isSystemEntity,
   })
   const recordType = recordTypes.find(t => t.slug === entity)
 
@@ -64,21 +89,22 @@ export default function ImportPage() {
     queryFn:  () => customFieldsApi.list(entity).then(r => r.data.data),
   })
 
-  // Leads: system fields are hardcoded (tuned labels/synonyms) + tenant's custom lead
-  // fields as extra targets. Record types: every field definition is a mapping target,
-  // since there's no separate hardcoded list — plus a synthetic "created_at" target.
+  // System entities (leads/contacts/clients): fields are hardcoded (tuned labels/synonyms)
+  // + tenant's custom fields for that entity as extra targets. Record types: every field
+  // definition is a mapping target, since there's no separate hardcoded list — plus a
+  // synthetic "created_at" target.
   const allFields = useMemo(() => {
-    if (isLeads) {
+    if (isSystemEntity) {
       const customFields = customFieldDefs.filter(f => !f.is_system && !f.hidden)
-      return [...FIELDS, ...customFields.map(f => ({ key: f.name, label: f.label }))]
+      return [...SYSTEM_ENTITY_FIELDS[entity], ...customFields.map(f => ({ key: f.name, label: f.label }))]
     }
     const fields = customFieldDefs.filter(f => !f.hidden).map(f => ({
       key: f.name, label: f.name === 'title' ? `${f.label} *` : f.label, required: f.name === 'title',
     }))
     return [...fields, { key: 'created_at', label: 'נוצר בתאריך (תאריך + שעה)' }]
-  }, [isLeads, customFieldDefs])
+  }, [isSystemEntity, entity, customFieldDefs])
 
-  const requiredKey = isLeads ? 'name' : 'title'
+  const requiredKey = isSystemEntity ? 'name' : 'title'
 
   const handleFile = async (e) => {
     const file = e.target.files[0]
@@ -159,7 +185,7 @@ export default function ImportPage() {
           ← חזור
         </button>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          ייבוא {isLeads ? 'לידים' : recordType?.label ?? 'רשומות'} מ-CSV
+          ייבוא {ENTITY_LABELS[entity] ?? recordType?.label ?? 'רשומות'} מ-CSV
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">העלה קובץ, מפה שדות, וייבא בקלות</p>
       </div>
@@ -205,13 +231,13 @@ export default function ImportPage() {
             ))}
           </div>
           <div className="flex gap-2 mt-5">
-            <button disabled={!mapping.name || distinctValues.isPending} onClick={handleMappingNext}
+            <button disabled={!mapping[requiredKey] || distinctValues.isPending} onClick={handleMappingNext}
               className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
               {distinctValues.isPending ? 'טוען...' : 'המשך'}
             </button>
             <button onClick={reset} className="text-gray-500 dark:text-gray-400 px-3 py-2 text-sm">התחל מחדש</button>
           </div>
-          {!mapping.name && <p className="text-xs text-red-500 mt-2">חובה למפות לפחות את שדה "שם"</p>}
+          {!mapping[requiredKey] && <p className="text-xs text-red-500 mt-2">חובה למפות לפחות את שדה "{requiredKey === 'name' ? 'שם' : 'כותרת'}"</p>}
         </div>
       )}
 

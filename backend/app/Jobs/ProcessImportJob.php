@@ -57,6 +57,26 @@ class ProcessImportJob implements ShouldQueue
                     $errors[] = ['row' => $i, 'error' => $e->getMessage()];
                 }
             }
+        } elseif ($job->entity === 'contacts') {
+            foreach ($csv->getRecords() as $i => $row) {
+                try {
+                    $res = $svc->importContactRow($row, $mapping);
+                    $res === 'imported' ? $imported++ : $skipped++;
+                } catch (\Throwable $e) {
+                    $skipped++;
+                    $errors[] = ['row' => $i, 'error' => $e->getMessage()];
+                }
+            }
+        } elseif ($job->entity === 'clients') {
+            foreach ($csv->getRecords() as $i => $row) {
+                try {
+                    $res = $svc->importClientRow($row, $mapping);
+                    $res === 'imported' ? $imported++ : $skipped++;
+                } catch (\Throwable $e) {
+                    $skipped++;
+                    $errors[] = ['row' => $i, 'error' => $e->getMessage()];
+                }
+            }
         } else {
             foreach ($csv->getRecords() as $i => $row) {
                 try {

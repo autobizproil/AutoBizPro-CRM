@@ -77,6 +77,25 @@ class ImportController extends Controller
                 'field_mapping'  => $mapping,
                 'status_mapping' => $request->input('status_mapping', []),
             ]);
+        } elseif (in_array($entity, ['contacts', 'clients'], true)) {
+            $request->validate(['field_mapping.name' => 'required|string']);
+
+            $systemFields = $entity === 'contacts'
+                ? ['name', 'phone', 'email', 'company', 'role', 'notes', 'created_at']
+                : ['name', 'phone', 'email', 'company', 'source', 'notes', 'created_at'];
+            $allowed = array_merge($systemFields, CustomFieldDefinition::where('tenant_id', app('current_tenant_id'))
+                ->where('entity', $entity)
+                ->where('is_system', false)
+                ->pluck('name')
+                ->all());
+            $mapping = array_intersect_key($request->input('field_mapping', []), array_flip($allowed));
+
+            $job->update([
+                'entity'         => $entity,
+                'status'         => 'pending',
+                'field_mapping'  => $mapping,
+                'status_mapping' => [],
+            ]);
         } else {
             $recordType = RecordType::where('tenant_id', app('current_tenant_id'))
                 ->where('slug', $entity)

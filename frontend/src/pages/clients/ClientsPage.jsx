@@ -18,6 +18,7 @@ function CopyEmailIcon({ email }) {
   )
 }
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { clientsApi } from '../../api/clients'
 import { useAuth } from '../../context/AuthContext'
 
@@ -27,6 +28,7 @@ const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:
 const LABEL = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
 
 export default function ClientsPage() {
+  const navigate = useNavigate()
   const { can } = useAuth()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
@@ -74,10 +76,16 @@ export default function ClientsPage() {
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{total} לקוחות פעילים</p>
         </div>
         {can('leads', 'can_create') && (
-          <button onClick={() => { setForm(EMPTY); setError(''); setModal(true) }}
-            className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm">
-            <span className="text-lg leading-none">+</span> לקוח חדש
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/import?entity=clients')}
+              className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-colors">
+              📥 ייבוא CSV
+            </button>
+            <button onClick={() => { setForm(EMPTY); setError(''); setModal(true) }}
+              className="bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm">
+              <span className="text-lg leading-none">+</span> לקוח חדש
+            </button>
+          </div>
         )}
       </div>
 

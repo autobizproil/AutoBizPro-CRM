@@ -1,5 +1,7 @@
 <?php
 namespace App\Services;
+use App\Models\Client;
+use App\Models\Contact;
 use App\Models\Lead;
 use App\Models\Record;
 use League\Csv\Reader;
@@ -82,6 +84,76 @@ class ImportService
         if ($createdAt) {
             $lead->created_at = $createdAt;
             $lead->saveQuietly(); // backdate only — must not re-fire the outgoing webhook
+        }
+        return 'imported';
+    }
+
+    private const CONTACT_RESERVED_FIELDS = ['name', 'phone', 'email', 'company', 'role', 'notes', 'created_at'];
+    private const CLIENT_RESERVED_FIELDS  = ['name', 'phone', 'email', 'company', 'source', 'notes', 'created_at'];
+
+    public function importContactRow(array $row, array $mapping): string
+    {
+        $data = [];
+        $customFields = [];
+        foreach ($mapping as $field => $csvCol) {
+            if (! $csvCol || ! isset($row[$csvCol])) continue;
+            $value = trim($row[$csvCol]);
+            if (in_array($field, self::CONTACT_RESERVED_FIELDS, true)) {
+                $data[$field] = $value;
+            } elseif ($value !== '') {
+                $customFields[$field] = $value;
+            }
+        }
+        if ($customFields) $data['custom_fields'] = $customFields;
+        if (empty($data['name'])) return 'skipped';
+
+        $createdAt = null;
+        if (! empty($data['created_at'])) {
+            $createdAt = self::parseDate($data['created_at']);
+            unset($data['created_at']);
+        }
+
+        $contact = Contact::create($data);
+        if ($createdAt) {
+            $contact->created_at = $createdAt;
+            $contact->saveQuietly(); // backdate only
+        }
+        return 'imported';
+    }
+
+    public function importClientRow(array $row, array $mapping): string
+    {
+        $data = [];
+        $customFields = [];
+        foreach ($mapping as $field => $csvCol) {
+            if (! $csvCol || ! isset($row[$csvCol])) continue;
+            $value = trim($row[$csvCol]);
+            if (in_array($field, self::CLIENT_RESERVED_FIELDS, true)) {
+                $data[$field] = $value;
+            } elseif ($value !== '') {
+                $customFields[$field] = $value;
+            }
+        }
+        if ($customFields) $data['custom_fields'] = $customFields;
+        if (empty($data['name'])) return 'skipped';
+
+        // Client::booted() normalizes phone_normalized on save, so this dedupe check
+        // only needs a raw normalize() to match what's already stored.
+        $normalized = PhoneNormalizer::normalize($data['phone'] ?? '');
+        if ($normalized && Client::where('phone_normalized', $normalized)->exists()) {
+            return 'skipped';
+        }
+
+        $createdAt = null;
+        if (! empty($data['created_at'])) {
+            $createdAt = self::parseDate($data['created_at']);
+            unset($data['created_at']);
+        }
+
+        $client = Client::create($data);
+        if ($createdAt) {
+            $client->created_at = $createdAt;
+            $client->saveQuietly(); // backdate only
         }
         return 'imported';
     }
