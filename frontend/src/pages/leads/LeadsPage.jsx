@@ -132,7 +132,22 @@ export default function LeadsPage() {
   const qc = useQueryClient()
   const reorderCols = useMutation({
     mutationFn: (ids) => customFieldsApi.reorder('leads', ids),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['custom-fields', 'leads'] }),
+    // Optimistic: reorder the cached field defs immediately so the columns
+    // visually move on drop instead of waiting for the round-trip.
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: ['custom-fields', 'leads'] })
+      const previous = qc.getQueryData(['custom-fields', 'leads'])
+      if (previous) {
+        const byId = new Map(previous.map(d => [d.id, d]))
+        const reordered = ids.map((id, i) => ({ ...byId.get(id), sort_order: i })).filter(Boolean)
+        qc.setQueryData(['custom-fields', 'leads'], reordered)
+      }
+      return { previous }
+    },
+    onError: (_err, _ids, ctx) => {
+      if (ctx?.previous) qc.setQueryData(['custom-fields', 'leads'], ctx.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['custom-fields', 'leads'] }),
   })
 
   // Reorders only the draggable (non-pinned, non-hidden) fields shown in the
