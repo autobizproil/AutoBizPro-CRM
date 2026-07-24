@@ -10,13 +10,11 @@ import { useAuth } from '../../context/AuthContext'
 const TRIGGER_LABELS = {
   lead_created:        'ליד חדש נוצר',
   lead_stage_changed:  'שלב ליד השתנה',
-  lead_status_changed: 'סטטוס ליד השתנה',
   form_submitted:      'טופס נשלח',
   contact_created:     'איש קשר חדש',
   client_created:      'לקוח חדש נוצר',
   call_received:       'שיחה נכנסת התקבלה',
   whatsapp_received:   'הודעת WhatsApp התקבלה',
-  scheduled:           'מתוזמן',
 }
 
 const ACTION_TYPES = [
@@ -31,12 +29,12 @@ const ACTION_TYPES = [
 ]
 
 const CONDITION_FIELDS = [
-  { value: 'name',    label: 'שם' },
-  { value: 'phone',   label: 'טלפון' },
-  { value: 'email',   label: 'אימייל' },
-  { value: 'source',  label: 'מקור' },
-  { value: 'status',  label: 'סטטוס' },
-  { value: 'notes',   label: 'הערות' },
+  { value: 'name',              label: 'שם' },
+  { value: 'phone',             label: 'טלפון' },
+  { value: 'email',             label: 'אימייל' },
+  { value: 'source',            label: 'מקור' },
+  { value: 'pipeline_stage_id', label: 'שלב בפייפליין' },
+  { value: 'notes',             label: 'הערות' },
 ]
 
 const CONDITION_OPERATORS = [
@@ -225,8 +223,16 @@ export default function AutomationsPage() {
                         {CONDITION_OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
                       </select>
                       {!['not_empty', 'empty'].includes(cond.operator) && (
-                        <input value={cond.value} onChange={e => setCond(i, { value: e.target.value })} placeholder="ערך..."
-                          className={INP_SM + ' flex-1 min-w-[80px]'} />
+                        cond.field === 'pipeline_stage_id' ? (
+                          <select value={cond.value} onChange={e => setCond(i, { value: Number(e.target.value) })}
+                            className={INP_SM + ' flex-1 min-w-[80px]'}>
+                            <option value="">בחר שלב</option>
+                            {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                        ) : (
+                          <input value={cond.value} onChange={e => setCond(i, { value: e.target.value })} placeholder="ערך..."
+                            className={INP_SM + ' flex-1 min-w-[80px]'} />
+                        )
                       )}
                       <button type="button" onClick={() => removeCond(i)} className="text-red-400 hover:text-red-600 text-lg leading-none px-1">×</button>
                     </div>
