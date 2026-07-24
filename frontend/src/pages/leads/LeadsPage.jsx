@@ -1,7 +1,7 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLeads, useCreateLead, useChangeLeadStage, useUpdateLead, useBulkLeadAction, useDeleteAllLeads } from '../../hooks/useLeads'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { pipelineApi } from '../../api/pipeline'
 import { customFieldsApi } from '../../api/customFields'
 import { useAuth } from '../../context/AuthContext'
@@ -127,7 +127,37 @@ export default function LeadsPage() {
   const [viewMode, setViewMode]   = useState('list') // 'list' | 'kanban'
   const [showCols, setShowCols]   = useState(false)
   const [visibleCols, setVisCols] = useState(loadCols)
+  const [colDragIdx, setColDragIdx] = useState(null)
   const colsRef = useRef(null)
+  const qc = useQueryClient()
+  const reorderCols = useMutation({
+    mutationFn: (ids) => customFieldsApi.reorder('leads', ids),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['custom-fields', 'leads'] }),
+  })
+
+  // Reorders only the draggable (non-pinned, non-hidden) fields shown in the
+  // columns dropdown, while leaving 'name' and backend-hidden fields exactly
+  // where they already are in the full per-tenant field order.
+  function handleColDrop(dropIdx) {
+    if (colDragIdx === null || colDragIdx === dropIdx) { setColDragIdx(null); return }
+    const draggableDefs = defs.filter(d => {
+      if (d.is_system) {
+        const key = SYSTEM_COL_KEY[d.name]
+        return key && key !== 'name' && !d.hidden
+      }
+      return !d.hidden
+    })
+    const reordered = draggableDefs.map(d => d.id)
+    const [moved] = reordered.splice(colDragIdx, 1)
+    reordered.splice(dropIdx, 0, moved)
+
+    const draggableIds = new Set(draggableDefs.map(d => d.id))
+    let cursor = 0
+    const fullIds = defs.map(d => draggableIds.has(d.id) ? reordered[cursor++] : d.id)
+
+    reorderCols.mutate(fullIds)
+    setColDragIdx(null)
+  }
   const [showFilter, setShowFilter] = useState(false)
   const [advFilter, setAdvFilter]   = useState({ dateFrom: '', dateTo: '', conditions: [] })
   const filterRef = useRef(null)
@@ -613,16 +643,29 @@ export default function LeadsPage() {
             </button>
             {showCols && (
               <div className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-20 p-3 w-52 max-h-72 overflow-y-auto">
-                {dynamicCols.filter(c => !c.always).map(c => (
-                  <label key={c.key} className="flex items-center gap-2 py-1.5 cursor-pointer hover:text-[#2398c2]">
-                    <input type="checkbox" checked={visibleCols[c.key] !== false}
-                      onChange={e => setVisCols(v => ({ ...v, [c.key]: e.target.checked }))}
-                      className="rounded border-gray-300 accent-[#2398c2]" />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {c.label}
-                      {c.cfName && <span className="text-xs text-gray-400 mr-1">*</span>}
-                    </span>
-                  </label>
+                {dynamicCols.filter(c => !c.always).map((c, idx) => (
+                  <div key={c.key}
+                    draggable={canEdit}
+                    onDragStart={() => setColDragIdx(idx)}
+                    onDragOver={e => { if (canEdit) e.preventDefault() }}
+                    onDrop={() => canEdit && handleColDrop(idx)}
+                    onDragEnd={() => setColDragIdx(null)}
+                    className={`flex items-center gap-2 py-1.5 rounded transition-opacity ${colDragIdx === idx ? 'opacity-30' : ''}`}>
+                    {canEdit && (
+                      <span className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#2398c2] select-none text-sm leading-none" title="גרור לשינוי סדר">
+                        ⠿
+                      </span>
+                    )}
+                    <label className="flex items-center gap-2 cursor-pointer hover:text-[#2398c2] flex-1 min-w-0">
+                      <input type="checkbox" checked={visibleCols[c.key] !== false}
+                        onChange={e => setVisCols(v => ({ ...v, [c.key]: e.target.checked }))}
+                        className="rounded border-gray-300 accent-[#2398c2] flex-shrink-0" />
+                      <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                        {c.label}
+                        {c.cfName && <span className="text-xs text-gray-400 mr-1">*</span>}
+                      </span>
+                    </label>
+                  </div>
                 ))}
               </div>
             )}
