@@ -418,7 +418,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ח.פ / ת.ז (אופציונלי)</label>
                   <input value={invTaxId} onChange={e => setInvTaxId(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="—" />
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="—" dir="ltr" />
                 </div>
               </div>
               <div>
@@ -429,9 +429,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                       <input value={it.description} onChange={setItem(i, 'description')} placeholder="תיאור"
                         className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
                       <input value={it.price} onChange={setItem(i, 'price')} type="number" step="0.01" placeholder="מחיר"
-                        className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+                        className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" dir="ltr" />
                       <input value={it.quantity} onChange={setItem(i, 'quantity')} type="number" placeholder="כמות"
-                        className="w-16 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+                        className="w-16 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" dir="ltr" />
                       {invItems.length > 1 && (
                         <button type="button" onClick={() => removeItem(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
                       )}
@@ -483,6 +483,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="הכנס סכום..."
                   required
+                  dir="ltr"
                 />
               </div>
               <div>
@@ -493,6 +494,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   onChange={e => setCardcomDesc(e.target.value)}
                   className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="תיאור העסקה..."
+                  dir="ltr"
                 />
               </div>
               <div className="flex gap-2 pt-1">
@@ -540,7 +542,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ח.פ / ת.ז (אופציונלי)</label>
                   <input value={yeshTaxId} onChange={e => setYeshTaxId(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="—" />
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" placeholder="—" dir="ltr" />
                 </div>
               </div>
               <div>
@@ -551,9 +553,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                       <input value={it.description} onChange={setYeshItem(i, 'description')} placeholder="תיאור"
                         className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
                       <input value={it.price} onChange={setYeshItem(i, 'price')} type="number" step="0.01" placeholder="מחיר"
-                        className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+                        className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" dir="ltr" />
                       <input value={it.quantity} onChange={setYeshItem(i, 'quantity')} type="number" placeholder="כמות"
-                        className="w-16 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+                        className="w-16 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" dir="ltr" />
                       {yeshItems.length > 1 && (
                         <button type="button" onClick={() => removeYeshItem(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
                       )}
@@ -657,7 +659,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">תאריך יעד</label>
                   <input type="datetime-local" value={taskDue} onChange={e => setTaskDue(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" />
+                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" dir="ltr" />
                 </div>
               </div>
               <div className="flex gap-2 pt-1">

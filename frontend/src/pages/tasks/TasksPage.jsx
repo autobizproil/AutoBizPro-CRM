@@ -188,7 +188,7 @@ export default function TasksPage() {
                 </div>
                 <div>
                   <label className={LABEL}>תאריך יעד</label>
-                  <input type="datetime-local" value={form.due_at} onChange={set('due_at')} className={INPUT} />
+                  <input type="datetime-local" value={form.due_at} onChange={set('due_at')} className={INPUT} dir="ltr" />
                 </div>
               </div>
               <div>

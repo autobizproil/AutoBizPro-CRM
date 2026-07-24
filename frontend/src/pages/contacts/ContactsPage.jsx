@@ -152,11 +152,11 @@ export default function ContactsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={LABEL}>טלפון</label>
-                  <input value={form.phone} onChange={set('phone')} type="tel" placeholder="05X-XXXXXXX" className={INPUT} />
+                  <input value={form.phone} onChange={set('phone')} type="tel" placeholder="05X-XXXXXXX" className={INPUT} dir="ltr" />
                 </div>
                 <div>
                   <label className={LABEL}>אימייל</label>
-                  <input value={form.email} onChange={set('email')} type="email" placeholder="email@..." className={INPUT} />
+                  <input value={form.email} onChange={set('email')} type="email" placeholder="email@..." className={INPUT} dir="ltr" />
                 </div>
               </div>
 
