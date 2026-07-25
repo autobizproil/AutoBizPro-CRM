@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { recordTypesApi, recordsApi } from '../../api/recordTypes'
 import { customFieldsApi } from '../../api/customFields'
 import { useAuth } from '../../context/AuthContext'
+import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
+import DeleteAllModal from '../../components/ui/DeleteAllModal'
 
 const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
 const LABEL = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
@@ -75,6 +77,9 @@ export default function RecordsPage() {
     mutationFn: (id) => recordsApi.destroy(type.id, id),
     onSuccess:  invalidate,
   })
+
+  const deleteAll = useDeleteAllEntity(slug, ['records', slug])
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false)
 
   const openCreate = () => { setEditing(null); setForm({}); setError(''); setModal(true) }
   const openEdit = (r) => { setEditing(r); setForm(r.data ?? {}); setError(''); setModal(true) }
@@ -191,6 +196,21 @@ export default function RecordsPage() {
           </tbody>
         </table>
       </div>
+
+      <div className="flex items-center justify-end mt-3">
+        {canDelete && total > 0 && (
+          <button onClick={() => setDeleteAllOpen(true)}
+            className="border border-red-200 text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm transition-colors">מחק הכל</button>
+        )}
+      </div>
+
+      <DeleteAllModal
+        open={deleteAllOpen}
+        onClose={() => setDeleteAllOpen(false)}
+        onConfirm={() => deleteAll.mutateAsync()}
+        entityLabel={type?.label ?? 'רשומות'}
+        total={total}
+      />
 
       {modal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={closeModal}>
