@@ -34,6 +34,17 @@ class TaskController extends Controller
                   ->where('related_id', $request->get('related_id'));
         }
 
+        if ($request->filled('date_from')) {
+            $query->where('created_at', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->where('created_at', '<=', $request->input('date_to'));
+        }
+        if ($request->filled('conditions')) {
+            $decoded = json_decode($request->input('conditions'), true);
+            \App\Services\ConditionFilter::apply($query, is_array($decoded) ? $decoded : [], ['title', 'priority', 'status', 'due_at', 'assigned_to', 'created_at']);
+        }
+
         // Sort: open first, then by due date ascending (nulls last)
         $tasks = $query
             ->orderByRaw("CASE WHEN status='open' THEN 0 ELSE 1 END")
