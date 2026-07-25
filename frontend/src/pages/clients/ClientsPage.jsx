@@ -21,6 +21,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { clientsApi } from '../../api/clients'
 import { useAuth } from '../../context/AuthContext'
+import { customFieldsApi } from '../../api/customFields'
+import FilterPanel from '../leads/FilterPanel'
 import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
 import DeleteAllModal from '../../components/ui/DeleteAllModal'
 
@@ -39,9 +41,38 @@ export default function ClientsPage() {
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
 
+  const [showFilter, setShowFilter] = useState(false)
+  const [advFilter, setAdvFilter]   = useState({ dateFrom: '', dateTo: '', conditions: [] })
+
+  const { data: cfData } = useQuery({
+    queryKey: ['custom-fields', 'clients'],
+    queryFn:  () => customFieldsApi.list('clients').then(r => r.data.data),
+    staleTime: 1000 * 60 * 5,
+  })
+  const FALLBACK_FILTER_FIELDS = [
+    { key: 'name', label: 'שם' },
+    { key: 'phone', label: 'טלפון' },
+    { key: 'email', label: 'דוא"ל' },
+    { key: 'company', label: 'חברה' },
+    { key: 'source', label: 'מקור' },
+    { key: 'assigned_to', label: 'נציג אחראי' },
+    { key: 'created_at', label: 'תאריך יצירה' },
+  ]
+  const FILTER_FIELDS = (cfData ?? []).length
+    ? cfData
+        .filter(f => !f.hidden)
+        .map(f => f.is_system ? { key: f.name, label: f.label } : { key: `cf_${f.name}`, label: f.label })
+    : FALLBACK_FILTER_FIELDS
+  const activeFilterCount = (advFilter.dateFrom || advFilter.dateTo ? 1 : 0) + advFilter.conditions.length
+
   const { data, isLoading } = useQuery({
-    queryKey: ['clients', search],
-    queryFn:  () => clientsApi.list({ search }).then(r => r.data.data),
+    queryKey: ['clients', search, advFilter],
+    queryFn:  () => clientsApi.list({
+      search,
+      date_from: advFilter.dateFrom || undefined,
+      date_to: advFilter.dateTo || undefined,
+      conditions: advFilter.conditions.length ? JSON.stringify(advFilter.conditions) : undefined,
+    }).then(r => r.data.data),
   })
 
   const clients = data?.data ?? []
@@ -94,9 +125,22 @@ export default function ClientsPage() {
         )}
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex items-center gap-2">
         <input type="text" placeholder="🔍  חיפוש לפי שם, טלפון, אימייל, חברה..."
-          value={search} onChange={e => setSearch(e.target.value)} className={INPUT} />
+          value={search} onChange={e => setSearch(e.target.value)} className={INPUT + ' flex-1'} />
+        <div className="relative">
+          <button onClick={() => setShowFilter(s => !s)}
+            className={`border rounded-lg px-3 py-2 text-sm flex items-center gap-1.5 transition-colors ${activeFilterCount > 0 ? 'border-[#2398c2] bg-[#2398c2]/10 text-[#2398c2]' : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300'}`}>
+            סינון ▾
+            {activeFilterCount > 0 && (
+              <span className="bg-[#2398c2] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{activeFilterCount}</span>
+            )}
+          </button>
+          {showFilter && (
+            <FilterPanel fields={FILTER_FIELDS} conditions={advFilter.conditions}
+              onApply={setAdvFilter} onClose={() => setShowFilter(false)} />
+          )}
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
