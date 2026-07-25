@@ -19,11 +19,20 @@ class ClientController extends Controller
                    ->orWhere('phone', 'like', "%$q%")
                    ->orWhere('email', 'like', "%$q%")
                    ->orWhere('company', 'like', "%$q%")
-            ))
-            ->latest()
-            ->paginate(25);
+            ));
 
-        return response()->json(['success' => true, 'data' => $query]);
+        if ($request->filled('date_from')) {
+            $query->where('created_at', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->where('created_at', '<=', $request->input('date_to'));
+        }
+        if ($request->filled('conditions')) {
+            $decoded = json_decode($request->input('conditions'), true);
+            \App\Services\ConditionFilter::apply($query, is_array($decoded) ? $decoded : [], ['name', 'phone', 'email', 'company', 'source', 'assigned_to', 'created_at'], 'custom_fields');
+        }
+
+        return response()->json(['success' => true, 'data' => $query->latest()->paginate(25)]);
     }
 
     public function store(Request $request): JsonResponse
