@@ -4,14 +4,13 @@ namespace App\Services;
 
 use App\Models\Lead;
 use App\Services\AutomationEngine;
+use App\Services\ConditionFilter;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
 
 class LeadService
 {
     // System fields a filter condition may target directly (not custom_fields JSON)
     private const FILTERABLE_FIELDS = ['name', 'phone', 'email', 'source', 'status', 'pipeline_stage_id', 'assigned_to', 'created_at'];
-    private const FILTER_OPERATORS  = ['equals', 'not_equals', 'contains', 'gt', 'gte', 'lt', 'lte', 'empty', 'not_empty'];
 
     public function list(array $filters, int $userId, string $role): LengthAwarePaginator
     {
@@ -70,37 +69,7 @@ class LeadService
      */
     private function applyConditions($query, array $conditions): void
     {
-        foreach ($conditions as $cond) {
-            $field    = $cond['field'] ?? null;
-            $operator = $cond['operator'] ?? null;
-            $value    = $cond['value'] ?? null;
-
-            if (! $field || ! in_array($operator, self::FILTER_OPERATORS, true)) {
-                continue;
-            }
-
-            $isCustom = str_starts_with((string) $field, 'cf_') && preg_match('/^cf_[a-z0-9_]+$/', $field);
-            if (! $isCustom && ! in_array($field, self::FILTERABLE_FIELDS, true)) {
-                continue;
-            }
-
-            $column = $isCustom
-                ? DB::raw("JSON_UNQUOTE(JSON_EXTRACT(custom_fields, '$.\"" . substr($field, 3) . "\"'))")
-                : $field;
-
-            match ($operator) {
-                'equals'     => $query->where($column, '=', $value),
-                'not_equals' => $query->where($column, '!=', $value),
-                'contains'   => $query->where($column, 'like', "%{$value}%"),
-                'gt'         => $query->where($column, '>', $value),
-                'gte'        => $query->where($column, '>=', $value),
-                'lt'         => $query->where($column, '<', $value),
-                'lte'        => $query->where($column, '<=', $value),
-                'empty'      => $query->where(fn ($q) => $q->whereNull($column)->orWhere($column, '=', '')),
-                'not_empty'  => $query->where(fn ($q) => $q->whereNotNull($column)->where($column, '!=', '')),
-                default      => null,
-            };
-        }
+        ConditionFilter::apply($query, $conditions, self::FILTERABLE_FIELDS, 'custom_fields');
     }
 
     public function create(array $data): Lead
