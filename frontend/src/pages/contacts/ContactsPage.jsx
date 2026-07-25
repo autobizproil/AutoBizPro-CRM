@@ -4,6 +4,9 @@ import { useContacts, useCreateContact, useDeleteContact } from '../../hooks/use
 import { useAuth } from '../../context/AuthContext'
 import { usePreferences } from '../../context/PreferencesContext'
 import { translations } from '../../i18n/translations'
+import { useQuery } from '@tanstack/react-query'
+import { customFieldsApi } from '../../api/customFields'
+import FilterPanel from '../leads/FilterPanel'
 import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
 import DeleteAllModal from '../../components/ui/DeleteAllModal'
 
@@ -32,8 +35,35 @@ export default function ContactsPage() {
   const [form, setForm]     = useState(EMPTY)
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
+  const [showFilter, setShowFilter] = useState(false)
+  const [advFilter, setAdvFilter]   = useState({ dateFrom: '', dateTo: '', conditions: [] })
 
-  const { data, isLoading } = useContacts({ search })
+  const { data: cfData } = useQuery({
+    queryKey: ['custom-fields', 'contacts'],
+    queryFn:  () => customFieldsApi.list('contacts').then(r => r.data.data),
+    staleTime: 1000 * 60 * 5,
+  })
+  const FALLBACK_FILTER_FIELDS = [
+    { key: 'name', label: 'שם' },
+    { key: 'phone', label: 'טלפון' },
+    { key: 'email', label: 'דוא"ל' },
+    { key: 'company', label: 'חברה' },
+    { key: 'role', label: 'תפקיד' },
+    { key: 'created_at', label: 'תאריך יצירה' },
+  ]
+  const FILTER_FIELDS = (cfData ?? []).length
+    ? cfData
+        .filter(f => !f.hidden)
+        .map(f => f.is_system ? { key: f.name, label: f.label } : { key: `cf_${f.name}`, label: f.label })
+    : FALLBACK_FILTER_FIELDS
+  const activeFilterCount = (advFilter.dateFrom || advFilter.dateTo ? 1 : 0) + advFilter.conditions.length
+
+  const { data, isLoading } = useContacts({
+    search,
+    date_from: advFilter.dateFrom || undefined,
+    date_to: advFilter.dateTo || undefined,
+    conditions: advFilter.conditions.length ? JSON.stringify(advFilter.conditions) : undefined,
+  })
   const createContact       = useCreateContact()
   const deleteContact       = useDeleteContact()
   const deleteAll           = useDeleteAllEntity('contacts', ['contacts'])
@@ -81,10 +111,23 @@ export default function ContactsPage() {
         )}
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex items-center gap-2">
         <input type="text" placeholder="🔍  חיפוש לפי שם, טלפון, אימייל..."
           value={search} onChange={e => setSearch(e.target.value)}
-          className={INPUT} />
+          className={INPUT + ' flex-1'} />
+        <div className="relative">
+          <button onClick={() => setShowFilter(s => !s)}
+            className={`border rounded-lg px-3 py-2 text-sm flex items-center gap-1.5 transition-colors ${activeFilterCount > 0 ? 'border-[#2398c2] bg-[#2398c2]/10 text-[#2398c2]' : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300'}`}>
+            סינון ▾
+            {activeFilterCount > 0 && (
+              <span className="bg-[#2398c2] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{activeFilterCount}</span>
+            )}
+          </button>
+          {showFilter && (
+            <FilterPanel fields={FILTER_FIELDS} conditions={advFilter.conditions}
+              onApply={setAdvFilter} onClose={() => setShowFilter(false)} />
+          )}
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
