@@ -4,6 +4,8 @@ import client from '../../api/client'
 import { tasksApi, PRIORITY_META } from '../../api/tasks'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
+import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
+import DeleteAllModal from '../../components/ui/DeleteAllModal'
 
 const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
 const LABEL = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
@@ -64,6 +66,14 @@ export default function TasksPage() {
     mutationFn: (id) => tasksApi.destroy(id),
     onSuccess:  () => { qc.invalidateQueries({ queryKey: ['tasks'] }); qc.invalidateQueries({ queryKey: ['task-counts'] }); toast.success('המשימה נמחקה') },
   })
+
+  const deleteAll = useDeleteAllEntity('tasks', ['tasks'])
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false)
+
+  const handleDeleteAllConfirm = async () => {
+    await deleteAll.mutateAsync()
+    qc.invalidateQueries({ queryKey: ['task-counts'] })
+  }
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
@@ -158,6 +168,21 @@ export default function TasksPage() {
           )
         })}
       </div>
+
+      <div className="flex items-center justify-end mt-3">
+        {can('leads', 'can_update') && tasks.length > 0 && (
+          <button onClick={() => setDeleteAllOpen(true)}
+            className="border border-red-200 text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm transition-colors">מחק הכל</button>
+        )}
+      </div>
+
+      <DeleteAllModal
+        open={deleteAllOpen}
+        onClose={() => setDeleteAllOpen(false)}
+        onConfirm={handleDeleteAllConfirm}
+        entityLabel="משימות"
+        total={tasks.length}
+      />
 
       {/* Create modal */}
       {modal && (
