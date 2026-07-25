@@ -23,6 +23,17 @@ class ContactController extends Controller
                 ->orWhere('company', 'like', "%$s%"));
         }
 
+        if ($request->filled('date_from')) {
+            $query->where('created_at', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->where('created_at', '<=', $request->input('date_to'));
+        }
+        if ($request->filled('conditions')) {
+            $decoded = json_decode($request->input('conditions'), true);
+            \App\Services\ConditionFilter::apply($query, is_array($decoded) ? $decoded : [], ['name', 'phone', 'email', 'company', 'role', 'created_at'], 'custom_fields');
+        }
+
         return response()->json(['success' => true, 'data' => $query->latest()->paginate(25)]);
     }
 
