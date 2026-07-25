@@ -21,6 +21,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { clientsApi } from '../../api/clients'
 import { useAuth } from '../../context/AuthContext'
+import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
+import DeleteAllModal from '../../components/ui/DeleteAllModal'
 
 const EMPTY = { name: '', phone: '', email: '', company: '', source: '', notes: '' }
 
@@ -49,6 +51,9 @@ export default function ClientsPage() {
     mutationFn: (id) => clientsApi.destroy(id),
     onSuccess:  () => qc.invalidateQueries({ queryKey: ['clients'] }),
   })
+
+  const deleteAll = useDeleteAllEntity('clients', ['clients'])
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false)
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
@@ -179,6 +184,21 @@ export default function ClientsPage() {
           </tbody>
         </table>
       </div>
+
+      <div className="flex items-center justify-end mt-3">
+        {can('leads', 'can_delete') && total > 0 && (
+          <button onClick={() => setDeleteAllOpen(true)}
+            className="border border-red-200 text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm transition-colors">מחק הכל</button>
+        )}
+      </div>
+
+      <DeleteAllModal
+        open={deleteAllOpen}
+        onClose={() => setDeleteAllOpen(false)}
+        onConfirm={() => deleteAll.mutateAsync()}
+        entityLabel="לקוחות"
+        total={total}
+      />
 
       {/* Add modal */}
       {modal && (
