@@ -4,6 +4,8 @@ import client from '../../api/client'
 import { tasksApi, PRIORITY_META } from '../../api/tasks'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
+import { customFieldsApi } from '../../api/customFields'
+import FilterPanel from '../leads/FilterPanel'
 import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
 import DeleteAllModal from '../../components/ui/DeleteAllModal'
 
@@ -40,10 +42,38 @@ export default function TasksPage() {
   const [form, setForm]     = useState(EMPTY)
   const [error, setError]   = useState('')
 
-  const params = filter === 'all' ? {} : filter === 'overdue' ? { overdue: true } : { status: filter }
+  const [showFilter, setShowFilter] = useState(false)
+  const [advFilter, setAdvFilter]   = useState({ dateFrom: '', dateTo: '', conditions: [] })
+
+  const { data: cfData } = useQuery({
+    queryKey: ['custom-fields', 'tasks'],
+    queryFn:  () => customFieldsApi.list('tasks').then(r => r.data.data),
+    staleTime: 1000 * 60 * 5,
+  })
+  const FALLBACK_FILTER_FIELDS = [
+    { key: 'title', label: 'כותרת' },
+    { key: 'priority', label: 'עדיפות' },
+    { key: 'status', label: 'סטטוס' },
+    { key: 'due_at', label: 'תאריך יעד' },
+    { key: 'assigned_to', label: 'אחראי' },
+    { key: 'created_at', label: 'תאריך יצירה' },
+  ]
+  const FILTER_FIELDS = (cfData ?? []).length
+    ? cfData
+        .filter(f => !f.hidden)
+        .map(f => f.is_system ? { key: f.name, label: f.label } : { key: `cf_${f.name}`, label: f.label })
+    : FALLBACK_FILTER_FIELDS
+  const activeFilterCount = (advFilter.dateFrom || advFilter.dateTo ? 1 : 0) + advFilter.conditions.length
+
+  const params = {
+    ...(filter === 'all' ? {} : filter === 'overdue' ? { overdue: true } : { status: filter }),
+    date_from: advFilter.dateFrom || undefined,
+    date_to: advFilter.dateTo || undefined,
+    conditions: advFilter.conditions.length ? JSON.stringify(advFilter.conditions) : undefined,
+  }
 
   const { data, isLoading } = useQuery({
-    queryKey: ['tasks', filter],
+    queryKey: ['tasks', filter, advFilter],
     queryFn:  () => tasksApi.list(params).then(r => r.data.data),
   })
   const { data: users = [] } = useQuery({
@@ -103,16 +133,31 @@ export default function TasksPage() {
         )}
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 mb-4 bg-gray-100 dark:bg-gray-700 rounded-xl p-1 w-fit">
-        {FILTERS.map(f => (
-          <button key={f.id} onClick={() => setFilter(f.id)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              filter === f.id ? 'bg-white dark:bg-gray-800 text-[#2398c2] shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-            }`}>
-            {f.label}
+      {/* Filter tabs + advanced filter */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded-xl p-1 w-fit">
+          {FILTERS.map(f => (
+            <button key={f.id} onClick={() => setFilter(f.id)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                filter === f.id ? 'bg-white dark:bg-gray-800 text-[#2398c2] shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+              }`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative">
+          <button onClick={() => setShowFilter(s => !s)}
+            className={`border rounded-lg px-3 py-2 text-sm flex items-center gap-1.5 transition-colors ${activeFilterCount > 0 ? 'border-[#2398c2] bg-[#2398c2]/10 text-[#2398c2]' : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300'}`}>
+            סינון ▾
+            {activeFilterCount > 0 && (
+              <span className="bg-[#2398c2] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{activeFilterCount}</span>
+            )}
           </button>
-        ))}
+          {showFilter && (
+            <FilterPanel fields={FILTER_FIELDS} conditions={advFilter.conditions}
+              onApply={setAdvFilter} onClose={() => setShowFilter(false)} />
+          )}
+        </div>
       </div>
 
       {/* List */}
