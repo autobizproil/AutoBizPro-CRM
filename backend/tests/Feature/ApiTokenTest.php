@@ -131,7 +131,7 @@ class ApiTokenTest extends TestCase
             ->assertStatus(403);
 
         $this->withHeaders($headers)
-            ->deleteJson('/api/leads/all/clear')
+            ->deleteJson('/api/entities/leads/all')
             ->assertStatus(403);
 
         $this->assertDatabaseHas('leads', ['id' => $lead->id]);

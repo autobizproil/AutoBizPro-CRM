@@ -1,6 +1,8 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useLeads, useCreateLead, useChangeLeadStage, useUpdateLead, useBulkLeadAction, useDeleteAllLeads } from '../../hooks/useLeads'
+import { useLeads, useCreateLead, useChangeLeadStage, useUpdateLead, useBulkLeadAction } from '../../hooks/useLeads'
+import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
+import DeleteAllModal from '../../components/ui/DeleteAllModal'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { pipelineApi } from '../../api/pipeline'
 import { customFieldsApi } from '../../api/customFields'
@@ -191,7 +193,8 @@ export default function LeadsPage() {
   const changeStage = useChangeLeadStage()
   const updateLead  = useUpdateLead()
   const bulkAction  = useBulkLeadAction()
-  const deleteAll   = useDeleteAllLeads()
+  const deleteAll   = useDeleteAllEntity('leads', ['leads'])
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false)
 
   const { data: stages = [] } = useQuery({
     queryKey: ['pipeline'],
@@ -265,12 +268,6 @@ export default function LeadsPage() {
           ? { key: f.name, label: f.label }
           : { key: `cf_${f.name}`, label: f.label })
     : FALLBACK_FILTER_FIELDS
-
-  const handleDeleteAll = async () => {
-    const ok = window.prompt(`פעולה בלתי הפיכה! ימחקו כל ${total} ה${t('leads')}.\nהקלד "מחק" לאישור:`)
-    if (ok !== 'מחק') return
-    await deleteAll.mutateAsync()
-  }
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
   const setCf = (name) => (e) => {
@@ -602,12 +599,6 @@ export default function LeadsPage() {
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{total} {t('leads')} במערכת</p>
           </div>
           <div className="flex items-center gap-2">
-            {can('leads', 'can_delete') && total > 0 && (
-              <button onClick={handleDeleteAll} disabled={deleteAll.isPending}
-                className="border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50 px-3 py-2 rounded-lg text-sm transition-colors">
-                מחק הכל
-              </button>
-            )}
             {can('leads', 'can_create') && (
               <button onClick={() => navigate('/import')}
                 className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-colors">
@@ -807,18 +798,40 @@ export default function LeadsPage() {
             </table>
           </div>
 
-          {/* Pagination */}
-          {lastPage > 1 && (
-            <div className="flex items-center justify-between mt-3 text-sm text-gray-500 dark:text-gray-400">
-              <span>עמוד {page} מתוך {lastPage} · סה"כ {total} {t('leads')}</span>
-              <div className="flex gap-2">
-                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-                  className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">הקודם</button>
-                <button onClick={() => setPage(p => Math.min(lastPage, p + 1))} disabled={page >= lastPage}
-                  className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">הבא</button>
-              </div>
-            </div>
-          )}
+          {/* Footer: pagination (when applicable) + Delete All */}
+          <div className="flex items-center justify-between mt-3 text-sm text-gray-500 dark:text-gray-400">
+            {lastPage > 1 ? (
+              <>
+                <span>עמוד {page} מתוך {lastPage} · סה"כ {total} {t('leads')}</span>
+                <div className="flex gap-2 items-center">
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+                    className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">הקודם</button>
+                  <button onClick={() => setPage(p => Math.min(lastPage, p + 1))} disabled={page >= lastPage}
+                    className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">הבא</button>
+                  {can('leads', 'can_delete') && total > 0 && (
+                    <button onClick={() => setDeleteAllOpen(true)}
+                      className="border border-red-200 text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm transition-colors">מחק הכל</button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <span />
+                {can('leads', 'can_delete') && total > 0 && (
+                  <button onClick={() => setDeleteAllOpen(true)}
+                    className="border border-red-200 text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm transition-colors">מחק הכל</button>
+                )}
+              </>
+            )}
+          </div>
+
+          <DeleteAllModal
+            open={deleteAllOpen}
+            onClose={() => setDeleteAllOpen(false)}
+            onConfirm={() => deleteAll.mutateAsync()}
+            entityLabel={t('leads')}
+            total={total}
+          />
         </div>
         </>
         )}
