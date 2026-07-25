@@ -10,5 +10,4 @@ export const leadsApi = {
   getActivities: (id)     => client.get(`/leads/${id}/activities`),
   addActivity:   (id, data) => client.post(`/leads/${id}/activities`, data),
   bulk:          (action, ids, value) => client.post('/leads/bulk', { action, ids, value }),
-  deleteAll:     () => client.delete('/leads/all/clear'),
 }
