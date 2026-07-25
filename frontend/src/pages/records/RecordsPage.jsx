@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { recordTypesApi, recordsApi } from '../../api/recordTypes'
 import { customFieldsApi } from '../../api/customFields'
 import { useAuth } from '../../context/AuthContext'
+import FilterPanel from '../leads/FilterPanel'
 import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
 import DeleteAllModal from '../../components/ui/DeleteAllModal'
 
@@ -38,6 +39,8 @@ export default function RecordsPage() {
   const [editing, setEditing] = useState(null) // record being edited, or null for create
   const [form, setForm]     = useState({})
   const [error, setError]   = useState('')
+  const [showFilter, setShowFilter] = useState(false)
+  const [advFilter, setAdvFilter]   = useState({ dateFrom: '', dateTo: '', conditions: [] })
 
   const { data: types = [] } = useQuery({
     queryKey: ['record-types'],
@@ -51,10 +54,17 @@ export default function RecordsPage() {
     enabled: !!slug,
   })
   const visibleFields = fields.filter(f => !f.hidden).sort((a, b) => a.sort_order - b.sort_order)
+  const FILTER_FIELDS = fields.filter(f => !f.hidden).map(f => ({ key: f.name, label: f.label }))
+  const activeFilterCount = (advFilter.dateFrom || advFilter.dateTo ? 1 : 0) + advFilter.conditions.length
 
   const { data, isLoading } = useQuery({
-    queryKey: ['records', slug, search],
-    queryFn:  () => recordsApi.list(type.id, { search }).then(r => r.data.data),
+    queryKey: ['records', slug, search, advFilter],
+    queryFn:  () => recordsApi.list(type.id, {
+      search,
+      date_from: advFilter.dateFrom || undefined,
+      date_to: advFilter.dateTo || undefined,
+      conditions: advFilter.conditions.length ? JSON.stringify(advFilter.conditions) : undefined,
+    }).then(r => r.data.data),
     enabled: !!type,
   })
 
@@ -138,10 +148,23 @@ export default function RecordsPage() {
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex items-center gap-2">
         <input type="text" placeholder="🔍  חיפוש..."
           value={search} onChange={e => setSearch(e.target.value)}
           className={INPUT + ' max-w-[320px]'} />
+        <div className="relative">
+          <button onClick={() => setShowFilter(s => !s)}
+            className={`border rounded-lg px-3 py-2 text-sm flex items-center gap-1.5 transition-colors ${activeFilterCount > 0 ? 'border-[#2398c2] bg-[#2398c2]/10 text-[#2398c2]' : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300'}`}>
+            סינון ▾
+            {activeFilterCount > 0 && (
+              <span className="bg-[#2398c2] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{activeFilterCount}</span>
+            )}
+          </button>
+          {showFilter && (
+            <FilterPanel fields={FILTER_FIELDS} conditions={advFilter.conditions}
+              onApply={setAdvFilter} onClose={() => setShowFilter(false)} />
+          )}
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-auto">
