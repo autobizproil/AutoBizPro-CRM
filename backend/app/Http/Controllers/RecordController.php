@@ -28,6 +28,16 @@ class RecordController extends Controller
         if ($search = $request->query('search')) {
             $query->where('data', 'like', "%{$search}%");
         }
+        if ($request->filled('date_from')) {
+            $query->where('created_at', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->where('created_at', '<=', $request->input('date_to'));
+        }
+        if ($request->filled('conditions')) {
+            $decoded = json_decode($request->input('conditions'), true);
+            \App\Services\ConditionFilter::apply($query, is_array($decoded) ? $decoded : [], [], 'data', true);
+        }
 
         $records = $query->orderByDesc('id')->paginate(25);
 
