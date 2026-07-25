@@ -4,6 +4,8 @@ import { useContacts, useCreateContact, useDeleteContact } from '../../hooks/use
 import { useAuth } from '../../context/AuthContext'
 import { usePreferences } from '../../context/PreferencesContext'
 import { translations } from '../../i18n/translations'
+import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
+import DeleteAllModal from '../../components/ui/DeleteAllModal'
 
 function CopyEmailBtn({ email, className = '' }) {
   const [copied, setCopied] = useState(false)
@@ -34,6 +36,8 @@ export default function ContactsPage() {
   const { data, isLoading } = useContacts({ search })
   const createContact       = useCreateContact()
   const deleteContact       = useDeleteContact()
+  const deleteAll           = useDeleteAllEntity('contacts', ['contacts'])
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false)
 
   const contacts = data?.data ?? []
   const total    = data?.total ?? 0
@@ -143,6 +147,21 @@ export default function ContactsPage() {
           </tbody>
         </table>
       </div>
+
+      <div className="flex items-center justify-end mt-3">
+        {can('contacts', 'can_delete') && total > 0 && (
+          <button onClick={() => setDeleteAllOpen(true)}
+            className="border border-red-200 text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm transition-colors">מחק הכל</button>
+        )}
+      </div>
+
+      <DeleteAllModal
+        open={deleteAllOpen}
+        onClose={() => setDeleteAllOpen(false)}
+        onConfirm={() => deleteAll.mutateAsync()}
+        entityLabel={tr('contacts')}
+        total={total}
+      />
 
       {modal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setModal(false)}>
