@@ -26,4 +26,16 @@ describe('isViewDirty', () => {
     const current = { search: 'abc', dateFrom: '', dateTo: '', conditions: [] }
     expect(isViewDirty(baseView, current)).toBe(true)
   })
+
+  it('is not dirty when visible_columns has the same keys in a different order', () => {
+    const view = {
+      ...baseView,
+      visible_columns: { name: true, phone: true, email: false },
+    }
+    const current = {
+      search: 'abc', dateFrom: '', dateTo: '', conditions: baseView.conditions,
+      visibleColumns: { email: false, name: true, phone: true },
+    }
+    expect(isViewDirty(view, current)).toBe(false)
+  })
 })

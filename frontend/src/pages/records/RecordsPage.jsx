@@ -166,7 +166,7 @@ export default function RecordsPage() {
               onApply={setAdvFilter} onClose={() => setShowFilter(false)} />
           )}
         </div>
-        <SavedViewsBar entityType="records" entityKey={slug}
+        <SavedViewsBar key={slug} entityType="records" entityKey={slug}
           currentState={{ search, dateFrom: advFilter.dateFrom, dateTo: advFilter.dateTo, conditions: advFilter.conditions }}
           onApply={(patch) => {
             setSearch(patch.search)
