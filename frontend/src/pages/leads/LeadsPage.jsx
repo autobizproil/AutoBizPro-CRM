@@ -11,6 +11,7 @@ import { useLabels } from '../../context/LabelsContext'
 import LeadPanel from './LeadPanel'
 import FilterPanel from './FilterPanel'
 import KanbanBoard from '../pipeline/KanbanBoard'
+import SavedViewsBar from '../../components/ui/SavedViewsBar'
 
 const SOURCES = ['', 'אתר', 'פייסבוק', 'גוגל', 'המלצה', 'אחר']
 
@@ -68,11 +69,6 @@ const cfSortField = (name) => name.startsWith('cf_') ? name : `cf_${name}`
 
 const DEFAULT_VISIBLE = { name: true, phone: true, email: true, stage: true, source: true, assigned_to: true, created_at: true }
 
-const SAVED_VIEWS = [
-  { id: 'all',      label: 'כל הלידים', filter: {} },
-  { id: 'no_agent', label: 'ללא נציג',  filter: { no_agent: true } },
-]
-
 const COLS_VERSION = 'v4' // v4: keys now derive from field definitions
 function loadCols() {
   try {
@@ -125,7 +121,6 @@ export default function LeadsPage() {
   const [saving, setSaving]       = useState(false)
   const [selected, setSelected]   = useState(new Set())
   const [panelId, setPanelId]     = useState(null)
-  const [activeView, setView]     = useState('all')
   const [viewMode, setViewMode]   = useState('list') // 'list' | 'kanban'
   const [showCols, setShowCols]   = useState(false)
   const [visibleCols, setVisCols] = useState(loadCols)
@@ -179,7 +174,6 @@ export default function LeadsPage() {
   const [advFilter, setAdvFilter]   = useState({ dateFrom: '', dateTo: '', conditions: [] })
   const filterRef = useRef(null)
 
-  const viewFilter = SAVED_VIEWS.find(v => v.id === activeView)?.filter ?? {}
   const activeFilterCount = (advFilter.dateFrom || advFilter.dateTo ? 1 : 0) + advFilter.conditions.length
 
   const { data, isLoading } = useLeads({
@@ -232,12 +226,7 @@ export default function LeadsPage() {
     return cols.length ? cols : FALLBACK_COLS
   }, [cfData, defs])
 
-  const allLeads = data?.data ?? []
-  const leads = allLeads.filter(l => {
-    if (viewFilter.status && l.status !== viewFilter.status) return false
-    if (viewFilter.no_agent && l.assigned_to != null) return false
-    return true
-  })
+  const leads = data?.data ?? []
   const total = data?.total ?? 0
   const lastPage = data?.last_page ?? 1
   const canEdit = can('leads', 'can_update')
@@ -247,7 +236,7 @@ export default function LeadsPage() {
     localStorage.setItem('crm_leads_cols', JSON.stringify(visibleCols))
   }, [visibleCols])
 
-  useEffect(() => { setPage(1) }, [search, stageFilter, activeView, advFilter])
+  useEffect(() => { setPage(1) }, [search, stageFilter, advFilter])
 
   useEffect(() => {
     const handler = (e) => {
@@ -579,14 +568,13 @@ export default function LeadsPage() {
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
           <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">תצוגות</span>
         </div>
-        <nav className="py-1">
-          {SAVED_VIEWS.map(v => (
-            <button key={v.id} onClick={() => setView(v.id)}
-              className={`w-full text-right px-4 py-2 text-sm transition-colors ${activeView === v.id ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
-              {v.label}
-            </button>
-          ))}
-        </nav>
+        <SavedViewsBar layout="sidebar" entityType="leads"
+          currentState={{ search, dateFrom: advFilter.dateFrom, dateTo: advFilter.dateTo, conditions: advFilter.conditions, visibleColumns: visibleCols }}
+          onApply={(patch) => {
+            setSearch(patch.search)
+            setAdvFilter({ dateFrom: patch.dateFrom, dateTo: patch.dateTo, conditions: patch.conditions })
+            if (patch.visibleColumns) setVisCols(patch.visibleColumns)
+          }} />
       </aside>
 
       {/* Main area */}
@@ -746,7 +734,7 @@ export default function LeadsPage() {
                 {!isLoading && leads.length === 0 && (
                   <tr><td colSpan={dynamicCols.length + 2} className="px-4 py-12 text-center text-gray-400">
                     <div className="text-3xl mb-2">👥</div>
-                    <div>אין {t('leads')} {activeView !== 'all' ? 'בתצוגה זו' : 'עדיין'}</div>
+                    <div>אין {t('leads')} {(search || advFilter.dateFrom || advFilter.dateTo || advFilter.conditions.length) ? 'בסינון זה' : 'עדיין'}</div>
                   </td></tr>
                 )}
                 {leads.map(lead => (
