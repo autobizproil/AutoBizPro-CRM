@@ -104,7 +104,8 @@ export default function FilterPanel({ fields, conditions, onApply, onClose }) {
               {needsValue(row.operator) && (
                 <input type="text" value={row.value} onChange={e => updateRow(i, { value: e.target.value })}
                   placeholder="ערך..."
-                  className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+                  className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  dir="auto" />
               )}
               <button type="button" onClick={() => removeRow(i)} disabled={rows.length === 1}
                 className="text-gray-300 hover:text-red-500 disabled:opacity-30 disabled:cursor-default flex-shrink-0 px-1">×</button>
