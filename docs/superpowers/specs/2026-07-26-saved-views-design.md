@@ -19,9 +19,16 @@ A saved view captures three things together, as one unit:
   `FilterPanel.jsx` already emits and `ConditionFilter::apply` already
   consumes)
 - The free-text search box value
-- Column order/visibility (same shape as the existing
-  `localStorage.setItem('crm_leads_cols', ...)` pattern in
-  `LeadsPage.jsx:247` — an ordered array of visible column keys)
+- Column visibility — **correction after re-checking the code**:
+  `crm_leads_cols` (`LeadsPage.jsx:247`) is a visibility dict
+  (`{colKey: boolean}`, `visibleCols` state), not a reorderable array —
+  column *order* comes from `CustomFieldDefinition.sort_order`, a
+  tenant-wide Settings setting, not something a saved view controls. No
+  other page (Contacts/Clients/Tasks/Records) has any column
+  show/hide feature at all today. So: `visible_columns` is a nullable JSON
+  dict, meaningful only for Leads right now; the other four entities' saved
+  views simply never populate it (`SavedViewsBar` still works for them,
+  just without a columns component to capture).
 
 Personal only — views belong to the user who created them, not shared
 tenant-wide. Applies to all five entities: Leads, Contacts, Clients, Tasks,
@@ -43,7 +50,7 @@ New migration in `SCHEMA_DB/`, table `saved_views`:
 | `date_from` | date, nullable | |
 | `date_to` | date, nullable | |
 | `conditions` | json, nullable | `[{field, operator, value}, ...]` |
-| `column_order` | json, nullable | `[colKey, ...]` |
+| `visible_columns` | json, nullable | `{colKey: boolean}`, Leads-only for now (see Scope) |
 | `is_default` | boolean, default false | at most one true per `(tenant_id, user_id, entity_type, entity_key)` |
 | timestamps | | |
 
@@ -61,21 +68,26 @@ auth/tenant-scoped middleware group as the existing entity controllers:
 
 ```
 GET    /api/saved-views?entity_type=leads&entity_key=
-POST   /api/saved-views              {entity_type, entity_key?, name, search, date_from, date_to, conditions, column_order}
+POST   /api/saved-views              {entity_type, entity_key?, name, search, date_from, date_to, conditions, visible_columns}
 PUT    /api/saved-views/{id}         same body, used both for rename and "update view" (overwrite with current page state)
 DELETE /api/saved-views/{id}
 POST   /api/saved-views/{id}/set-default
 ```
 
-- Ownership check on update/delete/set-default: `abort_unless($view->user_id
-  === auth()->id())`. No admin override — personal feature.
+- Ownership check on update/delete/set-default:
+  `abort_unless($view->user_id === $request->user()->id, 403)` — same
+  `$request->user()` pattern already used throughout (e.g.
+  `TaskController::store/update`), not `auth()->id()`. No admin override —
+  personal feature.
+- Also scoped to tenant like every other resource:
+  `abort_unless($view->tenant_id === app('current_tenant_id'), 403)`.
 - `entity_type` validated against the fixed whitelist above.
 - `entity_key` required only when `entity_type = records`, and must resolve
   to a record type the current tenant actually owns.
 - `conditions` validated with the same field/operator/value shape the
   existing per-entity filter request validation already uses.
-- List endpoint scopes to `user_id = auth()->id()` — a user only ever sees
-  their own views.
+- List endpoint scopes to `user_id = $request->user()->id` — a user only
+  ever sees their own views.
 - **No changes to the five existing list endpoints**
   (`LeadController::index`, `ContactController::index`, etc.). Saved views
   only supply values for their existing `date_from`/`date_to`/`conditions`/
@@ -97,8 +109,9 @@ POST   /api/saved-views/{id}/set-default
     button (overwrites the stored view with current state), and a kebab menu
     for rename/delete/set-default.
   - Props: `entityType`, `entityKey` (records slug, else undefined),
-    `currentState={search, dateFrom, dateTo, conditions, columnOrder}`,
-    `onApply(view)`.
+    `currentState={search, dateFrom, dateTo, conditions, visibleColumns}`
+    (`visibleColumns` only ever populated on Leads today; other four pages
+    pass `undefined`), `onApply(view)`.
 - `frontend/src/lib/useSavedViews.js` — hook: fetches views for
   `(entityType, entityKey)`, tracks `activeViewId`, computes the dirty flag by
   comparing `currentState` to the active view's stored values, exposes
@@ -133,7 +146,7 @@ loaded.
 - Two tabs calling set-default concurrently: last write wins inside the
   transaction; DB never ends up with two `is_default = true` rows for the
   same scope.
-- `conditions`/`column_order` referencing a field removed from
+- `conditions`/`visible_columns` referencing a field removed from
   `CustomFieldDefinition` since the view was saved: `FilterPanel`/
   `ConditionFilter` already no-op on unknown fields today — same tolerance
   applies unchanged when the values come from a saved view instead of live
