@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { customFieldsApi } from '../../api/customFields'
 import FilterPanel from '../leads/FilterPanel'
+import SavedViewsBar from '../../components/ui/SavedViewsBar'
 import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
 import DeleteAllModal from '../../components/ui/DeleteAllModal'
 
@@ -158,6 +159,11 @@ export default function TasksPage() {
               onApply={setAdvFilter} onClose={() => setShowFilter(false)} />
           )}
         </div>
+        <SavedViewsBar entityType="tasks"
+          currentState={{ dateFrom: advFilter.dateFrom, dateTo: advFilter.dateTo, conditions: advFilter.conditions }}
+          onApply={(patch) => {
+            setAdvFilter({ dateFrom: patch.dateFrom, dateTo: patch.dateTo, conditions: patch.conditions })
+          }} />
       </div>
 
       {/* List */}

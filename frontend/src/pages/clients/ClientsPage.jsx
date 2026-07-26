@@ -25,6 +25,7 @@ import { customFieldsApi } from '../../api/customFields'
 import FilterPanel from '../leads/FilterPanel'
 import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
 import DeleteAllModal from '../../components/ui/DeleteAllModal'
+import SavedViewsBar from '../../components/ui/SavedViewsBar'
 
 const EMPTY = { name: '', phone: '', email: '', company: '', source: '', notes: '' }
 
@@ -141,6 +142,12 @@ export default function ClientsPage() {
               onApply={setAdvFilter} onClose={() => setShowFilter(false)} />
           )}
         </div>
+        <SavedViewsBar entityType="clients"
+          currentState={{ search, dateFrom: advFilter.dateFrom, dateTo: advFilter.dateTo, conditions: advFilter.conditions }}
+          onApply={(patch) => {
+            setSearch(patch.search)
+            setAdvFilter({ dateFrom: patch.dateFrom, dateTo: patch.dateTo, conditions: patch.conditions })
+          }} />
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">

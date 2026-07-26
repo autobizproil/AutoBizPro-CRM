@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext'
 import FilterPanel from '../leads/FilterPanel'
 import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
 import DeleteAllModal from '../../components/ui/DeleteAllModal'
+import SavedViewsBar from '../../components/ui/SavedViewsBar'
 
 const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
 const LABEL = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
@@ -165,6 +166,12 @@ export default function RecordsPage() {
               onApply={setAdvFilter} onClose={() => setShowFilter(false)} />
           )}
         </div>
+        <SavedViewsBar key={slug} entityType="records" entityKey={slug}
+          currentState={{ search, dateFrom: advFilter.dateFrom, dateTo: advFilter.dateTo, conditions: advFilter.conditions }}
+          onApply={(patch) => {
+            setSearch(patch.search)
+            setAdvFilter({ dateFrom: patch.dateFrom, dateTo: patch.dateTo, conditions: patch.conditions })
+          }} />
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-auto">

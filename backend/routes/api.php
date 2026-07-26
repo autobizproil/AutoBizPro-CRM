@@ -16,6 +16,7 @@ use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\RecordTypeController;
 use App\Http\Controllers\RecordController;
 use App\Http\Controllers\BulkDeleteController;
+use App\Http\Controllers\SavedViewController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -221,6 +222,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'agent.ability'])->group(function (
     Route::post('/tasks',                [TaskController::class, 'store'])  ->middleware('permission:leads,can_create');
     Route::put('/tasks/{task}',          [TaskController::class, 'update']) ->middleware('permission:leads,can_update');
     Route::delete('/tasks/{task}',       [TaskController::class, 'destroy'])->middleware('permission:leads,can_update');
+
+    // Saved views — personal, per-user (not tenant-shared)
+    Route::get('/saved-views',                          [SavedViewController::class, 'index']);
+    Route::post('/saved-views',                         [SavedViewController::class, 'store']);
+    Route::put('/saved-views/{savedView}',              [SavedViewController::class, 'update']);
+    Route::delete('/saved-views/{savedView}',           [SavedViewController::class, 'destroy']);
+    Route::post('/saved-views/{savedView}/set-default', [SavedViewController::class, 'setDefault']);
 
     // Custom field definitions
     Route::get('/custom-fields',                              [CustomFieldController::class, 'index'])
