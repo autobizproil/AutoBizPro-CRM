@@ -177,6 +177,8 @@ export default function TasksPage() {
             <div key={task.id}
               className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 shadow-sm flex items-start gap-3 group">
               <button onClick={() => toggle.mutate({ id: task.id, status: done ? 'open' : 'done' })}
+                // Force LTR on the button to ensure the checkmark icon and visual state transition is consistent regardless of page direction
+                dir="ltr"
                 className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                   done ? 'bg-[#2398c2] border-[#2398c2] text-white' : 'border-gray-300 dark:border-gray-500 hover:border-[#2398c2]'
                 }`}>

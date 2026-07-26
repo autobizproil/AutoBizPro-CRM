@@ -97,7 +97,7 @@ export default function Layout() {
               >
                 {tr(labelKey)}
                 {count > 0 && (
-                  <span className="absolute -top-1 -left-1 bg-[#2398c2] text-white text-[10px] font-bold rounded-full min-w-[16px] h-[16px] px-1 flex items-center justify-center">
+                  <span className={`absolute -top-1 ${lang === 'he' ? '-right-1' : '-left-1'} bg-[#2398c2] text-white text-[10px] font-bold rounded-full min-w-[16px] h-[16px] px-1 flex items-center justify-center`}>
                     {count > 99 ? '99+' : count}
                   </span>
                 )}

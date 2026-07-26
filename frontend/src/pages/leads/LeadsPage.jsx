@@ -450,7 +450,7 @@ export default function LeadsPage() {
               }
             </div>
             {isEditing(lead, 'name')
-              ? editInput(lead, 'name')
+              ? editInput(lead, 'name', { dir: 'auto' })
               : <>
                   <span className="font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">{lead.name}</span>
                   {pencilBtn(lead, 'name')}
@@ -855,7 +855,7 @@ export default function LeadsPage() {
                   {nameDef?.label ?? 'שם'} <span className="text-red-400">*</span>
                 </label>
                 <input required value={form.name} onChange={set('name')} placeholder={`שם ה${t('lead')}`}
-                  className={MODAL_INPUT} />
+                  className={MODAL_INPUT} dir="auto" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {modalDefs.map(f => (

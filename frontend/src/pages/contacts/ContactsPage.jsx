@@ -16,7 +16,7 @@ function CopyEmailBtn({ email, className = '' }) {
     <button type="button" title={copied ? 'הועתק!' : email}
       onClick={() => navigator.clipboard.writeText(email).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) })}
       className={`hover:text-[#2398c2] transition-colors ${className}`}>
-      {copied ? '✓' : email}
+      {copied ? '✓' : <span dir="ltr">{email}</span>}
     </button>
   )
 }

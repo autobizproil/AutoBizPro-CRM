@@ -259,8 +259,8 @@ export default function ClientsPage() {
                 <input required value={form.name} onChange={set('name')} placeholder="שם מלא" className={INPUT} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={LABEL}>טלפון</label><input value={form.phone} onChange={set('phone')} type="tel" className={INPUT} /></div>
-                <div><label className={LABEL}>אימייל</label><input value={form.email} onChange={set('email')} type="email" className={INPUT} /></div>
+                <div><label className={LABEL}>טלפון</label><input value={form.phone} onChange={set('phone')} type="tel" className={INPUT} dir="ltr" /></div>
+                <div><label className={LABEL}>אימייל</label><input value={form.email} onChange={set('email')} type="email" className={INPUT} dir="ltr" /></div>
               </div>
               <div>
                 <label className={LABEL}>חברה</label>
