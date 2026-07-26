@@ -7,6 +7,8 @@ import { translations } from '../../i18n/translations'
 import { tasksApi } from '../../api/tasks'
 import { settingsApi } from '../../api/settings'
 import { recordTypesApi } from '../../api/recordTypes'
+import { computeNavLayout, saveNavLayout } from '../../lib/navLayout'
+import NavEditModal from './NavEditModal'
 
 // Top-level, always visible — keep this to ~5 so the bar never overflows.
 const PRIMARY_NAV = [
@@ -62,7 +64,12 @@ export default function Layout() {
     queryFn:  () => recordTypesApi.list().then(r => r.data.data),
     staleTime: 1000 * 60 * 5,
   })
-  const customNav = recordTypes.map(rt => ({ to: `/records/${rt.slug}`, label: rt.label, icon: rt.icon }))
+  const customNav = recordTypes.map(rt => ({ key: rt.slug, to: `/records/${rt.slug}`, label: rt.label, icon: rt.icon }))
+  const PRIMARY_NAV_KEYED = PRIMARY_NAV.map(item => ({ ...item, key: item.to }))
+  const MORE_NAV_KEYED = MORE_NAV.map(item => ({ ...item, key: item.to }))
+  const [navLayoutVersion, setNavLayoutVersion] = useState(0)
+  const { pinned: navPinned, more: navMore } = computeNavLayout(PRIMARY_NAV_KEYED, MORE_NAV_KEYED, customNav)
+  const [showNavEdit, setShowNavEdit] = useState(false)
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900" dir={lang === 'he' ? 'rtl' : 'ltr'}>
@@ -80,7 +87,7 @@ export default function Layout() {
 
         {/* Nav items — centered */}
         <nav className="flex items-center gap-0.5 flex-1 justify-center">
-          {PRIMARY_NAV.map(({ to, labelKey, badge }) => {
+          {navPinned.map(({ to, labelKey, label, badge, icon }) => {
             const count = badge ? badges[badge] : 0
             return (
               <NavLink
@@ -95,7 +102,7 @@ export default function Layout() {
                 }
                 style={{ fontSize: '13px' }}
               >
-                {tr(labelKey)}
+                {labelKey ? tr(labelKey) : <>{icon && <span className="ml-1">{icon}</span>}{label}</>}
                 {count > 0 && (
                   <span className="absolute -top-1 -left-1 bg-[#2398c2] text-white text-[10px] font-bold rounded-full min-w-[16px] h-[16px] px-1 flex items-center justify-center">
                     {count > 99 ? '99+' : count}
@@ -120,42 +127,28 @@ export default function Layout() {
             </button>
             {showMore && (
               <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-40 py-1.5 w-48 max-h-[70vh] overflow-y-auto" dir="rtl">
-                {MORE_NAV.map(({ to, labelKey }) => (
+                {navMore.map(({ to, labelKey, label, icon }) => (
                   <NavLink
                     key={to}
                     to={to}
                     className={({ isActive }) =>
-                      `block px-4 py-2 text-sm transition-colors ${
+                      `block px-4 py-2 text-sm transition-colors truncate ${
                         isActive
                           ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium'
                           : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`
                     }
                   >
-                    {tr(labelKey)}
+                    {labelKey ? tr(labelKey) : <>{icon && <span className="ml-1">{icon}</span>}{label}</>}
                   </NavLink>
                 ))}
-                {customNav.length > 0 && (
-                  <>
-                    <div className="my-1.5 border-t border-gray-100 dark:border-gray-700" />
-                    <div className="px-4 py-1 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">רשומות מותאמות</div>
-                    {customNav.map(({ to, label, icon }) => (
-                      <NavLink
-                        key={to}
-                        to={to}
-                        className={({ isActive }) =>
-                          `block px-4 py-2 text-sm transition-colors truncate ${
-                            isActive
-                              ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium'
-                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                          }`
-                        }
-                      >
-                        {icon && <span className="ml-1">{icon}</span>}{label}
-                      </NavLink>
-                    ))}
-                  </>
-                )}
+                <div className="my-1.5 border-t border-gray-100 dark:border-gray-700" />
+                <button
+                  onClick={() => { setShowMore(false); setShowNavEdit(true) }}
+                  className="w-full text-right block px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  ⚙️ עריכת תפריט
+                </button>
               </div>
             )}
           </div>
@@ -198,6 +191,15 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+
+      <NavEditModal
+        open={showNavEdit}
+        onClose={() => setShowNavEdit(false)}
+        pinned={navPinned}
+        more={navMore}
+        tr={tr}
+        onSave={(pinned, more) => { saveNavLayout(pinned, more); setNavLayoutVersion(v => v + 1) }}
+      />
     </div>
   )
 }
