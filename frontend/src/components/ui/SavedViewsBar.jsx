@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSavedViews } from '../../hooks/useSavedViews'
 import { isViewDirty } from '../../lib/savedViewsDiff'
 
@@ -17,6 +17,15 @@ export default function SavedViewsBar({ layout = 'dropdown', entityType, entityK
   const [open, setOpen] = useState(false)
   const [saveModal, setSaveModal] = useState(false)
   const [nameInput, setNameInput] = useState('')
+  const barRef = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (barRef.current && !barRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const onApplyDefault = useCallback((view) => {
     setActiveViewId(view.id)
@@ -112,7 +121,7 @@ export default function SavedViewsBar({ layout = 'dropdown', entityType, entityK
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={barRef}>
       <button type="button" onClick={() => setOpen(o => !o)}
         className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-colors">
         {activeView ? activeView.name : 'תצוגות'} ▾
