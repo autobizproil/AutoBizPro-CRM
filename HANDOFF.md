@@ -1,4 +1,28 @@
-# HANDOFF — CRM (AutoBizPro) — 2026-07-24 (updated, same day)
+# HANDOFF — CRM (AutoBizPro) — 2026-07-26 (latest session, on top of everything below)
+
+## 0. Latest session summary (2026-07-26)
+
+Three features built via superpowers brainstorming → spec → plan → subagent-driven-development, each on its own short-lived feature branch, merged to `master` and pushed to `origin/master`. All commits on `master`, no branches left over.
+
+1. **Generic "Delete All" bulk action** — replaces the old leads-only `/api/leads/all/clear` with one endpoint `DELETE /api/entities/{entity}/all` (`BulkDeleteController`), covering leads/contacts/clients/tasks and every custom record type. Frontend: shared `DeleteAllModal` (real modal, types "מחק" to confirm — not `window.prompt` like before) + `useDeleteAllEntity` hook, wired into all five list pages near the pagination/footer area. Spec: `docs/superpowers/specs/2026-07-24-generic-delete-all-design.md`.
+
+2. **Generic advanced filter system** — extracts `LeadService::applyConditions` into `App\Services\ConditionFilter` (date-range + multi-condition filtering, reused by all entities), wires it into Contacts/Clients/Tasks/Records list endpoints, and reuses the existing `FilterPanel.jsx` component (already generic, untouched) across all five pages. Records use a distinct `allFieldsAreJson=true` mode (every field lives in `data`, no `cf_` prefix) with a regex-validated field name (`/^[a-z0-9_]+$/`) to prevent SQL injection since there's no prefix to anchor on. Tasks has no `custom_fields` column — its filtering is system-fields-only, a pre-existing gap, not fixed here. Spec: `docs/superpowers/specs/2026-07-26-generic-advanced-filters-design.md`.
+
+3. **Customizable top navigation** — `frontend/src/lib/navLayout.js` (`computeNavLayout`/`saveNavLayout`, localStorage-backed, per-user/per-browser, versioned like the existing column-order pattern) + `NavEditModal.jsx` (drag-to-reorder between main bar and "עוד") wired into `Layout.jsx`. Custom record types are now full nav participants (reorderable/pinnable) instead of being stuck in a fixed always-in-More section. Spec: `docs/superpowers/specs/2026-07-26-nav-customization-design.md`.
+
+**Backend: 170/170 tests passing** (up from 159 at start of session — ConditionFilter + per-entity filter tests). **Frontend: `npx vite build` clean, `npx vitest run` 6/6 passing** (new `navLayout.test.js`).
+
+**Not yet deployed to VPS** as of this handoff — deploy commands: `git pull origin master`, `php artisan config:clear && php artisan cache:clear`, `sudo systemctl restart php8.3-fpm`, then `cd frontend && npm run build` (frontend changed this time, needs a rebuild, not just backend).
+
+**Not yet verified live in a browser**: nav customization (drag-reorder/save/persist/reset) — every reviewer in this session lacked browser access, so it's build+unit-test verified only, never click-tested. Do this before trusting it fully.
+
+**Still outstanding from the original request this session started from**: "Saved Views + persistent active filter" (e.g. a named view "לידים חדשים, 20 יום אחרונים" that stays selected across reloads until manually changed) — the advanced filter system it depends on is now done, but saved-views itself was never spec'd or built. Confirmed design direction (from brainstorming, not yet written as a spec): DB-backed per-user (not localStorage), applies to all five entities like the filter system did.
+
+**Environment quirk hit repeatedly this session, worth knowing for next time:** subagent implementer worktrees kept forking from a stale base (missing already-merged prior tasks in the same plan), even mid-plan. Every time, the fix was the same: extract the worktree's diff for just the intended files via `git diff <stale-base> HEAD -- <files>`, then `git apply` it onto the actual shared-checkout branch tip, rebuild/retest there, and commit from the main checkout — never trust the worktree's own commit SHA directly into a `git merge`. Also hit an org-wide **monthly spend limit** on subagent dispatch near the end of this session (blocked one `opus` final-review dispatch) — if that recurs, the controller can do a manual/lighter final check itself instead of retrying the same dispatch.
+
+---
+
+# Prior session — 2026-07-24
 
 ## 1. Goal
 
