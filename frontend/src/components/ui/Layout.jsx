@@ -102,7 +102,7 @@ export default function Layout() {
                 }
                 style={{ fontSize: '13px' }}
               >
-                {labelKey ? tr(labelKey) : <>{icon && <span className="ml-1">{icon}</span>}{label}</>}
+                {labelKey ? tr(labelKey) : <>{icon && <span className={lang === 'he' ? 'ml-1' : 'mr-1'}>{icon}</span>}{label}</>}
                 {count > 0 && (
                   <span className={`absolute -top-1 ${lang === 'he' ? '-right-1' : '-left-1'} bg-[#2398c2] text-white text-[10px] font-bold rounded-full min-w-[16px] h-[16px] px-1 flex items-center justify-center`}>
                     {count > 99 ? '99+' : count}

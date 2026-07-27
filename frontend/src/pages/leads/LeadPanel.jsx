@@ -312,9 +312,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </Detail>
-                <EditableDetail label="טלפון" value={field('phone')} onChange={setField('phone')} onBlur={() => commit('phone')} disabled={!canEdit} type="tel" />
-                <EditableDetail label="אימייל" value={field('email')} onChange={setField('email')} onBlur={() => commit('email')} disabled={!canEdit} type="email" />
-                <EditableDetail label="מקור" value={field('source')} onChange={setField('source')} onBlur={() => commit('source')} disabled={!canEdit} />
+                <EditableDetail label="טלפון" value={field('phone')} onChange={setField('phone')} onBlur={() => commit('phone')} disabled={!canEdit} type="tel" inputDir="ltr" />
+                <EditableDetail label="אימייל" value={field('email')} onChange={setField('email')} onBlur={() => commit('email')} disabled={!canEdit} type="email" inputDir="ltr" />
+                <EditableDetail label="מקור" value={field('source')} onChange={setField('source')} onBlur={() => commit('source')} disabled={!canEdit} inputDir="rtl" />
                 <div>
                   <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">הערות</label>
                   <textarea value={field('notes')} onChange={setField('notes')} onBlur={() => commit('notes')} disabled={!canEdit} rows={2}
@@ -440,7 +440,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 </div>
                 <button type="button" onClick={addItem} className="mt-2 text-[#2398c2] hover:text-[#1d7fa3] text-sm font-medium">+ הוסף פריט</button>
               </div>
-              <div className="text-left text-sm font-semibold text-gray-700">סה"כ: ₪{invTotal.toLocaleString('he-IL')}</div>
+              <div className="text-right text-sm font-semibold text-gray-700">סה"כ: ₪{invTotal.toLocaleString('he-IL')}</div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={createInvoice.isPending || invTotal <= 0}
                   className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
@@ -494,7 +494,6 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                   onChange={e => setCardcomDesc(e.target.value)}
                   className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="תיאור העסקה..."
-                  dir="ltr"
                 />
               </div>
               <div className="flex gap-2 pt-1">
@@ -564,7 +563,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 </div>
                 <button type="button" onClick={addYeshItem} className="mt-2 text-[#2398c2] hover:text-[#1d7fa3] text-sm font-medium">+ הוסף פריט</button>
               </div>
-              <div className="text-left text-sm font-semibold text-gray-700">סה"כ: ₪{yeshTotal.toLocaleString('he-IL')}</div>
+              <div className="text-right text-sm font-semibold text-gray-700">סה"כ: ₪{yeshTotal.toLocaleString('he-IL')}</div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={yeshCreateInvoice.isPending || yeshTotal <= 0}
                   className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
@@ -686,37 +685,44 @@ function Detail({ label, children }) {
   )
 }
 
-function EditableDetail({ label, value, onChange, onBlur, disabled, type = 'text' }) {
+function EditableDetail({ label, value, onChange, onBlur, disabled, type = 'text', inputDir = 'rtl' }) {
+  // Remove text-left as it overrides default RTL alignment for Hebrew text
+  const inputClasses = "text-sm text-gray-800 dark:text-gray-200 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60 bg-transparent"
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-gray-500 flex-shrink-0">{label}</span>
+      <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">{label}</span>
       <input type={type} value={value} onChange={onChange} onBlur={onBlur} disabled={disabled}
-        className="text-sm text-gray-800 dark:text-gray-200 text-left border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60 bg-transparent"
-        placeholder="—" />
+        className={inputClasses}
+        placeholder="—"
+        dir={inputDir} />
     </div>
   )
 }
 
 function CustomFieldInput({ field, value, onChange, onBlur, disabled }) {
-  const INPUT_CLS = 'text-sm text-gray-800 dark:text-gray-200 text-left border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60 bg-transparent'
-
+  // Removed text-left from INPUT_CLS to allow natural RTL alignment for Hebrew text
+  const INPUT_CLS = 'text-sm text-gray-800 dark:text-gray-200 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60 bg-transparent'
+    
+  const inputDir = ['number', 'date', 'url'].includes(field.field_type) ? 'ltr' : 'rtl'
+    
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">{field.label}</span>
       {field.field_type === 'select' ? (
         <select value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur} disabled={disabled}
-          className={INPUT_CLS + ' bg-white dark:bg-gray-700'}>
+          className={INPUT_CLS + ' bg-white dark:bg-gray-700'} dir={inputDir}>
           <option value="">—</option>
           {(field.options ?? []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       ) : field.field_type === 'checkbox' ? (
         <input type="checkbox" checked={!!value} disabled={disabled}
           onChange={e => { onChange(e.target.checked); onBlur() }}
-          className="rounded border-gray-300 accent-[#2398c2]" />
+          className="rounded border-gray-300 accent-[#2398c2]" dir={inputDir} />
       ) : field.field_type === 'textarea' ? (
         <textarea value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur} disabled={disabled} rows={2}
           className="text-sm text-gray-800 dark:text-gray-200 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 resize-none focus:outline-none disabled:opacity-60 bg-transparent"
-          placeholder="—" />
+          placeholder="—"
+          dir={inputDir} />
       ) : (
         <input
           type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : field.field_type === 'url' ? 'url' : 'text'}
@@ -726,6 +732,7 @@ function CustomFieldInput({ field, value, onChange, onBlur, disabled }) {
           disabled={disabled}
           className={INPUT_CLS}
           placeholder="—"
+          dir={inputDir}
         />
       )}
     </div>
