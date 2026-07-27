@@ -108,4 +108,26 @@ class SavedViewTest extends TestCase
             ->postJson('/api/saved-views', ['entity_type' => 'records', 'entity_key' => 'does-not-exist', 'name' => 'bad'])
             ->assertStatus(422);
     }
+
+    public function test_moving_a_default_view_to_another_bucket_does_not_create_two_defaults(): void
+    {
+        [$tenant, $user, $sub] = $this->tenantAndUser('sv-move-default');
+        app()->instance('current_tenant_id', $tenant->id);
+
+        $movedView = SavedView::create(['tenant_id' => $tenant->id, 'user_id' => $user->id, 'entity_type' => 'leads', 'name' => 'moved', 'is_default' => true]);
+        $existingDefaultInTarget = SavedView::create(['tenant_id' => $tenant->id, 'user_id' => $user->id, 'entity_type' => 'contacts', 'name' => 'already default', 'is_default' => true]);
+
+        // Move the leads default view into the contacts bucket, which already has its own default.
+        $this->actingAs($user)->withHeaders(['X-Tenant' => $sub])
+            ->putJson("/api/saved-views/{$movedView->id}", ['entity_type' => 'contacts', 'name' => 'moved'])
+            ->assertOk();
+
+        $defaultsInContactsBucket = SavedView::where('tenant_id', $tenant->id)
+            ->where('user_id', $user->id)->where('entity_type', 'contacts')
+            ->where('is_default', true)->count();
+
+        $this->assertSame(1, $defaultsInContactsBucket);
+        $this->assertTrue($movedView->fresh()->is_default);
+        $this->assertFalse($existingDefaultInTarget->fresh()->is_default);
+    }
 }
