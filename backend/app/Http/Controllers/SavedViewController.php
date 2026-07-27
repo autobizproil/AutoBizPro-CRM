@@ -39,16 +39,16 @@ class SavedViewController extends Controller
         return $data;
     }
 
-    /** Scope a query to the same (tenant, user, entity_type, entity_key) bucket as $view. */
-    private function scopeToBucket($query, SavedView $view)
+    /** Scope a query to one (tenant, user, entity_type, entity_key) bucket. Shared by index() and the default-uniqueness transaction so the two never drift apart. */
+    private function scopeToBucket($query, int $tenantId, int $userId, string $entityType, ?string $entityKey)
     {
-        $query->where('tenant_id', $view->tenant_id)
-            ->where('user_id', $view->user_id)
-            ->where('entity_type', $view->entity_type);
+        $query->where('tenant_id', $tenantId)
+            ->where('user_id', $userId)
+            ->where('entity_type', $entityType);
 
-        return $view->entity_key === null
+        return $entityKey === null
             ? $query->whereNull('entity_key')
-            : $query->where('entity_key', $view->entity_key);
+            : $query->where('entity_key', $entityKey);
     }
 
     public function index(Request $request): JsonResponse
@@ -56,13 +56,9 @@ class SavedViewController extends Controller
         $tenantId   = app('current_tenant_id');
         $entityType = $request->query('entity_type');
         abort_unless(in_array($entityType, self::ENTITY_TYPES, true), 422, 'entity_type לא חוקי');
-        $entityKey = $request->query('entity_key');
+        $entityKey = $request->query('entity_key') ?: null;
 
-        $query = SavedView::where('tenant_id', $tenantId)
-            ->where('user_id', $request->user()->id)
-            ->where('entity_type', $entityType);
-
-        $query = $entityKey ? $query->where('entity_key', $entityKey) : $query->whereNull('entity_key');
+        $query = $this->scopeToBucket(SavedView::query(), $tenantId, $request->user()->id, $entityType, $entityKey);
 
         return response()->json(['success' => true, 'data' => $query->orderBy('name')->get()]);
     }
@@ -88,7 +84,20 @@ class SavedViewController extends Controller
         abort_unless($savedView->user_id === $request->user()->id, 403);
 
         $data = $this->validated($request, $savedView->tenant_id);
-        $savedView->update($data);
+
+        DB::transaction(function () use ($savedView, $data) {
+            $savedView->update($data);
+
+            // A default view moved into a different (entity_type, entity_key) bucket
+            // must not collide with that bucket's existing default — re-run the same
+            // uniqueness pass setDefault() uses. No-op when nothing changed or the
+            // view isn't a default.
+            if ($savedView->is_default) {
+                $this->scopeToBucket(SavedView::query(), $savedView->tenant_id, $savedView->user_id, $savedView->entity_type, $savedView->entity_key)
+                    ->where('id', '!=', $savedView->id)
+                    ->update(['is_default' => false]);
+            }
+        });
 
         return response()->json(['success' => true, 'data' => $savedView->fresh()]);
     }
@@ -109,7 +118,7 @@ class SavedViewController extends Controller
         abort_unless($savedView->user_id === $request->user()->id, 403);
 
         DB::transaction(function () use ($savedView) {
-            $this->scopeToBucket(SavedView::query(), $savedView)
+            $this->scopeToBucket(SavedView::query(), $savedView->tenant_id, $savedView->user_id, $savedView->entity_type, $savedView->entity_key)
                 ->where('id', '!=', $savedView->id)
                 ->update(['is_default' => false]);
             $savedView->update(['is_default' => true]);

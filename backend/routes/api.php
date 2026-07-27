@@ -223,7 +223,13 @@ Route::middleware(['auth:sanctum', 'tenant', 'agent.ability'])->group(function (
     Route::put('/tasks/{task}',          [TaskController::class, 'update']) ->middleware('permission:leads,can_update');
     Route::delete('/tasks/{task}',       [TaskController::class, 'destroy'])->middleware('permission:leads,can_update');
 
-    // Saved views — personal, per-user (not tenant-shared)
+    // Saved views — personal, per-user (not tenant-shared). Deliberately no
+    // permission:module,action gate: this is a user's own preference data (a
+    // filter/search/column preset), not a view onto entity data itself — any
+    // authenticated tenant user manages their own views regardless of their
+    // leads/contacts/etc module permissions. Ownership (tenant_id + user_id)
+    // is enforced inside SavedViewController instead.
+
     Route::get('/saved-views',                          [SavedViewController::class, 'index']);
     Route::post('/saved-views',                         [SavedViewController::class, 'store']);
     Route::put('/saved-views/{savedView}',              [SavedViewController::class, 'update']);
