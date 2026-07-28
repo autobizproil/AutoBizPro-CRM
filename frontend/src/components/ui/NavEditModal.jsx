@@ -52,7 +52,7 @@ export default function NavEditModal({ open, onClose, pinned, more, onSave, tr }
 
   const renderGroup = (title, items, group) => (
     <div className="flex-1">
-      <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{title}</div>
+      <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 text-right">{title}</div>
       <div
         className="space-y-1 min-h-[80px] border border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-2"
         onDragOver={e => e.preventDefault()}

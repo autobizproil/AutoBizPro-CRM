@@ -132,7 +132,7 @@ export default function Layout() {
                     key={to}
                     to={to}
                     className={({ isActive }) =>
-                      `block px-4 py-2 text-sm transition-colors truncate ${
+                      `block text-right px-4 py-2 text-sm transition-colors truncate ${
                         isActive
                           ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium'
                           : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
