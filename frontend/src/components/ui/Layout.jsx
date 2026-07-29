@@ -126,26 +126,26 @@ export default function Layout() {
               עוד <span className="text-[10px]">▾</span>
             </button>
             {showMore && (
-              <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-40 py-1.5 w-48 max-h-[70vh] overflow-y-auto" dir="rtl">
+              <div className={`absolute top-full mt-1 ${lang === 'he' ? 'left-0' : 'right-0'} bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-40 py-1.5 w-48 max-h-[70vh] overflow-y-auto`} dir="auto">
                 {navMore.map(({ to, labelKey, label, icon }) => (
                   <NavLink
                     key={to}
                     to={to}
                     className={({ isActive }) =>
-                      `block text-right px-4 py-2 text-sm transition-colors truncate ${
+                      `block ${lang === 'he' ? 'text-right' : 'text-left'} px-4 py-2 text-sm transition-colors truncate ${
                         isActive
                           ? 'bg-[#2398c2]/10 text-[#2398c2] font-medium'
                           : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`
                     }
                   >
-                    {labelKey ? tr(labelKey) : <>{icon && <span className="ml-1">{icon}</span>}{label}</>}
+                    {labelKey ? tr(labelKey) : <>{icon && <span className={lang === 'he' ? 'ml-1' : 'mr-1'}>{icon}</span>}{label}</>}
                   </NavLink>
                 ))}
                 <div className="my-1.5 border-t border-gray-100 dark:border-gray-700" />
                 <button
                   onClick={() => { setShowMore(false); setShowNavEdit(true) }}
-                  className="w-full text-right block px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className={`w-full block px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 ${lang === 'he' ? 'text-right' : 'text-left'}`}
                 >
                   ⚙️ עריכת תפריט
                 </button>

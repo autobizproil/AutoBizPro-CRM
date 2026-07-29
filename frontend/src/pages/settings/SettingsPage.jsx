@@ -350,13 +350,13 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Key ID</label>
             <input value={giId} onChange={e => setGiId(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
-              placeholder="key id..." />
+              placeholder="key id..." dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Secret</label>
             <input type="password" value={giSecret} onChange={e => setGiSecret(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
-              placeholder="secret..." />
+              placeholder="secret..." dir="ltr" />
           </div>
           <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none">
             <input type="checkbox" checked={giSandbox} onChange={e => setGiSandbox(e.target.checked)}
@@ -387,19 +387,19 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">מספר טרמינל</label>
             <input value={cardcomTerminal} onChange={e => setCardcomTerminal(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
-              placeholder="מספר טרמינל..." />
+              placeholder="מספר טרמינל..." dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">שם משתמש API</label>
             <input value={cardcomApiName} onChange={e => setCardcomApiName(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
-              placeholder="שם משתמש..." />
+              placeholder="שם משתמש..." dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">סיסמת API</label>
             <input type="password" value={cardcomApiPassword} onChange={e => setCardcomApiPassword(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
-              placeholder="סיסמה..." />
+              placeholder="סיסמה..." dir="ltr" />
           </div>
           {can('users', 'can_update') && (
             <SaveRow
@@ -421,13 +421,13 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">מפתח משתמש</label>
             <input value={yeshUserKey} onChange={e => setYeshUserKey(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
-              placeholder="user key..." />
+              placeholder="user key..." dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">מפתח סודי</label>
             <input type="password" value={yeshSecretKey} onChange={e => setYeshSecretKey(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
-              placeholder="secret key..." />
+              placeholder="secret key..." dir="ltr" />
           </div>
           {can('users', 'can_update') && (
             <SaveRow
@@ -566,21 +566,21 @@ function FacebookCard({ integ, qc, can, tenantSubdomain }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">App ID</label>
-            <input value={appId} onChange={e => setAppId(e.target.value)} placeholder="123456789..." className={INPUT} />
+            <input value={appId} onChange={e => setAppId(e.target.value)} placeholder="123456789..." className={INPUT} dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">App Secret</label>
-            <input type="password" value={appSecret} onChange={e => setAppSecret(e.target.value)} placeholder="secret..." className={INPUT} />
+            <input type="password" value={appSecret} onChange={e => setAppSecret(e.target.value)} placeholder="secret..." className={INPUT} dir="ltr" />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Page ID</label>
-            <input value={pageId} onChange={e => setPageId(e.target.value)} placeholder="page id..." className={INPUT} />
+            <input value={pageId} onChange={e => setPageId(e.target.value)} placeholder="page id..." className={INPUT} dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Verify Token</label>
-            <input value={verifyToken} onChange={e => setVerify(e.target.value)} placeholder="my_verify_token" className={INPUT} />
+            <input value={verifyToken} onChange={e => setVerify(e.target.value)} placeholder="my_verify_token" className={INPUT} dir="ltr" />
           </div>
         </div>
         <div className="pt-1 border-t border-gray-100 dark:border-gray-700">
@@ -637,16 +637,16 @@ function VoicenterCard({ integ, qc, can, tenantSubdomain }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Account ID</label>
-            <input value={accountId} onChange={e => setAccountId(e.target.value)} placeholder="account id..." className={INPUT} />
+            <input value={accountId} onChange={e => setAccountId(e.target.value)} placeholder="account id..." className={INPUT} dir="ltr" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Token</label>
-            <input type="password" value={apiToken} onChange={e => setApiToken(e.target.value)} placeholder="token..." className={INPUT} />
+            <input type="password" value={apiToken} onChange={e => setApiToken(e.target.value)} placeholder="token..." className={INPUT} dir="ltr" />
           </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Webhook Secret (אופציונלי)</label>
-          <input type="password" value={webhookSecret} onChange={e => setSecret(e.target.value)} placeholder="secret..." className={INPUT} />
+          <input type="password" value={webhookSecret} onChange={e => setSecret(e.target.value)} placeholder="secret..." className={INPUT} dir="ltr" />
         </div>
         <div className="pt-1 border-t border-gray-100 dark:border-gray-700">
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Webhook URL (הכנס בהגדרות Voicenter):</p>
