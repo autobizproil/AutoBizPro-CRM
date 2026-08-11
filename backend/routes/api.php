@@ -188,6 +188,14 @@ Route::middleware(['auth:sanctum', 'tenant', 'agent.ability'])->group(function (
     Route::post('/integrations/greeninvoice/lead/{lead}', [IntegrationsController::class, 'greenInvoiceCreate'])
         ->middleware('permission:leads,can_update');
 
+    // Facebook Lead Ads — OAuth connect (replaces manual app_id/secret entry)
+    Route::get('/integrations/facebook/oauth/redirect', [\App\Http\Controllers\FacebookOAuthController::class, 'redirect'])
+        ->middleware('permission:users,can_update');
+    Route::get('/integrations/facebook/oauth/callback', [\App\Http\Controllers\FacebookOAuthController::class, 'callback'])
+        ->middleware('permission:users,can_update');
+    Route::post('/integrations/facebook/oauth/select-page', [\App\Http\Controllers\FacebookOAuthController::class, 'selectPage'])
+        ->middleware('permission:users,can_update');
+
     // Integrations — WhatsApp (GREEN-API)
     Route::post('/integrations/whatsapp/test', [IntegrationsController::class, 'whatsappTest'])
         ->middleware('permission:users,can_update');
