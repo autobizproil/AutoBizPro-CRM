@@ -34,7 +34,7 @@ class FacebookLeadAdsService
      */
     public function verifyWebhook(array $params): string|false
     {
-        $verifyToken = $this->settings->get('facebook_verify_token');
+        $verifyToken = config('services.facebook.verify_token');
         if (
             ($params['hub_mode'] ?? '') === 'subscribe' &&
             ($params['hub_verify_token'] ?? '') === $verifyToken &&
@@ -51,11 +51,10 @@ class FacebookLeadAdsService
      */
     public function processWebhook(array $payload, int $tenantId): void
     {
-        $appId     = $this->settings->get('facebook_app_id');
-        $appSecret = $this->settings->get('facebook_app_secret');
+        $pageAccessToken = $this->settings->get('facebook_page_access_token');
 
-        if (!$appId || !$appSecret) {
-            Log::warning('Facebook: missing app_id or app_secret', ['tenant' => $tenantId]);
+        if (!$pageAccessToken) {
+            Log::warning('Facebook: no page access token connected', ['tenant' => $tenantId]);
             return;
         }
 
@@ -65,7 +64,7 @@ class FacebookLeadAdsService
                 $formId    = $change['value']['form_id'] ?? null;
                 if (!$leadgenId) continue;
 
-                $leadData = $this->fetchLead($leadgenId, $appId, $appSecret);
+                $leadData = $this->fetchLead($leadgenId, $pageAccessToken);
                 if (!$leadData) continue;
 
                 $this->upsertLead($leadData, $formId, $leadgenId, $tenantId);
@@ -78,24 +77,29 @@ class FacebookLeadAdsService
      */
     public function verifySignature(string $rawBody, string $signature): bool
     {
-        $appSecret = $this->settings->get('facebook_app_secret');
+        $appSecret = config('services.facebook.client_secret');
         if (!$appSecret) return false;
 
         $expected = 'sha256=' . hash_hmac('sha256', $rawBody, $appSecret);
         return hash_equals($expected, $signature);
     }
 
-    private function fetchLead(string $leadgenId, string $appId, string $appSecret): ?array
+    private function fetchLead(string $leadgenId, string $pageAccessToken): ?array
     {
         try {
-            $token    = "{$appId}|{$appSecret}";
             $response = Http::timeout(10)
-                ->get("https://graph.facebook.com/v19.0/{$leadgenId}", [
-                    'access_token' => $token,
+                ->get("https://graph.facebook.com/v21.0/{$leadgenId}", [
+                    'access_token' => $pageAccessToken,
                     'fields'       => 'field_data,created_time,ad_id,ad_name,form_id',
                 ]);
 
             if (!$response->ok()) {
+                // Graph API's shape for an expired/revoked token: OAuthException, code 190.
+                // Flag it so the Settings screen can tell the tenant to reconnect, instead of
+                // leads silently vanishing with no visible cause.
+                if ($response->json('error.code') === 190) {
+                    $this->settings->set('facebook_connection_status', 'needs_renewal');
+                }
                 Log::warning('Facebook: failed to fetch lead', ['id' => $leadgenId, 'status' => $response->status()]);
                 return null;
             }

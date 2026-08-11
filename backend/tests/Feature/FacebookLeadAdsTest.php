@@ -18,8 +18,7 @@ class FacebookLeadAdsTest extends TestCase
     {
         $tenant = Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
         app()->instance('current_tenant_id', $tenant->id);
-        TenantSetting::create(['key' => 'facebook_app_id', 'value' => 'app123', 'tenant_id' => $tenant->id]);
-        TenantSetting::create(['key' => 'facebook_app_secret', 'value' => 'secret456', 'tenant_id' => $tenant->id]);
+        TenantSetting::create(['key' => 'facebook_page_access_token', 'value' => 'page-token-abc', 'tenant_id' => $tenant->id]);
         return $tenant;
     }
 
@@ -81,5 +80,41 @@ class FacebookLeadAdsTest extends TestCase
 
         $this->assertSame(1, Lead::count());
         Http::assertSentCount(2);
+    }
+
+    public function test_fetch_lead_uses_page_access_token_not_app_credentials(): void
+    {
+        $this->tenantWithSettings();
+
+        Http::fake([
+            'graph.facebook.com/*' => Http::response([
+                'field_data' => [
+                    ['name' => 'full_name', 'values' => ['דני כהן']],
+                    ['name' => 'phone_number', 'values' => ['0541234567']],
+                ],
+                'form_id' => 'form789',
+            ], 200),
+        ]);
+
+        $this->postJson('/api/integrations/facebook/webhook/acme', $this->leadgenPayload('lg_003'))->assertOk();
+
+        Http::assertSent(fn ($request) => $request['access_token'] === 'page-token-abc');
+    }
+
+    public function test_expired_page_token_marks_connection_as_needing_renewal(): void
+    {
+        $tenant = $this->tenantWithSettings();
+
+        // Graph API's shape for an expired/invalid token: HTTP 400, OAuthException, code 190.
+        Http::fake([
+            'graph.facebook.com/*' => Http::response([
+                'error' => ['message' => 'Error validating access token', 'type' => 'OAuthException', 'code' => 190],
+            ], 400),
+        ]);
+
+        $this->postJson('/api/integrations/facebook/webhook/acme', $this->leadgenPayload('lg_004'))->assertOk();
+
+        $this->assertSame(0, Lead::count());
+        $this->assertSame('needs_renewal', app(\App\Services\SettingsService::class)->get('facebook_connection_status'));
     }
 }
