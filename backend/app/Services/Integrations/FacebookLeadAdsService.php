@@ -68,7 +68,7 @@ class FacebookLeadAdsService
                 $leadData = $this->fetchLead($leadgenId, $appId, $appSecret);
                 if (!$leadData) continue;
 
-                $this->upsertLead($leadData, $formId, $tenantId);
+                $this->upsertLead($leadData, $formId, $leadgenId, $tenantId);
             }
         }
     }
@@ -107,8 +107,17 @@ class FacebookLeadAdsService
         }
     }
 
-    private function upsertLead(array $leadData, ?string $formId, int $tenantId): void
+    private function upsertLead(array $leadData, ?string $formId, string $leadgenId, int $tenantId): void
     {
+        // Facebook retries webhook delivery on non-200 responses, so leadgen_id
+        // is the reliable dedupe key — check it before falling back to phone.
+        $alreadyProcessed = Lead::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('fb_leadgen_id', $leadgenId)
+            ->exists();
+
+        if ($alreadyProcessed) return;
+
         // field_data is an array of { name, values } objects
         $fields = [];
         foreach ($leadData['field_data'] ?? [] as $field) {
@@ -135,13 +144,14 @@ class FacebookLeadAdsService
         }
 
         Lead::create([
-            'tenant_id' => $tenantId,
-            'name'      => $name ?: 'Facebook Lead',
-            'phone'     => $phone,
-            'email'     => $email,
-            'source'    => 'פייסבוק',
-            'status'    => 'NEW_LEAD',
-            'notes'     => $formId ? "Form ID: {$formId}" : null,
+            'tenant_id'     => $tenantId,
+            'name'          => $name ?: 'Facebook Lead',
+            'phone'         => $phone,
+            'email'         => $email,
+            'source'        => 'פייסבוק',
+            'fb_leadgen_id' => $leadgenId,
+            'status'        => 'NEW_LEAD',
+            'notes'         => $formId ? "Form ID: {$formId}" : null,
         ]);
     }
 }

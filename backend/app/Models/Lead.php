@@ -14,7 +14,7 @@ class Lead extends Model
 
     protected $fillable = [
         'tenant_id', 'name', 'phone', 'phone_normalized', 'email', 'status',
-        'pipeline_stage_id', 'assigned_to', 'source', 'notes', 'custom_fields',
+        'pipeline_stage_id', 'assigned_to', 'source', 'fb_leadgen_id', 'notes', 'custom_fields',
     ];
 
     protected $casts = [
