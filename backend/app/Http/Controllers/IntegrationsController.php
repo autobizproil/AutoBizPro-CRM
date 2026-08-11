@@ -37,11 +37,13 @@ class IntegrationsController extends Controller
         'paycall_enabled',
         'paycall_did',
         'paycall_secret',
-        // Facebook Lead Ads
-        'facebook_app_id',
-        'facebook_app_secret',
+        // Facebook Lead Ads — app credentials live in config/services.php (global,
+        // one Meta App for the whole install). Only the OAuth callback writes
+        // facebook_page_access_token; see FacebookOAuthController.
         'facebook_page_id',
-        'facebook_verify_token',
+        'facebook_page_name',
+        'facebook_page_access_token',
+        'facebook_connection_status', // null | 'needs_renewal' — set by FacebookLeadAdsService::fetchLead, cleared by FacebookOAuthService::connectPage
         // Voicenter
         'voicenter_account_id',
         'voicenter_api_token',
@@ -81,6 +83,9 @@ class IntegrationsController extends Controller
     {
         $settings = app(SettingsService::class);
         foreach (self::INTEGRATION_KEYS as $k) {
+            if ($k === 'facebook_page_access_token') {
+                continue; // OAuth-only — never accepted from a manual request
+            }
             if ($request->has($k)) {
                 $val = $request->input($k);
                 // Ignore masked secret echoes (don't overwrite with ****1234)
