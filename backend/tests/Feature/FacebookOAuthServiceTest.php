@@ -76,4 +76,26 @@ class FacebookOAuthServiceTest extends TestCase
 
         $this->assertSame([], $this->service()->fetchPages('user-token-abc'));
     }
+
+    public function test_subscribe_page_posts_leadgen_field_and_returns_true_on_success(): void
+    {
+        Http::fake(['graph.facebook.com/*/subscribed_apps*' => Http::response(['success' => true], 200)]);
+
+        $result = $this->service()->subscribePage('111', 'page-token-111');
+
+        $this->assertTrue($result);
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '111/subscribed_apps')
+                && $request->method() === 'POST'
+                && $request['subscribed_fields'] === 'leadgen'
+                && $request['access_token'] === 'page-token-111';
+        });
+    }
+
+    public function test_subscribe_page_returns_false_without_throwing_on_failure(): void
+    {
+        Http::fake(['graph.facebook.com/*/subscribed_apps*' => Http::response(['error' => ['message' => 'denied']], 400)]);
+
+        $this->assertFalse($this->service()->subscribePage('111', 'page-token-111'));
+    }
 }

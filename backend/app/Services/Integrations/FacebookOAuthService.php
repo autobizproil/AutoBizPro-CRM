@@ -64,4 +64,25 @@ class FacebookOAuthService
             $response->json('data') ?? []
         );
     }
+
+    /**
+     * Subscribe a Page to this app's leadgen webhook field. Without this call the
+     * webhook endpoint can return 200 to Meta's own dashboard test yet still never
+     * receive a real lead — the failure mode that motivated this whole flow.
+     * Never throws: a failed subscription must not undo an otherwise-saved connection.
+     */
+    public function subscribePage(string $pageId, string $pageAccessToken): bool
+    {
+        $response = Http::asForm()->post("https://graph.facebook.com/v21.0/{$pageId}/subscribed_apps", [
+            'subscribed_fields' => 'leadgen',
+            'access_token'      => $pageAccessToken,
+        ]);
+
+        if (!$response->ok() || !$response->json('success')) {
+            Log::error('Facebook OAuth: subscribed_apps failed', ['page_id' => $pageId, 'status' => $response->status(), 'body' => $response->body()]);
+            return false;
+        }
+
+        return true;
+    }
 }
