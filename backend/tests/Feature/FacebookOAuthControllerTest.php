@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Tenant;
+use App\Models\TenantSetting;
 use App\Models\User;
 use App\Services\SettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -172,5 +173,47 @@ class FacebookOAuthControllerTest extends TestCase
         $this->postJson('/api/integrations/facebook/oauth/select-page', ['pages_token' => $pagesToken, 'page_id' => '111'])
             ->assertStatus(400)
             ->assertJson(['success' => false, 'message' => 'הבחירה פגה, נסה להתחבר שוב']);
+    }
+
+    public function test_select_page_does_not_leak_across_tenants(): void
+    {
+        $tenantA = Tenant::create(['name' => 'A', 'subdomain' => 'tenant-a', 'status' => 'active']);
+        $tenantB = Tenant::create(['name' => 'B', 'subdomain' => 'tenant-b', 'status' => 'active']);
+
+        // Seed tenant B with an existing connection that must survive untouched.
+        app()->instance('current_tenant_id', $tenantB->id);
+        TenantSetting::create(['key' => 'facebook_page_id', 'value' => 'tenant-b-page', 'tenant_id' => $tenantB->id]);
+        app()->forgetInstance('current_tenant_id'); // simulate the unbound state a real public request starts from
+
+        Http::fake(['graph.facebook.com/*/subscribed_apps*' => Http::response(['success' => true], 200)]);
+
+        $pagesToken = Crypt::encryptString(json_encode([
+            'tenant_id' => $tenantA->id,
+            'pages' => [['id' => '999', 'name' => 'Tenant A Page', 'access_token' => 'page-token-999']],
+            'expires_at' => now()->addMinutes(10)->timestamp,
+        ]));
+
+        // No auth, no tenant binding — exactly how the real endpoint is hit.
+        $this->postJson('/api/integrations/facebook/oauth/select-page', ['pages_token' => $pagesToken, 'page_id' => '999'])
+            ->assertOk();
+
+        app()->instance('current_tenant_id', $tenantB->id);
+        $this->assertSame('tenant-b-page', app(SettingsService::class)->get('facebook_page_id'));
+
+        app()->instance('current_tenant_id', $tenantA->id);
+        $this->assertSame('999', app(SettingsService::class)->get('facebook_page_id'));
+    }
+
+    public function test_callback_redirects_with_error_when_token_exchange_fails(): void
+    {
+        [$tenant] = $this->tenantAdmin();
+
+        Socialite::shouldReceive('driver->stateless->user')->once()->andReturn($this->fakeSocialiteUser('short-lived-token'));
+        Http::fake(['graph.facebook.com/*/oauth/access_token*' => Http::response(['error' => ['message' => 'bad']], 400)]);
+
+        $response = $this->get('/api/integrations/facebook/oauth/callback?state=' . urlencode($this->stateFor($tenant->id)));
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('fb_status=error', $response->headers->get('Location'));
     }
 }

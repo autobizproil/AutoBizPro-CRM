@@ -70,6 +70,21 @@ class FacebookOAuthServiceTest extends TestCase
         $this->assertSame(['id' => '111', 'name' => 'AutoBizPro IL', 'access_token' => 'page-token-111'], $pages[0]);
     }
 
+    public function test_fetch_pages_skips_entries_missing_access_token_instead_of_throwing(): void
+    {
+        Http::fake([
+            'graph.facebook.com/*/me/accounts*' => Http::response(['data' => [
+                ['id' => '111', 'name' => 'Good Page', 'access_token' => 'page-token-111'],
+                ['id' => '222', 'name' => 'No Access Page'], // missing access_token — should be skipped, not thrown
+            ]], 200),
+        ]);
+
+        $pages = $this->service()->fetchPages('user-token-abc');
+
+        $this->assertCount(1, $pages);
+        $this->assertSame('111', $pages[0]['id']);
+    }
+
     public function test_fetch_pages_returns_empty_array_when_user_manages_no_pages(): void
     {
         Http::fake(['graph.facebook.com/*/me/accounts*' => Http::response(['data' => []], 200)]);

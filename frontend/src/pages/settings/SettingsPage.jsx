@@ -569,13 +569,11 @@ function FacebookCard({ integ, qc, can }) {
     setError('')
     try {
       const { data } = await integrationsApi.facebookSelectPage(pagesToken, pageId)
-      if (!data.success) {
-        setError(data.message)
-      } else {
-        setPageChoices(null)
-        setJustConnected({ page: data.page_name, subscribed: data.subscribed })
-        qc.invalidateQueries({ queryKey: ['integrations-settings'] })
-      }
+      setPageChoices(null)
+      setJustConnected({ page: data.page_name, subscribed: data.subscribed })
+      qc.invalidateQueries({ queryKey: ['integrations-settings'] })
+    } catch (e) {
+      setError(e.response?.data?.message || 'שגיאה בחיבור העמוד')
     } finally {
       setConnecting(false)
     }

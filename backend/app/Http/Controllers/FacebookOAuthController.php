@@ -44,7 +44,7 @@ class FacebookOAuthController extends Controller
     /** GET — hit directly by Facebook's cross-origin redirect. No auth, no session. */
     public function callback(Request $request, FacebookOAuthService $svc): RedirectResponse
     {
-        if ($request->query('error') === 'access_denied') {
+        if ($request->has('error')) {
             return $this->toSettings(['fb_status' => 'error', 'fb_message' => 'ההתחברות בוטלה']);
         }
 
@@ -54,9 +54,14 @@ class FacebookOAuthController extends Controller
         }
         app()->instance('current_tenant_id', $tenantId);
 
-        $socialiteUser = Socialite::driver('facebook')->stateless()->user();
-        $longLivedToken = $svc->exchangeLongLivedToken($socialiteUser->token);
-        $pages = $svc->fetchPages($longLivedToken);
+        try {
+            $socialiteUser = Socialite::driver('facebook')->stateless()->user();
+            $longLivedToken = $svc->exchangeLongLivedToken($socialiteUser->token);
+            $pages = $svc->fetchPages($longLivedToken);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Facebook OAuth: callback failed', ['error' => $e->getMessage()]);
+            return $this->toSettings(['fb_status' => 'error', 'fb_message' => 'ההתחברות נכשלה, נסה שוב']);
+        }
 
         if (empty($pages)) {
             return $this->toSettings(['fb_status' => 'error', 'fb_message' => 'לא נמצאו עמודים שאתה מנהל']);

@@ -669,7 +669,9 @@ on mount instead of calling `/oauth/callback` itself.
 **Interfaces:**
 - Consumes: `FacebookOAuthService::exchangeLongLivedToken`, `fetchPages`, `connectPage` (Tasks 2, 3,
   5); `Laravel\Socialite\Facades\Socialite` in `->stateless()` mode (no session dependency);
-  `Illuminate\Support\Facades\Crypt`.
+  `Illuminate\Support\Facades\Crypt`. Note: `connectPage()` is responsible for binding
+  `current_tenant_id` itself, since `selectPage()` is a public, unauthenticated route with no
+  ambient tenant context.
 - Produces:
   - `GET /api/integrations/facebook/oauth/redirect` (authenticated, same-origin) → 302 to Facebook.
   - `GET /api/integrations/facebook/oauth/callback` (public, hit by Facebook's redirect) → 302 to

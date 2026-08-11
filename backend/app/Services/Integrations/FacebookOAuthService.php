@@ -59,10 +59,15 @@ class FacebookOAuthService
             return [];
         }
 
-        return array_map(
-            fn (array $p) => ['id' => $p['id'], 'name' => $p['name'], 'access_token' => $p['access_token']],
-            $response->json('data') ?? []
+        $pages = array_filter(
+            $response->json('data') ?? [],
+            fn (array $p) => isset($p['id'], $p['name'], $p['access_token'])
         );
+
+        return array_values(array_map(
+            fn (array $p) => ['id' => $p['id'], 'name' => $p['name'], 'access_token' => $p['access_token']],
+            $pages
+        ));
     }
 
     /**
@@ -99,6 +104,8 @@ class FacebookOAuthService
      */
     public function connectPage(array $page, int $tenantId): array
     {
+        app()->instance('current_tenant_id', $tenantId);
+
         $this->settings->set('facebook_page_id', $page['id']);
         $this->settings->set('facebook_page_name', $page['name']);
         $this->settings->set('facebook_page_access_token', $page['access_token']);
