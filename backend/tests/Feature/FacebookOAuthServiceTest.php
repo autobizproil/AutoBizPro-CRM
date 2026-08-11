@@ -107,4 +107,37 @@ class FacebookOAuthServiceTest extends TestCase
 
         $this->assertFalse($this->service()->subscribePage('111', 'page-token-111'));
     }
+
+    public function test_connect_page_persists_settings_and_subscribes(): void
+    {
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+        app()->instance('current_tenant_id', $tenant->id);
+
+        Http::fake(['graph.facebook.com/*/subscribed_apps*' => Http::response(['success' => true], 200)]);
+
+        $result = $this->service()->connectPage(['id' => '111', 'name' => 'AutoBizPro IL', 'access_token' => 'page-token-111'], $tenant->id);
+
+        $this->assertSame(['page_name' => 'AutoBizPro IL', 'subscribed' => true], $result);
+        $this->assertSame('111', $this->settings()->get('facebook_page_id'));
+        $this->assertSame('AutoBizPro IL', $this->settings()->get('facebook_page_name'));
+        $this->assertSame('page-token-111', $this->settings()->get('facebook_page_access_token'));
+    }
+
+    public function test_connect_page_saves_settings_even_when_subscribe_fails(): void
+    {
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+        app()->instance('current_tenant_id', $tenant->id);
+
+        Http::fake(['graph.facebook.com/*/subscribed_apps*' => Http::response(['error' => ['message' => 'denied']], 400)]);
+
+        $result = $this->service()->connectPage(['id' => '111', 'name' => 'AutoBizPro IL', 'access_token' => 'page-token-111'], $tenant->id);
+
+        $this->assertSame(['page_name' => 'AutoBizPro IL', 'subscribed' => false], $result);
+        $this->assertSame('111', $this->settings()->get('facebook_page_id'));
+    }
+
+    private function settings(): SettingsService
+    {
+        return app(SettingsService::class);
+    }
 }

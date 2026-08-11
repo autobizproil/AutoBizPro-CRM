@@ -90,4 +90,22 @@ class FacebookOAuthService
             return false;
         }
     }
+
+    /**
+     * Persist the chosen Page's connection details for the current tenant and
+     * attempt the webhook subscription. Always saves the connection, even if the
+     * subscription call fails — the caller surfaces $result['subscribed'] === false
+     * as a warning rather than losing the connection outright.
+     */
+    public function connectPage(array $page, int $tenantId): array
+    {
+        $this->settings->set('facebook_page_id', $page['id']);
+        $this->settings->set('facebook_page_name', $page['name']);
+        $this->settings->set('facebook_page_access_token', $page['access_token']);
+        $this->settings->set('facebook_connection_status', null); // clear any prior needs_renewal flag
+
+        $subscribed = $this->subscribePage($page['id'], $page['access_token']);
+
+        return ['page_name' => $page['name'], 'subscribed' => $subscribed];
+    }
 }
