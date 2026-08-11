@@ -513,7 +513,7 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
       </Card>
 
       {/* Facebook Lead Ads */}
-      <FacebookCard integ={integ} qc={qc} can={can} tenantSubdomain={tenantSubdomain} />
+      <FacebookCard integ={integ} qc={qc} can={can} />
 
       {/* Voicenter */}
       <VoicenterCard integ={integ} qc={qc} can={can} tenantSubdomain={tenantSubdomain} />
@@ -530,73 +530,98 @@ function ConnectionsTab({ integ, can, qc, tenantSubdomain }) {
 // ──────────────────────────────────────────────────────────────────────────────
 //  Facebook Lead Ads card
 // ──────────────────────────────────────────────────────────────────────────────
-function FacebookCard({ integ, qc, can, tenantSubdomain }) {
-  const [appId, setAppId]           = useState('')
-  const [appSecret, setAppSecret]   = useState('')
-  const [pageId, setPageId]         = useState('')
-  const [verifyToken, setVerify]    = useState('')
-  const [copied, setCopied]         = useState(false)
+function FacebookCard({ integ, qc, can }) {
+  const [pageChoices, setPageChoices] = useState(null) // [{id, name}] parsed from fb_pages
+  const [pagesToken, setPagesToken] = useState(null)
+  const [connecting, setConnecting] = useState(false)
+  const [error, setError] = useState('')
+  const [justConnected, setJustConnected] = useState(null) // {page, subscribed} from a fresh redirect
 
+  const connected = Boolean(integ?.facebook_page_id)
+  const pageName = justConnected?.page ?? integ?.facebook_page_name
+  const needsRenewal = integ?.facebook_connection_status === 'needs_renewal'
+
+  // Task 6's callback() redirects Facebook's own browser navigation straight back here
+  // with the outcome encoded in the query string — it never gets fetched by this page.
   useEffect(() => {
-    if (integ) {
-      setAppId(integ.facebook_app_id ?? '')
-      setAppSecret(integ.facebook_app_secret ?? '')
-      setPageId(integ.facebook_page_id ?? '')
-      setVerify(integ.facebook_verify_token ?? '')
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get('fb_status')
+    if (!status) return
+    window.history.replaceState({}, '', window.location.pathname)
+
+    if (status === 'connected') {
+      setJustConnected({ page: params.get('fb_page'), subscribed: params.get('fb_subscribed') === '1' })
+      qc.invalidateQueries({ queryKey: ['integrations-settings'] })
+    } else if (status === 'choose_page') {
+      setPagesToken(params.get('fb_pages_token'))
+      try {
+        setPageChoices(JSON.parse(params.get('fb_pages') || '[]'))
+      } catch {
+        setError('שגיאה בטעינת רשימת העמודים, נסה שוב')
+      }
+    } else if (status === 'error') {
+      setError(params.get('fb_message') || 'שגיאה בהתחברות')
     }
-  }, [integ])
+  }, [])
 
-  const save = useMutation({
-    mutationFn: () => integrationsApi.saveSettings({
-      facebook_app_id: appId, facebook_app_secret: appSecret,
-      facebook_page_id: pageId, facebook_verify_token: verifyToken,
-    }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['integrations-settings'] }),
-  })
+  const selectPage = async (pageId) => {
+    setConnecting(true)
+    setError('')
+    try {
+      const { data } = await integrationsApi.facebookSelectPage(pagesToken, pageId)
+      if (!data.success) {
+        setError(data.message)
+      } else {
+        setPageChoices(null)
+        setJustConnected({ page: data.page_name, subscribed: data.subscribed })
+        qc.invalidateQueries({ queryKey: ['integrations-settings'] })
+      }
+    } finally {
+      setConnecting(false)
+    }
+  }
 
-  const webhookUrl = `${window.location.origin}/api/integrations/facebook/webhook/${tenantSubdomain ?? ''}`
-
-  const INPUT = 'w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]'
+  const startConnect = () => {
+    window.location.href = '/api/integrations/facebook/oauth/redirect'
+  }
 
   return (
     <Card>
       <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">📘 Facebook Lead Ads</h3>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">קבל לידים ממודעות פייסבוק אוטומטית. צור אפליקציית Meta, הגדר webhook ב-Meta Business Suite.</p>
-      <form onSubmit={e => { e.preventDefault(); save.mutate() }} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">App ID</label>
-            <input value={appId} onChange={e => setAppId(e.target.value)} placeholder="123456789..." className={INPUT} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">App Secret</label>
-            <input type="password" value={appSecret} onChange={e => setAppSecret(e.target.value)} placeholder="secret..." className={INPUT} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Page ID</label>
-            <input value={pageId} onChange={e => setPageId(e.target.value)} placeholder="page id..." className={INPUT} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Verify Token</label>
-            <input value={verifyToken} onChange={e => setVerify(e.target.value)} placeholder="my_verify_token" className={INPUT} />
-          </div>
-        </div>
-        <div className="pt-1 border-t border-gray-100 dark:border-gray-700">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Webhook URL (הכנס ב-Meta Business Suite):</p>
-          <div className="flex gap-2">
-            <input readOnly value={webhookUrl} dir="ltr" className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 font-mono" onClick={e => e.target.select()} />
-            <button type="button" onClick={() => { navigator.clipboard.writeText(webhookUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
-              className="shrink-0 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-700">
-              {copied ? '✓ הועתק' : 'העתק'}
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">קבל לידים ממודעות פייסבוק אוטומטית — התחבר בקליק אחד, בלי להגדיר כלום ידנית ב-Meta.</p>
+
+      {connected && !pageChoices && !needsRenewal && (
+        <div className="text-sm text-green-700 dark:text-green-400 mb-3">✓ מחובר לעמוד: <strong>{pageName}</strong></div>
+      )}
+
+      {justConnected && !justConnected.subscribed && (
+        <div className="text-sm text-amber-700 dark:text-amber-400 mb-3">⚠ העמוד חובר אך רישום ללידים נכשל — נסה להתחבר שוב.</div>
+      )}
+
+      {connected && needsRenewal && (
+        <div className="text-sm text-amber-700 dark:text-amber-400 mb-3">⚠ החיבור לעמוד <strong>{pageName}</strong> פג — יש להתחבר מחדש כדי להמשיך לקבל לידים.</div>
+      )}
+
+      {error && <div className="text-sm text-red-600 dark:text-red-400 mb-3">{error}</div>}
+
+      {pageChoices && (
+        <div className="space-y-2 mb-3">
+          <p className="text-sm text-gray-700 dark:text-gray-300">בחר את העמוד שברצונך לחבר:</p>
+          {pageChoices.map((p) => (
+            <button key={p.id} type="button" disabled={connecting} onClick={() => selectPage(p.id)}
+              className="block w-full text-right border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700">
+              {p.name}
             </button>
-          </div>
+          ))}
         </div>
-        {can('users', 'can_update') && (
-          <SaveRow isPending={save.isPending} isSuccess={save.isSuccess} isError={save.isError} errorMsg={save.error?.response?.data?.message} />
-        )}
-      </form>
+      )}
+
+      {can('users', 'can_update') && !pageChoices && (
+        <button type="button" disabled={connecting} onClick={startConnect}
+          className="bg-[#2398c2] hover:bg-[#1c7ea3] text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+          {connected ? 'התחבר לעמוד אחר' : 'התחבר עם פייסבוק'}
+        </button>
+      )}
     </Card>
   )
 }
