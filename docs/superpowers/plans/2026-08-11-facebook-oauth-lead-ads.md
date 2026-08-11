@@ -628,19 +628,58 @@ git commit -m "feat: persist Facebook Page connection per tenant"
 
 ### Task 6: `FacebookOAuthController` — redirect, callback, selectPage + routes
 
+> **Redesigned 2026-08-11 after task-level review.** The first version put all three endpoints
+> behind `auth:sanctum` and used Laravel's session for Socialite's CSRF `state` check and for
+> stashing the Page list between `callback` and `selectPage`. Review caught this before it merged:
+> `callback` is the literal URL Facebook's browser redirects to after the user approves — a
+> top-level, cross-origin navigation. Sanctum only attaches session support when a request's
+> `Referer`/`Origin` matches the app's own frontend domains, and `facebook.com` never matches. So the
+> original design would throw `Session store not set on request` (or 401 before the controller even
+> ran) on every real callback — invisible in tests only because they mocked Socialite's `user()`
+> call entirely, skipping the real state-validation code path that touches the session. See
+> `docs/superpowers/specs/2026-08-11-facebook-oauth-lead-ads-design.md`'s "OAuth callback identity"
+> addendum for the full writeup. The task below is the corrected version; ignore any earlier draft.
+
 **Files:**
 - Create: `backend/app/Http/Controllers/FacebookOAuthController.php`
-- Modify: `backend/routes/api.php` (inside the `auth:sanctum` group, near the existing
-  `/integrations/settings` routes)
+- Modify: `backend/routes/api.php` — `redirect` inside the existing `auth:sanctum` group (same as
+  before); `callback` and `selectPage` as new **public** routes (outside that group), placed near
+  the other public integration webhooks (`/integrations/whatsapp/webhook/{tenant}`,
+  `/integrations/facebook/webhook/{tenant}`) since they must be reachable without a session.
 - Test: `backend/tests/Feature/FacebookOAuthControllerTest.php`
+
+**The fix:** carry tenant identity through the OAuth round trip in a signed, encrypted `state` value
+instead of the session (`Illuminate\Support\Facades\Crypt::encryptString`/`decryptString` — AES-256,
+keyed by `APP_KEY`, tamper-proof, readable with no session at all). `redirect()` mints it while the
+user is still on an authenticated, same-origin request — that part is genuinely safe behind
+`auth:sanctum`. `callback()` and `selectPage()` decrypt it to recover the tenant and never touch
+`auth:sanctum` or `$request->session()`. The multi-page case uses the same trick: instead of
+stashing pages in session, `callback()` encrypts the candidate pages (including their access
+tokens — safe, because the blob is opaque to the browser without `APP_KEY`) into a `pages_token` and
+hands it to the frontend, which round-trips it unmodified in the `selectPage` POST. This is stronger
+than the original design's "strip `access_token` from the JSON, trust the session to hold the real
+data" — nothing sensitive is ever readable by the client, encrypted or not.
+
+`callback()` also changes from returning JSON to returning a **redirect** to the frontend's Settings
+page (`/settings?fb_status=...`), because it's now hit directly by a raw browser navigation, not
+fetched by the SPA — returning JSON would show the user a blob of raw JSON instead of their app.
+Task 8's frontend contract changes accordingly: it reads the outcome from `window.location.search`
+on mount instead of calling `/oauth/callback` itself.
 
 **Interfaces:**
 - Consumes: `FacebookOAuthService::exchangeLongLivedToken`, `fetchPages`, `connectPage` (Tasks 2, 3,
-  5); Socialite's `\Laravel\Facebook\Socialite` facade → actually
-  `Laravel\Socialite\Facades\Socialite`.
-- Produces: `GET /api/integrations/facebook/oauth/redirect`,
-  `GET /api/integrations/facebook/oauth/callback`,
-  `POST /api/integrations/facebook/oauth/select-page` — the three routes the frontend (Task 8) calls.
+  5); `Laravel\Socialite\Facades\Socialite` in `->stateless()` mode (no session dependency);
+  `Illuminate\Support\Facades\Crypt`.
+- Produces:
+  - `GET /api/integrations/facebook/oauth/redirect` (authenticated, same-origin) → 302 to Facebook.
+  - `GET /api/integrations/facebook/oauth/callback` (public, hit by Facebook's redirect) → 302 to
+    `/settings?fb_status=connected&fb_page=<name>&fb_subscribed=1|0`, or
+    `/settings?fb_status=choose_page&fb_pages_token=<token>&fb_pages=<json>`, or
+    `/settings?fb_status=error&fb_message=<text>`.
+  - `POST /api/integrations/facebook/oauth/select-page` (public, called by the SPA via fetch right
+    after landing back on Settings) — body `{ pages_token, page_id }`, JSON response
+    `{ success, status: 'connected', page_name, subscribed }` or `{ success: false, message }`.
+  Consumed by Task 8.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -655,6 +694,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\SettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Laravel\Socialite\Contracts\User as SocialiteUserContract;
 use Laravel\Socialite\Facades\Socialite;
@@ -680,6 +720,11 @@ class FacebookOAuthControllerTest extends TestCase
         return $socialiteUser;
     }
 
+    private function stateFor(int $tenantId): string
+    {
+        return Crypt::encryptString(json_encode(['tenant_id' => $tenantId, 'expires_at' => now()->addMinutes(10)->timestamp]));
+    }
+
     public function test_redirect_sends_the_browser_to_facebook(): void
     {
         [, $user] = $this->tenantAdmin();
@@ -692,11 +737,11 @@ class FacebookOAuthControllerTest extends TestCase
         $this->assertStringContainsString('facebook.com', $response->headers->get('Location'));
     }
 
-    public function test_callback_with_single_page_connects_immediately(): void
+    public function test_callback_with_single_page_redirects_to_settings_connected(): void
     {
-        [$tenant, $user] = $this->tenantAdmin();
+        [$tenant] = $this->tenantAdmin();
 
-        Socialite::shouldReceive('driver->user')->once()->andReturn($this->fakeSocialiteUser('short-lived-token'));
+        Socialite::shouldReceive('driver->stateless->user')->once()->andReturn($this->fakeSocialiteUser('short-lived-token'));
         Http::fake([
             'graph.facebook.com/*/oauth/access_token*' => Http::response(['access_token' => 'long-lived-token'], 200),
             'graph.facebook.com/*/me/accounts*' => Http::response(['data' => [
@@ -705,19 +750,23 @@ class FacebookOAuthControllerTest extends TestCase
             'graph.facebook.com/*/subscribed_apps*' => Http::response(['success' => true], 200),
         ]);
 
-        $response = $this->withHeader('X-Tenant', 'acme')
-            ->actingAs($user)
-            ->getJson('/api/integrations/facebook/oauth/callback');
+        // No auth, no X-Tenant header, no actingAs — this must work purely from the state param,
+        // exactly like Facebook's own redirect would arrive.
+        $response = $this->get('/api/integrations/facebook/oauth/callback?state=' . urlencode($this->stateFor($tenant->id)));
 
-        $response->assertOk()->assertJson(['success' => true, 'status' => 'connected', 'page_name' => 'AutoBizPro IL', 'subscribed' => true]);
+        $response->assertRedirect();
+        $location = $response->headers->get('Location');
+        $this->assertStringContainsString('/settings', $location);
+        $this->assertStringContainsString('fb_status=connected', $location);
+        $this->assertStringContainsString('fb_subscribed=1', $location);
         $this->assertSame('111', app(SettingsService::class)->get('facebook_page_id'));
     }
 
-    public function test_callback_with_multiple_pages_returns_choices_without_tokens(): void
+    public function test_callback_with_multiple_pages_redirects_with_pages_token_and_no_access_tokens_in_plaintext(): void
     {
-        [, $user] = $this->tenantAdmin();
+        [$tenant] = $this->tenantAdmin();
 
-        Socialite::shouldReceive('driver->user')->once()->andReturn($this->fakeSocialiteUser('short-lived-token'));
+        Socialite::shouldReceive('driver->stateless->user')->once()->andReturn($this->fakeSocialiteUser('short-lived-token'));
         Http::fake([
             'graph.facebook.com/*/oauth/access_token*' => Http::response(['access_token' => 'long-lived-token'], 200),
             'graph.facebook.com/*/me/accounts*' => Http::response(['data' => [
@@ -726,62 +775,91 @@ class FacebookOAuthControllerTest extends TestCase
             ]], 200),
         ]);
 
-        $response = $this->withHeader('X-Tenant', 'acme')
-            ->actingAs($user)
-            ->getJson('/api/integrations/facebook/oauth/callback');
+        $response = $this->get('/api/integrations/facebook/oauth/callback?state=' . urlencode($this->stateFor($tenant->id)));
 
-        $response->assertOk()->assertJson(['success' => true, 'status' => 'choose_page']);
-        $response->assertJsonPath('pages.0.id', '111');
-        $response->assertJsonPath('pages.0.name', 'Page One');
-        $response->assertJsonMissingPath('pages.0.access_token');
+        $response->assertRedirect();
+        $location = $response->headers->get('Location');
+        $this->assertStringContainsString('fb_status=choose_page', $location);
+        $this->assertStringNotContainsString('page-token-111', $location);
+        $this->assertStringNotContainsString('page-token-222', $location);
+        $this->assertMatchesRegularExpression('/fb_pages_token=[^&]+/', $location);
         $this->assertNull(app(SettingsService::class)->get('facebook_page_id'));
     }
 
-    public function test_callback_with_no_pages_reports_hebrew_error(): void
+    public function test_callback_with_no_pages_redirects_with_hebrew_error(): void
     {
-        [, $user] = $this->tenantAdmin();
+        [$tenant] = $this->tenantAdmin();
 
-        Socialite::shouldReceive('driver->user')->once()->andReturn($this->fakeSocialiteUser('short-lived-token'));
+        Socialite::shouldReceive('driver->stateless->user')->once()->andReturn($this->fakeSocialiteUser('short-lived-token'));
         Http::fake([
             'graph.facebook.com/*/oauth/access_token*' => Http::response(['access_token' => 'long-lived-token'], 200),
             'graph.facebook.com/*/me/accounts*' => Http::response(['data' => []], 200),
         ]);
 
-        $this->withHeader('X-Tenant', 'acme')
-            ->actingAs($user)
-            ->getJson('/api/integrations/facebook/oauth/callback')
-            ->assertOk()
-            ->assertJson(['success' => false, 'message' => 'לא נמצאו עמודים שאתה מנהל']);
+        $response = $this->get('/api/integrations/facebook/oauth/callback?state=' . urlencode($this->stateFor($tenant->id)));
+
+        $response->assertRedirect();
+        $location = urldecode($response->headers->get('Location'));
+        $this->assertStringContainsString('fb_status=error', $location);
+        $this->assertStringContainsString('לא נמצאו עמודים שאתה מנהל', $location);
     }
 
-    public function test_callback_with_access_denied_reports_cancellation(): void
+    public function test_callback_with_access_denied_redirects_with_cancellation_message(): void
     {
-        [, $user] = $this->tenantAdmin();
+        $response = $this->get('/api/integrations/facebook/oauth/callback?error=access_denied');
 
-        $this->withHeader('X-Tenant', 'acme')
-            ->actingAs($user)
-            ->getJson('/api/integrations/facebook/oauth/callback?error=access_denied')
-            ->assertOk()
-            ->assertJson(['success' => false, 'message' => 'ההתחברות בוטלה']);
+        $response->assertRedirect();
+        $location = urldecode($response->headers->get('Location'));
+        $this->assertStringContainsString('fb_status=error', $location);
+        $this->assertStringContainsString('ההתחברות בוטלה', $location);
     }
 
-    public function test_select_page_connects_from_stashed_session_choices(): void
+    public function test_callback_with_invalid_or_missing_state_redirects_with_error(): void
     {
-        [, $user] = $this->tenantAdmin();
+        $response = $this->get('/api/integrations/facebook/oauth/callback?state=not-a-real-encrypted-value');
+
+        $response->assertRedirect();
+        $location = urldecode($response->headers->get('Location'));
+        $this->assertStringContainsString('fb_status=error', $location);
+    }
+
+    public function test_select_page_connects_using_pages_token(): void
+    {
+        [$tenant] = $this->tenantAdmin();
 
         Http::fake(['graph.facebook.com/*/subscribed_apps*' => Http::response(['success' => true], 200)]);
 
-        session(['facebook_oauth_pages' => [
-            ['id' => '111', 'name' => 'Page One', 'access_token' => 'page-token-111'],
-            ['id' => '222', 'name' => 'Page Two', 'access_token' => 'page-token-222'],
-        ]]);
+        $pagesToken = Crypt::encryptString(json_encode([
+            'tenant_id' => $tenant->id,
+            'pages' => [
+                ['id' => '111', 'name' => 'Page One', 'access_token' => 'page-token-111'],
+                ['id' => '222', 'name' => 'Page Two', 'access_token' => 'page-token-222'],
+            ],
+            'expires_at' => now()->addMinutes(10)->timestamp,
+        ]));
 
-        $response = $this->withHeader('X-Tenant', 'acme')
-            ->actingAs($user)
-            ->postJson('/api/integrations/facebook/oauth/select-page', ['page_id' => '222']);
+        // No auth at all — this must work purely from the pages_token, since it's called by the
+        // frontend right after a cross-origin redirect landing, before any session exists.
+        $response = $this->postJson('/api/integrations/facebook/oauth/select-page', [
+            'pages_token' => $pagesToken,
+            'page_id' => '222',
+        ]);
 
         $response->assertOk()->assertJson(['success' => true, 'status' => 'connected', 'page_name' => 'Page Two', 'subscribed' => true]);
         $this->assertSame('222', app(SettingsService::class)->get('facebook_page_id'));
+    }
+
+    public function test_select_page_with_expired_pages_token_reports_hebrew_error(): void
+    {
+        $pagesToken = Crypt::encryptString(json_encode([
+            'tenant_id' => 1,
+            'pages' => [['id' => '111', 'name' => 'Page One', 'access_token' => 'x']],
+            'expires_at' => now()->subMinute()->timestamp,
+        ]));
+
+        $this->postJson('/api/integrations/facebook/oauth/select-page', ['pages_token' => $pagesToken, 'page_id' => '111'])
+            ->assertStatus(400)
+            ->assertJson(['success' => false, 'message' => 'הבחירה פגה, נסה להתחבר שוב']);
     }
 }
 ```
@@ -801,89 +879,155 @@ Create `backend/app/Http/Controllers/FacebookOAuthController.php`:
 namespace App\Http\Controllers;
 
 use App\Services\Integrations\FacebookOAuthService;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Laravel\Socialite\Facades\Socialite;
 
 /**
  * Facebook Lead Ads — OAuth connect. Replaces manual app_id/secret/page_id entry
  * with a one-click flow that also performs the Page→App webhook subscription that
  * has no reliable manual UI path (see docs/superpowers/specs/2026-08-11-facebook-oauth-lead-ads-design.md).
+ *
+ * callback() and selectPage() are deliberately NOT behind auth:sanctum — callback()
+ * is the literal URL Facebook's browser redirects to after consent, a cross-origin
+ * top-level navigation that never carries this app's session cookie (Sanctum's
+ * stateful check is Referer/Origin-based, and facebook.com never matches). Tenant
+ * identity instead travels in a signed, encrypted `state`/`pages_token` value — see
+ * the "OAuth callback identity" section of the design doc for the full reasoning.
  */
 class FacebookOAuthController extends Controller
 {
+    private const TOKEN_TTL_SECONDS = 600; // 10 minutes — bounds the whole redirect round-trip
+
+    /** GET — user-initiated, same-origin, normal authenticated request. */
     public function redirect(): RedirectResponse
     {
+        $state = Crypt::encryptString(json_encode([
+            'tenant_id'  => app('current_tenant_id'),
+            'expires_at' => now()->addSeconds(self::TOKEN_TTL_SECONDS)->timestamp,
+        ]));
+
         return Socialite::driver('facebook')
+            ->stateless()
             ->scopes(['pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'leads_retrieval'])
+            ->with(['state' => $state])
             ->redirect();
     }
 
-    public function callback(Request $request, FacebookOAuthService $svc): JsonResponse
+    /** GET — hit directly by Facebook's cross-origin redirect. No auth, no session. */
+    public function callback(Request $request, FacebookOAuthService $svc): RedirectResponse
     {
         if ($request->query('error') === 'access_denied') {
-            return response()->json(['success' => false, 'message' => 'ההתחברות בוטלה']);
+            return $this->toSettings(['fb_status' => 'error', 'fb_message' => 'ההתחברות בוטלה']);
         }
 
-        $socialiteUser = Socialite::driver('facebook')->user();
+        $tenantId = $this->decode($request->query('state', ''))['tenant_id'] ?? null;
+        if ($tenantId === null) {
+            return $this->toSettings(['fb_status' => 'error', 'fb_message' => 'קישור לא תקין או שפג תוקפו, נסה שוב']);
+        }
+        app()->instance('current_tenant_id', $tenantId);
+
+        $socialiteUser = Socialite::driver('facebook')->stateless()->user();
         $longLivedToken = $svc->exchangeLongLivedToken($socialiteUser->token);
         $pages = $svc->fetchPages($longLivedToken);
 
         if (empty($pages)) {
-            return response()->json(['success' => false, 'message' => 'לא נמצאו עמודים שאתה מנהל']);
+            return $this->toSettings(['fb_status' => 'error', 'fb_message' => 'לא נמצאו עמודים שאתה מנהל']);
         }
 
         if (count($pages) > 1) {
-            $request->session()->put('facebook_oauth_pages', $pages);
-            return response()->json([
-                'success' => true,
-                'status'  => 'choose_page',
-                'pages'   => array_map(fn (array $p) => ['id' => $p['id'], 'name' => $p['name']], $pages),
+            $pagesToken = Crypt::encryptString(json_encode([
+                'tenant_id'  => $tenantId,
+                'pages'      => $pages,
+                'expires_at' => now()->addSeconds(self::TOKEN_TTL_SECONDS)->timestamp,
+            ]));
+            return $this->toSettings([
+                'fb_status'      => 'choose_page',
+                'fb_pages_token' => $pagesToken,
+                'fb_pages'       => json_encode(array_map(fn (array $p) => ['id' => $p['id'], 'name' => $p['name']], $pages)),
             ]);
         }
 
-        $result = $svc->connectPage($pages[0], app('current_tenant_id'));
-        return response()->json(['success' => true, 'status' => 'connected'] + $result);
+        $result = $svc->connectPage($pages[0], $tenantId);
+        return $this->toSettings([
+            'fb_status'     => 'connected',
+            'fb_page'       => $result['page_name'],
+            'fb_subscribed' => $result['subscribed'] ? '1' : '0',
+        ]);
     }
 
+    /** POST — called by our own frontend right after landing back on Settings.
+     *  No auth:sanctum: the signed pages_token (minted only by callback() above,
+     *  valid for 10 minutes) is the credential. */
     public function selectPage(Request $request, FacebookOAuthService $svc): JsonResponse
     {
-        $data = $request->validate(['page_id' => 'required|string']);
-        $pages = $request->session()->get('facebook_oauth_pages', []);
-        $page = collect($pages)->firstWhere('id', $data['page_id']);
+        $data = $request->validate(['pages_token' => 'required|string', 'page_id' => 'required|string']);
 
+        $payload = $this->decode($data['pages_token']);
+        if ($payload === null) {
+            return response()->json(['success' => false, 'message' => 'הבחירה פגה, נסה להתחבר שוב'], 400);
+        }
+
+        $page = collect($payload['pages'] ?? [])->firstWhere('id', $data['page_id']);
         if (!$page) {
             return response()->json(['success' => false, 'message' => 'העמוד שנבחר לא נמצא, נסה להתחבר שוב'], 404);
         }
 
-        $result = $svc->connectPage($page, app('current_tenant_id'));
-        $request->session()->forget('facebook_oauth_pages');
+        $result = $svc->connectPage($page, $payload['tenant_id']);
         return response()->json(['success' => true, 'status' => 'connected'] + $result);
+    }
+
+    /** Decrypt a state/pages_token value, returning null if invalid or expired. */
+    private function decode(string $token): ?array
+    {
+        try {
+            $payload = json_decode(Crypt::decryptString($token), true);
+        } catch (DecryptException $e) {
+            return null;
+        }
+        if (!is_array($payload) || ($payload['expires_at'] ?? 0) < now()->timestamp) {
+            return null;
+        }
+        return $payload;
+    }
+
+    private function toSettings(array $query): RedirectResponse
+    {
+        return redirect('/settings?' . http_build_query($query));
     }
 }
 ```
 
-Add to `backend/routes/api.php`, inside the `auth:sanctum` group, right after the existing
-`/integrations/settings` routes (currently ending around line 189):
+Add to `backend/routes/api.php`. The `redirect` route stays inside the existing `auth:sanctum`
+group, right after the existing `/integrations/settings` routes (same as before):
 
 ```php
     // Facebook Lead Ads — OAuth connect (replaces manual app_id/secret entry)
     Route::get('/integrations/facebook/oauth/redirect', [\App\Http\Controllers\FacebookOAuthController::class, 'redirect'])
         ->middleware('permission:users,can_update');
-    Route::get('/integrations/facebook/oauth/callback', [\App\Http\Controllers\FacebookOAuthController::class, 'callback'])
-        ->middleware('permission:users,can_update');
-    Route::post('/integrations/facebook/oauth/select-page', [\App\Http\Controllers\FacebookOAuthController::class, 'selectPage'])
-        ->middleware('permission:users,can_update');
+```
+
+`callback` and `selectPage` go **outside** that group — find the other public integration routes
+near the top of the file (the `/integrations/whatsapp/webhook/{tenant}`,
+`/integrations/facebook/webhook/{tenant}` routes) and add these alongside them:
+
+```php
+// Facebook Lead Ads OAuth callback — hit directly by Facebook's cross-origin browser
+// redirect, so it can't sit behind auth:sanctum (see FacebookOAuthController's class
+// doc comment). Tenant identity travels in the signed `state`/`pages_token` instead.
+Route::get('/integrations/facebook/oauth/callback', [\App\Http\Controllers\FacebookOAuthController::class, 'callback'])
+    ->middleware('throttle:20,1');
+Route::post('/integrations/facebook/oauth/select-page', [\App\Http\Controllers\FacebookOAuthController::class, 'selectPage'])
+    ->middleware('throttle:20,1');
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd backend && php artisan test --filter=FacebookOAuthControllerTest`
-Expected: PASS — 6 tests. If `Mockery` isn't autoloaded in tests, confirm
-`backend/composer.json`'s `require-dev` already has `mockery/mockery` (Laravel ships it by
-default — if the run fails with a class-not-found error for `Mockery`, run
-`composer require --dev mockery/mockery` first).
+Expected: PASS — 8 tests.
 
 - [ ] **Step 5: Run the full backend test suite to confirm nothing broke**
 
@@ -895,7 +1039,7 @@ Expected: PASS — all tests, including `FacebookLeadAdsTest`, `LeadObserverAuto
 
 ```bash
 git add backend/app/Http/Controllers/FacebookOAuthController.php backend/routes/api.php backend/tests/Feature/FacebookOAuthControllerTest.php
-git commit -m "feat: add Facebook OAuth redirect/callback/select-page endpoints"
+git commit -m "feat: add Facebook OAuth redirect/callback/select-page endpoints (stateless, signed state)"
 ```
 
 ---
@@ -1109,25 +1253,28 @@ git commit -m "feat: read Facebook lead data with the tenant's page access token
 - Modify: `frontend/src/pages/settings/SettingsPage.jsx:531-598` (`FacebookCard`)
 
 **Interfaces:**
-- Consumes: `GET /api/integrations/facebook/oauth/redirect` (browser navigation, not fetch — it's a
-  302 to Meta), `GET /api/integrations/facebook/oauth/callback`,
-  `POST /api/integrations/facebook/oauth/select-page` (Task 6).
+- Consumes: `GET /api/integrations/facebook/oauth/redirect` (a plain full-page navigation, not
+  fetch — it's a 302 to Meta), and reads the outcome of `GET .../oauth/callback` from
+  `window.location.search` on mount, since Task 6's redesign makes `callback` redirect straight
+  back to `/settings?fb_status=...` instead of being called by the frontend. Calls
+  `POST /api/integrations/facebook/oauth/select-page` with `{ pages_token, page_id }` for the
+  multi-page case (Task 6).
 - No test file — this repo has no component-test setup for Settings cards (only `src/hooks` and
   `src/lib` have `vitest` unit tests); verify by running the dev server and clicking through, as
   Task 8's own steps do.
 
-- [ ] **Step 1: Add the three API calls**
+- [ ] **Step 1: Add the select-page API call**
 
 In `frontend/src/api/integrations.js`, add inside the `integrationsApi` object, after
 `googleSheetsExport`:
 
 ```js
-  facebookOAuthCallback: () => client.get('/integrations/facebook/oauth/callback'),
-  facebookSelectPage: (pageId) => client.post('/integrations/facebook/oauth/select-page', { page_id: pageId }),
+  facebookSelectPage: (pagesToken, pageId) => client.post('/integrations/facebook/oauth/select-page', { pages_token: pagesToken, page_id: pageId }),
 ```
 
-(`facebookOAuthCallback` is called by the frontend after the browser returns from Meta's consent
-screen with the session cookie still attached — see Step 2's flow.)
+There's no `facebookOAuthCallback` call — Task 6's `callback` endpoint is hit directly by Facebook's
+browser redirect and never fetched by the frontend; the SPA only ever reads its outcome from the URL
+query string it gets redirected back to.
 
 - [ ] **Step 2: Rewrite `FacebookCard`**
 
@@ -1136,40 +1283,49 @@ Replace the whole `FacebookCard` function in `frontend/src/pages/settings/Settin
 
 ```jsx
 function FacebookCard({ integ, qc, can }) {
+  const [pageChoices, setPageChoices] = useState(null) // [{id, name}] parsed from fb_pages
+  const [pagesToken, setPagesToken] = useState(null)
   const [connecting, setConnecting] = useState(false)
-  const [pageChoices, setPageChoices] = useState(null) // [{id, name}] when the user manages >1 page
   const [error, setError] = useState('')
+  const [justConnected, setJustConnected] = useState(null) // {page, subscribed} from a fresh redirect
 
   const connected = Boolean(integ?.facebook_page_id)
-  const pageName = integ?.facebook_page_name
+  const pageName = justConnected?.page ?? integ?.facebook_page_name
   const needsRenewal = integ?.facebook_connection_status === 'needs_renewal'
 
-  const finishConnect = async () => {
-    setConnecting(true)
-    setError('')
-    try {
-      const { data } = await integrationsApi.facebookOAuthCallback()
-      if (!data.success) {
-        setError(data.message)
-      } else if (data.status === 'choose_page') {
-        setPageChoices(data.pages)
-      } else {
-        qc.invalidateQueries({ queryKey: ['integrations-settings'] })
+  // Task 6's callback() redirects Facebook's own browser navigation straight back here
+  // with the outcome encoded in the query string — it never gets fetched by this page.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get('fb_status')
+    if (!status) return
+    window.history.replaceState({}, '', window.location.pathname)
+
+    if (status === 'connected') {
+      setJustConnected({ page: params.get('fb_page'), subscribed: params.get('fb_subscribed') === '1' })
+      qc.invalidateQueries({ queryKey: ['integrations-settings'] })
+    } else if (status === 'choose_page') {
+      setPagesToken(params.get('fb_pages_token'))
+      try {
+        setPageChoices(JSON.parse(params.get('fb_pages') || '[]'))
+      } catch {
+        setError('שגיאה בטעינת רשימת העמודים, נסה שוב')
       }
-    } finally {
-      setConnecting(false)
+    } else if (status === 'error') {
+      setError(params.get('fb_message') || 'שגיאה בהתחברות')
     }
-  }
+  }, [])
 
   const selectPage = async (pageId) => {
     setConnecting(true)
     setError('')
     try {
-      const { data } = await integrationsApi.facebookSelectPage(pageId)
+      const { data } = await integrationsApi.facebookSelectPage(pagesToken, pageId)
       if (!data.success) {
         setError(data.message)
       } else {
         setPageChoices(null)
+        setJustConnected({ page: data.page_name, subscribed: data.subscribed })
         qc.invalidateQueries({ queryKey: ['integrations-settings'] })
       }
     } finally {
@@ -1177,18 +1333,8 @@ function FacebookCard({ integ, qc, can }) {
     }
   }
 
-  // After the browser returns from Meta's consent screen, the app reloads on
-  // this page with the session cookie intact — the callback GET runs then.
-  useEffect(() => {
-    if (window.location.search.includes('fb_connect=1')) {
-      window.history.replaceState({}, '', window.location.pathname)
-      finishConnect()
-    }
-  }, [])
-
   const startConnect = () => {
-    const returnTo = `${window.location.pathname}?fb_connect=1`
-    window.location.href = `/api/integrations/facebook/oauth/redirect?return_to=${encodeURIComponent(returnTo)}`
+    window.location.href = '/api/integrations/facebook/oauth/redirect'
   }
 
   return (
@@ -1198,6 +1344,10 @@ function FacebookCard({ integ, qc, can }) {
 
       {connected && !pageChoices && !needsRenewal && (
         <div className="text-sm text-green-700 dark:text-green-400 mb-3">✓ מחובר לעמוד: <strong>{pageName}</strong></div>
+      )}
+
+      {justConnected && !justConnected.subscribed && (
+        <div className="text-sm text-amber-700 dark:text-amber-400 mb-3">⚠ העמוד חובר אך רישום ללידים נכשל — נסה להתחבר שוב.</div>
       )}
 
       {connected && needsRenewal && (
@@ -1221,7 +1371,7 @@ function FacebookCard({ integ, qc, can }) {
       {can('users', 'can_update') && !pageChoices && (
         <button type="button" disabled={connecting} onClick={startConnect}
           className="bg-[#2398c2] hover:bg-[#1c7ea3] text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50">
-          {connecting ? 'מתחבר...' : connected ? 'התחבר לעמוד אחר' : 'התחבר עם פייסבוק'}
+          {connected ? 'התחבר לעמוד אחר' : 'התחבר עם פייסבוק'}
         </button>
       )}
     </Card>

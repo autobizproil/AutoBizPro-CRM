@@ -169,3 +169,38 @@ recording the screencast are deliverables of this work, but approval is not a bl
   silently dies within the hour. This is the highest-risk detail in the implementation.
 - **App Review rejection.** Meta rejects submissions with vague permission justifications. Mitigated
   by writing the justification against the concrete flow rather than in general terms.
+
+## Addendum (2026-08-11): OAuth callback identity
+
+The implementation plan's first draft of the callback controller put all three OAuth endpoints
+behind `auth:sanctum` and relied on Laravel's session for two things: Socialite's own CSRF `state`
+validation, and stashing the candidate Page list between `callback` and `select-page` for the
+multi-page case. Task-level review caught this before it shipped.
+
+The problem: `callback` is not a request the frontend makes. It is the literal `redirect_uri` Meta's
+OAuth dialog sends the browser to after the user approves — a top-level, cross-origin navigation
+from `facebook.com`. Laravel Sanctum's `EnsureFrontendRequestsAreStateful` middleware only attaches
+session support to a request when its `Referer`/`Origin` header matches one of the app's own
+configured frontend domains; a redirect from Meta never matches. So in production this would either
+401 before the controller runs (no session ⇒ no cookie-based auth) or, if it somehow got further,
+throw `Session store not set on request` the moment Socialite's `hasInvalidState()` tried to read the
+CSRF state it wrote into session during `redirect()`. Every automated test for the original design
+passed anyway, because they all mocked `Socialite::driver('facebook')->user()` directly — bypassing
+the real state-check code path that touches the session.
+
+The fix, implemented in the plan's Task 6: carry tenant identity through the whole round trip in a
+signed, encrypted value (`Illuminate\Support\Facades\Crypt`) instead of the session. `redirect()`
+mints it while the request is still authenticated and same-origin — that part was never actually
+broken. `callback()` and `select-page` decrypt it and never touch `auth:sanctum` or
+`$request->session()` at all; both routes moved out of the authenticated route group into the public
+one, alongside the other integration webhooks that already follow this same "identity travels in the
+request, not in server-side session" pattern (`/integrations/whatsapp/webhook/{tenant}`,
+`/integrations/facebook/webhook/{tenant}`). The multi-page case's Page list (including access
+tokens) travels the same way, encrypted into a `pages_token` handed to the frontend as an opaque
+blob — stronger than the original design's session-based stash, since nothing sensitive is ever
+readable by the client at all, not even in principle.
+
+One more consequence: `callback()` returns a redirect to the frontend's Settings page with the
+outcome encoded in the query string, not JSON — since it's answering a raw browser navigation, not a
+fetch call. The frontend (Task 8) reads that outcome from `window.location.search` on mount instead
+of calling the callback endpoint itself.
