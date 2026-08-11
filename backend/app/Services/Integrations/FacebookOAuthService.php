@@ -73,16 +73,21 @@ class FacebookOAuthService
      */
     public function subscribePage(string $pageId, string $pageAccessToken): bool
     {
-        $response = Http::asForm()->post("https://graph.facebook.com/v21.0/{$pageId}/subscribed_apps", [
-            'subscribed_fields' => 'leadgen',
-            'access_token'      => $pageAccessToken,
-        ]);
+        try {
+            $response = Http::asForm()->post("https://graph.facebook.com/v21.0/{$pageId}/subscribed_apps", [
+                'subscribed_fields' => 'leadgen',
+                'access_token'      => $pageAccessToken,
+            ]);
 
-        if (!$response->ok() || !$response->json('success')) {
-            Log::error('Facebook OAuth: subscribed_apps failed', ['page_id' => $pageId, 'status' => $response->status(), 'body' => $response->body()]);
+            if (!$response->ok() || !$response->json('success')) {
+                Log::error('Facebook OAuth: subscribed_apps failed', ['page_id' => $pageId, 'status' => $response->status(), 'body' => $response->body()]);
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Facebook OAuth: exception subscribing page', ['page_id' => $pageId, 'error' => $e->getMessage()]);
             return false;
         }
-
-        return true;
     }
 }

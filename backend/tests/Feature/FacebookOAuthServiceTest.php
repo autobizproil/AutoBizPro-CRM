@@ -98,4 +98,13 @@ class FacebookOAuthServiceTest extends TestCase
 
         $this->assertFalse($this->service()->subscribePage('111', 'page-token-111'));
     }
+
+    public function test_subscribe_page_returns_false_without_throwing_on_connection_exception(): void
+    {
+        Http::fake([
+            'graph.facebook.com/*/subscribed_apps*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('Connection timed out'),
+        ]);
+
+        $this->assertFalse($this->service()->subscribePage('111', 'page-token-111'));
+    }
 }
