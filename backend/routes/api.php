@@ -48,6 +48,14 @@ Route::get('/integrations/facebook/webhook/{tenant}',  [IntegrationsController::
 Route::post('/integrations/facebook/webhook/{tenant}', [IntegrationsController::class, 'facebookWebhook'])
     ->middleware('throttle:120,1');
 
+// Facebook Lead Ads OAuth callback — hit directly by Facebook's cross-origin browser
+// redirect, so it can't sit behind auth:sanctum (see FacebookOAuthController's class
+// doc comment). Tenant identity travels in the signed `state`/`pages_token` instead.
+Route::get('/integrations/facebook/oauth/callback', [\App\Http\Controllers\FacebookOAuthController::class, 'callback'])
+    ->middleware('throttle:20,1');
+Route::post('/integrations/facebook/oauth/select-page', [\App\Http\Controllers\FacebookOAuthController::class, 'selectPage'])
+    ->middleware('throttle:20,1');
+
 // Voicenter PBX webhook
 Route::post('/integrations/voicenter/webhook/{tenant}', [IntegrationsController::class, 'voicenterWebhook'])
     ->middleware('throttle:120,1');
@@ -190,10 +198,6 @@ Route::middleware(['auth:sanctum', 'tenant', 'agent.ability'])->group(function (
 
     // Facebook Lead Ads — OAuth connect (replaces manual app_id/secret entry)
     Route::get('/integrations/facebook/oauth/redirect', [\App\Http\Controllers\FacebookOAuthController::class, 'redirect'])
-        ->middleware('permission:users,can_update');
-    Route::get('/integrations/facebook/oauth/callback', [\App\Http\Controllers\FacebookOAuthController::class, 'callback'])
-        ->middleware('permission:users,can_update');
-    Route::post('/integrations/facebook/oauth/select-page', [\App\Http\Controllers\FacebookOAuthController::class, 'selectPage'])
         ->middleware('permission:users,can_update');
 
     // Integrations — WhatsApp (GREEN-API)
