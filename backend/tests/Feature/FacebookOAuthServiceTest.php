@@ -52,4 +52,28 @@ class FacebookOAuthServiceTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->service()->exchangeLongLivedToken('bad-token');
     }
+
+    public function test_fetch_pages_returns_id_name_and_page_token(): void
+    {
+        Http::fake([
+            'graph.facebook.com/*/me/accounts*' => Http::response([
+                'data' => [
+                    ['id' => '111', 'name' => 'AutoBizPro IL', 'access_token' => 'page-token-111'],
+                    ['id' => '222', 'name' => 'Other Page', 'access_token' => 'page-token-222'],
+                ],
+            ], 200),
+        ]);
+
+        $pages = $this->service()->fetchPages('user-token-abc');
+
+        $this->assertCount(2, $pages);
+        $this->assertSame(['id' => '111', 'name' => 'AutoBizPro IL', 'access_token' => 'page-token-111'], $pages[0]);
+    }
+
+    public function test_fetch_pages_returns_empty_array_when_user_manages_no_pages(): void
+    {
+        Http::fake(['graph.facebook.com/*/me/accounts*' => Http::response(['data' => []], 200)]);
+
+        $this->assertSame([], $this->service()->fetchPages('user-token-abc'));
+    }
 }

@@ -41,4 +41,27 @@ class FacebookOAuthService
 
         return $response->json('access_token');
     }
+
+    /**
+     * Pages the authenticated user manages, each with its own page access token.
+     * Returns [] rather than throwing when the user manages no Pages — the
+     * caller decides how to report that to the user.
+     */
+    public function fetchPages(string $userAccessToken): array
+    {
+        $response = Http::get('https://graph.facebook.com/v21.0/me/accounts', [
+            'access_token' => $userAccessToken,
+            'fields'       => 'id,name,access_token',
+        ]);
+
+        if (!$response->ok()) {
+            Log::error('Facebook OAuth: /me/accounts failed', ['status' => $response->status(), 'body' => $response->body()]);
+            return [];
+        }
+
+        return array_map(
+            fn (array $p) => ['id' => $p['id'], 'name' => $p['name'], 'access_token' => $p['access_token']],
+            $response->json('data') ?? []
+        );
+    }
 }
