@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Log;
  *   2. Add the "Lead Ads" product to the app
  *   3. Subscribe the page to leadgen webhook events
  *   4. Set webhook URL: /api/integrations/facebook/webhook/{tenant}
- *   5. Verify token: the value stored in facebook_verify_token setting
+ *   5. Verify token: the value in config('services.facebook.verify_token') (FACEBOOK_VERIFY_TOKEN)
  *   6. Grant "leads_retrieval" permission
  */
 class FacebookLeadAdsService
