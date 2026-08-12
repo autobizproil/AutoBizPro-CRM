@@ -44,6 +44,7 @@ return [
         'client_secret' => env('FACEBOOK_APP_SECRET'),
         'redirect'      => env('FACEBOOK_REDIRECT_URI'),
         'verify_token'  => env('FACEBOOK_VERIFY_TOKEN'),
+        'config_id'     => env('FACEBOOK_CONFIG_ID'),
     ],
 
 ];

@@ -34,10 +34,15 @@ class FacebookOAuthController extends Controller
             'expires_at' => now()->addSeconds(self::TOKEN_TTL_SECONDS)->timestamp,
         ]));
 
+        // This app's permissions (pages_manage_metadata, leads_retrieval) are gated behind
+        // Facebook Login for Business's Configuration system, not classic OAuth scopes —
+        // passing ->scopes() directly triggers "Invalid Scopes" instead of a permission
+        // prompt. config_id carries the permission set instead; see the design doc's
+        // "OAuth callback identity" section for the Task 6 redesign context this builds on.
         return Socialite::driver('facebook')
             ->stateless()
-            ->scopes(['pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'leads_retrieval'])
-            ->with(['state' => $state])
+            ->setScopes([])
+            ->with(['state' => $state, 'config_id' => config('services.facebook.config_id')])
             ->redirect();
     }
 
