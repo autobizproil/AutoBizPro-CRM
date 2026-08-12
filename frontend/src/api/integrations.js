@@ -12,6 +12,7 @@ export const integrationsApi = {
   pdfGenerateDoc: (leadId, payload) => client.post(`/pdf/generate/lead/${leadId}`, payload),
   paycallTest: (tenantSubdomain) => client.post('/integrations/paycall/test', { subdomain: tenantSubdomain }),
   googleSheetsExport: () => client.post('/integrations/google/sheets/export'),
+  facebookSelectPage: (pagesToken, pageId) => client.post('/integrations/facebook/oauth/select-page', { pages_token: pagesToken, page_id: pageId }),
 }
 
 export const GI_DOC_TYPES = [
