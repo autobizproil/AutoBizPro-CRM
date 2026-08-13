@@ -60,6 +60,11 @@ Route::post('/integrations/facebook/oauth/select-page', [\App\Http\Controllers\F
 Route::post('/integrations/voicenter/webhook/{tenant}', [IntegrationsController::class, 'voicenterWebhook'])
     ->middleware('throttle:120,1');
 
+// Facebook Lead Ads via Make.com bridge — public, authenticated via per-tenant
+// X-Webhook-Secret header instead of a session (Make's HTTP module has no session).
+Route::post('/integrations/make/lead/{tenant}', [IntegrationsController::class, 'makeLeadWebhook'])
+    ->middleware('throttle:120,1');
+
 // ── PDF / Digital Signature — Public routes ───────────────────────────────
 // Ported from Taskey webapi/sign_document_v2.php + signature_form_to_pdf.php
 Route::get('/pdf/sign/{tenant}/{token}', [PdfController::class, 'signatureForm']);

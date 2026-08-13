@@ -695,4 +695,51 @@ class IntegrationsController extends Controller
 
         return response()->json(['success' => true, 'data' => ['secret' => $secret]]);
     }
+
+    /**
+     * Public ingestion endpoint for the Make.com Facebook Lead Ads bridge. Make's
+     * "Watch Leads" module already resolved the lead's fields — no Graph API call
+     * happens here. Auth is a per-tenant shared secret (X-Webhook-Secret), generated
+     * via generateMakeWebhookSecret() above, compared with hash_equals.
+     *
+     * POST /api/integrations/make/lead/{tenant}
+     * Body: { name?, phone?, email?, form_name? } — at least one of name/phone/email required.
+     */
+    public function makeLeadWebhook(Request $request, string $tenant): JsonResponse
+    {
+        $tenantModel = Tenant::where('subdomain', $tenant)->first();
+        if (!$tenantModel) {
+            return response()->json(['success' => false], 404);
+        }
+        app()->instance('current_tenant_id', $tenantModel->id);
+
+        $secret = app(SettingsService::class)->get('make_lead_webhook_secret');
+        $provided = $request->header('X-Webhook-Secret', '');
+        if (!$secret || !hash_equals($secret, $provided)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $data = $request->validate([
+            'name'      => 'nullable|string|max:255',
+            'phone'     => 'nullable|string|max:50',
+            'email'     => 'nullable|email|max:255',
+            'form_name' => 'nullable|string|max:255',
+        ]);
+
+        if (empty($data['name']) && empty($data['phone']) && empty($data['email'])) {
+            return response()->json(['success' => false, 'message' => 'name, phone, or email is required'], 422);
+        }
+
+        Lead::create([
+            'tenant_id' => $tenantModel->id,
+            'name'      => $data['name'] ?: 'Facebook Lead',
+            'phone'     => $data['phone'] ?? null,
+            'email'     => $data['email'] ?? null,
+            'source'    => 'פייסבוק (Make)',
+            'status'    => 'NEW_LEAD',
+            'notes'     => !empty($data['form_name']) ? "Form: {$data['form_name']}" : null,
+        ]);
+
+        return response()->json(['success' => true]);
+    }
 }
