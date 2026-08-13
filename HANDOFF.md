@@ -1,4 +1,109 @@
-# HANDOFF — CRM (AutoBizPro) — 2026-07-26 (latest session, on top of everything below)
+# HANDOFF — CRM (AutoBizPro) — 2026-08-13 (latest session, on top of everything below)
+
+## 0. Latest session summary (2026-08-12 → 2026-08-13)
+
+**Facebook Lead Ads integration — two parallel tracks. Track A (direct OAuth) is built, merged, and
+deployed but blocked on Meta; Track B (Make.com bridge) is designed but not yet implemented, and is
+the one to build first when this session resumes.**
+
+### Track A: Direct Facebook OAuth connect — DONE, DEPLOYED, BLOCKED ON META
+
+Full one-click "Connect with Facebook" flow replacing the old manual app_id/secret/page_id form.
+Built via superpowers brainstorming → spec → plan → subagent-driven-development, 9 tasks +
+1 final-review fix round, on branch `worktree-facebook-oauth-lead-ads`.
+
+- Spec: `docs/superpowers/specs/2026-08-11-facebook-oauth-lead-ads-design.md` (includes an
+  "Addendum: OAuth callback identity" — a real architecture bug caught mid-plan: the callback route
+  can't sit behind Sanctum session auth because Facebook's redirect is cross-origin and never
+  carries the session cookie. Fixed with a signed/encrypted `state`/`pages_token` instead of
+  session — read this before touching `FacebookOAuthController` again).
+- Plan: `docs/superpowers/plans/2026-08-11-facebook-oauth-lead-ads.md`.
+- Merged: [PR #3](https://github.com/autobizproil/AutoBizPro-CRM/pull/3) (main 9-task feature +
+  final-review fix for a cross-tenant data leak the whole-branch review caught — `selectPage()`
+  never bound `current_tenant_id` before writing settings), [PR #4](https://github.com/autobizproil/AutoBizPro-CRM/pull/4)
+  (follow-up: switched from raw OAuth `scopes()` to Facebook Login for Business's `config_id`
+  mechanism — see below).
+- **Deployed to production** (both `autobiz-crm.duckdns.org` and `sonia-crm.duckdns.org` — same VPS,
+  same app, two DuckDNS hostnames pointing at one nginx config). `FACEBOOK_APP_ID`,
+  `FACEBOOK_APP_SECRET`, `FACEBOOK_REDIRECT_URI`, `FACEBOOK_VERIFY_TOKEN` are set in production
+  `.env`. Migration ran, config cached, frontend rebuilt and copied to the real docroot (see deploy
+  gotcha below).
+
+**Currently blocked:** the Meta App's permission catalog (App Dashboard → Permissions and features)
+does not list `leads_retrieval` or `pages_manage_metadata` at all — not "needs review", not
+"limited access", just absent from the list entirely — even after completing Business Verification
+(confirmed complete, ~24-48h after submission). Checked and ruled out during this session:
+- Graph API Explorer's permission picker: same absence.
+- Facebook Login for Business → Configurations → Choose permissions: same absence.
+- Business Settings → Pages → the specific Page → no "Lead Access"/CRM-grant tab found there either
+  (only got as far as the general "CRM setup" screen under Instant Forms, which is Meta's own
+  Zapier/HubSpot/Gmail/Sheets marketplace — a different, unrelated feature).
+
+**Root cause is genuinely unknown** — could be a slow catalog-sync delay after verification, or a
+real App Review requirement Meta doesn't surface clearly for this permission pair anymore. Not
+resolved this session. `FACEBOOK_CONFIG_ID` is still empty in production `.env` — the OAuth
+`redirect()` call reads it from `config('services.facebook.config_id')` and will start working the
+moment a real Configuration with both permissions can be created and its ID pasted in — no code
+changes needed at that point, just: `sudo nano ~/AutoBizPro-CRM/backend/.env`, add
+`FACEBOOK_CONFIG_ID=...`, then `sudo -u www-data php artisan config:clear && config:cache`.
+
+**Deploy gotcha worth knowing for next time:** `frontend/npm run build` outputs to `frontend/dist/`,
+but nginx's actual docroot for this app is `backend/public/` (see
+`/etc/nginx/sites-enabled/crm` / `sonia-crm` → `root /home/ubuntu/AutoBizPro-CRM/backend/public`).
+The deploy README (`deploy/README.md`) doesn't mention copying `dist/` into `backend/public/` — this
+cost real debugging time this session (site kept serving a stale build from 2026-07-24 despite a
+fresh `npm run build`, because nobody was ever copying the output over). The actual command needed
+after every frontend build:
+```bash
+sudo rsync -a --delete frontend/dist/assets/ backend/public/assets/
+sudo cp frontend/dist/index.html backend/public/index.html
+sudo chown -R www-data:www-data backend/public/assets backend/public/index.html
+```
+Also found on the server this session: leftover uncommitted `.gitignore` diffs in `storage/`
+(harmless, cleared via `sudo git checkout --`) and a pile of bizarre untracked files with literal
+shell-fragment names (`backend/->stream = null;`, `backend/sudo`, etc.) — looked like an old
+copy-pasted command that got mis-interpreted as shell redirection at some point. Left untouched,
+didn't block anything, worth a manual cleanup pass sometime but not urgent.
+
+**Server access:** SSH key at `D:\new auto\fix_key.key` (also present as `fix_key.key`/`new.key` in
+the repo root, untracked — do not commit these), `ssh -i "D:/new auto/fix_key.key" ubuntu@autobiz-crm.duckdns.org`.
+Passwordless `sudo` available. PHP-FPM service is `php8.3-fpm` (not 8.2, despite what
+`deploy/README.md` says — the setup script apparently installed 8.3). DB creds are in the server's
+own `.env`, not reproduced here.
+
+### Track B: Make.com bridge — DESIGNED, NOT YET BUILT (start here next session)
+
+Two or three real customers are waiting on Lead Ads *now* and can't wait on Meta's unknown timeline.
+Decided this session: route leads through Make.com instead (Make's own app already has Meta's
+approval for these permissions, sidestepping the whole blocked chain), while Track A stays dormant
+and activates for free once/if Meta's permissions open up.
+
+- Spec: `docs/superpowers/specs/2026-08-13-make-facebook-lead-bridge-design.md` — written and
+  committed this session, **not yet reviewed by the user**, no implementation plan written yet, no
+  code written yet.
+- Model: **managed onboarding**, not self-serve. For each waiting customer, autobizpro builds one
+  Make.com scenario (autobizpro's own Make account) with a Facebook Lead Ads → Watch Leads trigger,
+  connects it to the customer's Page (customer just clicks "Allow" on Meta's own consent screen
+  during a short call), and points a new backend endpoint as the action's target.
+- New endpoint to build: `POST /api/integrations/make/lead/{tenant}` — public route, auth via a new
+  per-tenant `make_lead_webhook_secret` (`tenant_settings` key, same pattern as
+  `voicenter_webhook_secret`) sent as `X-Webhook-Secret` header. Body: `{name, phone, email, form_name?}`.
+  Creates a `Lead` with `source = 'פייסבוק (Make)'`, going through `LeadObserver` like every other
+  lead-creation path. No Graph API calls, no dedup logic needed (Make's own trigger cursor prevents
+  redelivery under normal operation) — see the spec for the full reasoning on why this is a new
+  endpoint rather than reusing the existing `/facebook/webhook/{tenant}`.
+
+**Next steps when resuming:**
+1. Have the user review `docs/superpowers/specs/2026-08-13-make-facebook-lead-bridge-design.md`.
+2. Invoke `superpowers:writing-plans` to turn it into a task-by-task implementation plan.
+3. Build via `superpowers:subagent-driven-development` (this session's established pattern — see
+   the ledger workflow used for Track A, `.superpowers/sdd/` gitignored local-only progress files).
+4. Once the endpoint exists: build the first customer's actual Make.com scenario (manual, in Make's
+   UI, not code) and verify one real lead flows end-to-end into their tenant.
+
+---
+
+# Prior HANDOFF — 2026-07-26 (kept below for continuity)
 
 ## 0. Latest session summary (2026-07-26)
 
