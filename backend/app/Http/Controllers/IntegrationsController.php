@@ -53,6 +53,10 @@ class IntegrationsController extends Controller
         'google_service_account_json',
         // Outgoing webhook (Make/n8n/Zapier)
         'outgoing_webhook_url',
+        // Facebook Lead Ads via Make.com bridge — server-generated, never hand-typed
+        // (see saveSettings' guard below). Compared against X-Webhook-Secret on the
+        // public ingestion endpoint.
+        'make_lead_webhook_secret',
     ];
 
     /** Substring match -> value masked in responses, masked echoes ignored on save. */
@@ -83,8 +87,8 @@ class IntegrationsController extends Controller
     {
         $settings = app(SettingsService::class);
         foreach (self::INTEGRATION_KEYS as $k) {
-            if ($k === 'facebook_page_access_token') {
-                continue; // OAuth-only — never accepted from a manual request
+            if ($k === 'facebook_page_access_token' || $k === 'make_lead_webhook_secret') {
+                continue; // generated server-side only — never accepted from a manual request
             }
             if ($request->has($k)) {
                 $val = $request->input($k);
@@ -671,5 +675,24 @@ class IntegrationsController extends Controller
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
+    }
+
+    // =====================================================================
+    //  Facebook Lead Ads via Make.com bridge
+    // =====================================================================
+
+    /**
+     * Generate (or rotate) the per-tenant shared secret Make's HTTP module sends
+     * as X-Webhook-Secret on the public ingestion endpoint below. Returned in full
+     * exactly once — every subsequent read via getSettings() comes back masked.
+     *
+     * POST /api/integrations/make-webhook-secret/generate
+     */
+    public function generateMakeWebhookSecret(): JsonResponse
+    {
+        $secret = bin2hex(random_bytes(32)); // 64 hex chars — same pattern as PdfController's signing tokens
+        app(SettingsService::class)->set('make_lead_webhook_secret', $secret);
+
+        return response()->json(['success' => true, 'data' => ['secret' => $secret]]);
     }
 }

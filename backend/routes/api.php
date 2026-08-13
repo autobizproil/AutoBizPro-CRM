@@ -200,6 +200,11 @@ Route::middleware(['auth:sanctum', 'tenant', 'agent.ability'])->group(function (
     Route::get('/integrations/facebook/oauth/redirect', [\App\Http\Controllers\FacebookOAuthController::class, 'redirect'])
         ->middleware('permission:users,can_update');
 
+    // Facebook Lead Ads via Make.com bridge — generates the per-tenant secret Make's
+    // HTTP module authenticates with against the public endpoint below.
+    Route::post('/integrations/make-webhook-secret/generate', [IntegrationsController::class, 'generateMakeWebhookSecret'])
+        ->middleware('permission:users,can_update');
+
     // Integrations — WhatsApp (GREEN-API)
     Route::post('/integrations/whatsapp/test', [IntegrationsController::class, 'whatsappTest'])
         ->middleware('permission:users,can_update');
