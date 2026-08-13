@@ -77,6 +77,22 @@ class MakeLeadBridgeTest extends TestCase
             ->assertStatus(404);
     }
 
+    public function test_payload_without_name_key_defaults_name_and_does_not_crash(): void
+    {
+        $this->tenantWithSecret();
+
+        $this->postJson('/api/integrations/make/lead/acme', [
+            'phone' => '0541234567',
+            'email' => 'dani@example.com',
+        ], ['X-Webhook-Secret' => 'test-secret-abc'])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $lead = Lead::where('phone', '0541234567')->first();
+        $this->assertNotNull($lead);
+        $this->assertSame('Facebook Lead', $lead->name);
+    }
+
     public function test_missing_all_contact_fields_returns_422(): void
     {
         $this->tenantWithSecret();

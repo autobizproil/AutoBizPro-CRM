@@ -3,8 +3,9 @@
 ## 0. Latest session summary (2026-08-12 → 2026-08-13)
 
 **Facebook Lead Ads integration — two parallel tracks. Track A (direct OAuth) is built, merged, and
-deployed but blocked on Meta; Track B (Make.com bridge) is designed but not yet implemented, and is
-the one to build first when this session resumes.**
+deployed but blocked on Meta; Track B (Make.com bridge)'s backend is now built and tested on this
+worktree branch (`worktree-make-facebook-lead-bridge`) — what's left is operational, not code: build
+a real customer scenario in Make's UI and verify one real lead end-to-end.**
 
 ### Track A: Direct Facebook OAuth connect — DONE, DEPLOYED, BLOCKED ON META
 
@@ -71,7 +72,7 @@ Passwordless `sudo` available. PHP-FPM service is `php8.3-fpm` (not 8.2, despite
 `deploy/README.md` says — the setup script apparently installed 8.3). DB creds are in the server's
 own `.env`, not reproduced here.
 
-### Track B: Make.com bridge — DESIGNED, NOT YET BUILT (start here next session)
+### Track B: Make.com bridge — BACKEND BUILT AND TESTED, ONBOARDING STILL MANUAL
 
 Two or three real customers are waiting on Lead Ads *now* and can't wait on Meta's unknown timeline.
 Decided this session: route leads through Make.com instead (Make's own app already has Meta's
@@ -79,27 +80,36 @@ approval for these permissions, sidestepping the whole blocked chain), while Tra
 and activates for free once/if Meta's permissions open up.
 
 - Spec: `docs/superpowers/specs/2026-08-13-make-facebook-lead-bridge-design.md` — written and
-  committed this session, **not yet reviewed by the user**, no implementation plan written yet, no
-  code written yet.
+  committed this session, matches what shipped (endpoint path corrected during the fix-review pass,
+  see below).
 - Model: **managed onboarding**, not self-serve. For each waiting customer, autobizpro builds one
   Make.com scenario (autobizpro's own Make account) with a Facebook Lead Ads → Watch Leads trigger,
   connects it to the customer's Page (customer just clicks "Allow" on Meta's own consent screen
   during a short call), and points a new backend endpoint as the action's target.
-- New endpoint to build: `POST /api/integrations/make/lead/{tenant}` — public route, auth via a new
-  per-tenant `make_lead_webhook_secret` (`tenant_settings` key, same pattern as
-  `voicenter_webhook_secret`) sent as `X-Webhook-Secret` header. Body: `{name, phone, email, form_name?}`.
-  Creates a `Lead` with `source = 'פייסבוק (Make)'`, going through `LeadObserver` like every other
-  lead-creation path. No Graph API calls, no dedup logic needed (Make's own trigger cursor prevents
-  redelivery under normal operation) — see the spec for the full reasoning on why this is a new
-  endpoint rather than reusing the existing `/facebook/webhook/{tenant}`.
+- **Implemented and tested**, `IntegrationsController::generateMakeWebhookSecret` /
+  `IntegrationsController::makeLeadWebhook`:
+  - `POST /api/integrations/make-webhook-secret/generate` (admin-only) generates the per-tenant
+    secret, stored as `make_lead_webhook_secret` in `tenant_settings` — same mechanism as
+    `voicenter_webhook_secret`.
+  - `POST /api/integrations/make/lead/{tenant}` (public route) — Make.com's HTTP module posts here
+    with the secret in an `X-Webhook-Secret` header, compared with `hash_equals`. Body:
+    `{name?, phone?, email?, form_name?}`, at least one of name/phone/email required. Creates a
+    `Lead` with `source = 'פייסבוק (Make)'`, going through `LeadObserver` like every other
+    lead-creation path. No Graph API calls, no dedup logic needed (Make's own trigger cursor
+    prevents redelivery under normal operation).
+  - Tests: `backend/tests/Feature/MakeLeadBridgeTest.php`, 8 tests covering the happy path, wrong/
+    missing secret, unknown tenant, missing-name-key edge case (was a 500 crash, fixed in the
+    whole-branch review — see `$data['name'] ?? null` in the controller), missing-all-contact-fields
+    422, no-secret-configured, and automation firing through this path. All passing.
+- **No frontend/UI exists yet** for triggering secret generation — deliberate, out of scope per the
+  spec's Non-goals. It's called manually (curl/Tinker) by whoever sets up a customer's Make scenario
+  during onboarding.
 
 **Next steps when resuming:**
-1. Have the user review `docs/superpowers/specs/2026-08-13-make-facebook-lead-bridge-design.md`.
-2. Invoke `superpowers:writing-plans` to turn it into a task-by-task implementation plan.
-3. Build via `superpowers:subagent-driven-development` (this session's established pattern — see
-   the ledger workflow used for Track A, `.superpowers/sdd/` gitignored local-only progress files).
-4. Once the endpoint exists: build the first customer's actual Make.com scenario (manual, in Make's
-   UI, not code) and verify one real lead flows end-to-end into their tenant.
+1. Build the first real customer's Make.com scenario (manual, in Make's UI, not code) and verify one
+   real lead flows end-to-end into their tenant. This is the one remaining step — it's operational,
+   not a coding task.
+2. If a self-serve secret-generation UI is ever wanted, that's new scope beyond the current spec.
 
 ---
 

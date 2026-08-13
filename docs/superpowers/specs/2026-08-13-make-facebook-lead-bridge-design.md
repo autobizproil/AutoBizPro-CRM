@@ -81,7 +81,7 @@ Rejected alternatives:
 `getSettings`, same as every other secret there). Unlike `voicenter_webhook_secret` — which is
 pasted in from Voicenter's own portal — this secret is ours to generate, not typed by an admin.
 
-New admin-only endpoint: `POST /api/settings/integrations/make-webhook-secret/generate`.
+New admin-only endpoint: `POST /api/integrations/make-webhook-secret/generate`.
 Generates `bin2hex(random_bytes(32))` (same as `PdfController`'s share-token generation), stores it
 via `SettingsService::set`, and returns the full value **once** in the response body so autobizpro
 can copy it straight into Make's HTTP module header during onboarding. Every subsequent

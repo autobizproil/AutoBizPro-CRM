@@ -732,7 +732,7 @@ class IntegrationsController extends Controller
 
         Lead::create([
             'tenant_id' => $tenantModel->id,
-            'name'      => $data['name'] ?: 'Facebook Lead',
+            'name'      => ($data['name'] ?? null) ?: 'Facebook Lead',
             'phone'     => $data['phone'] ?? null,
             'email'     => $data['email'] ?? null,
             'source'    => 'פייסבוק (Make)',
