@@ -75,6 +75,20 @@ Rejected alternatives:
 - **No authentication, subdomain-only** — anyone who guesses or observes a tenant's subdomain could
   inject fabricated leads into their CRM. Not acceptable.
 
+## Secret generation
+
+`make_lead_webhook_secret` is added to `IntegrationsController::INTEGRATION_KEYS` (masked in
+`getSettings`, same as every other secret there). Unlike `voicenter_webhook_secret` — which is
+pasted in from Voicenter's own portal — this secret is ours to generate, not typed by an admin.
+
+New admin-only endpoint: `POST /api/settings/integrations/make-webhook-secret/generate`.
+Generates `bin2hex(random_bytes(32))` (same as `PdfController`'s share-token generation), stores it
+via `SettingsService::set`, and returns the full value **once** in the response body so autobizpro
+can copy it straight into Make's HTTP module header during onboarding. Every subsequent
+`getSettings` call returns it masked like any other secret. Re-calling generate rotates the secret
+(old Make scenarios using the previous value start getting `403`s — acceptable, this is a managed
+integration autobizpro controls both ends of).
+
 ## Data flow / field mapping
 
 Make's Facebook Lead Ads module surfaces the lead's `field_data` as named output fields matching the
