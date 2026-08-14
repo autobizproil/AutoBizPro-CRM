@@ -47,4 +47,10 @@ return [
         'config_id'     => env('FACEBOOK_CONFIG_ID'),
     ],
 
+    'make' => [
+        'api_token'    => env('MAKE_API_TOKEN'),
+        'team_id'      => env('MAKE_TEAM_ID'),
+        'api_base_url' => env('MAKE_API_BASE_URL', 'https://eu1.make.com/api/v2'),
+    ],
+
 ];
