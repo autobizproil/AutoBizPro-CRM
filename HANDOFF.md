@@ -1,11 +1,10 @@
-# HANDOFF — CRM (AutoBizPro) — 2026-08-13 (latest session, on top of everything below)
+# HANDOFF — CRM (AutoBizPro) — 2026-08-14 (latest session, on top of everything below)
 
-## 0. Latest session summary (2026-08-12 → 2026-08-13)
+## 0. Latest session summary (2026-08-12 → 2026-08-14)
 
 **Facebook Lead Ads integration — two parallel tracks. Track A (direct OAuth) is built, merged, and
-deployed but blocked on Meta; Track B (Make.com bridge)'s backend is now built and tested on this
-worktree branch (`worktree-make-facebook-lead-bridge`) — what's left is operational, not code: build
-a real customer scenario in Make's UI and verify one real lead end-to-end.**
+deployed but blocked on Meta; Track B (Make.com bridge) is built, deployed, and verified live end-to-end
+for the first customer (sonia-crm) — a real test lead flowed from Facebook through Make into the CRM.**
 
 ### Track A: Direct Facebook OAuth connect — DONE, DEPLOYED, BLOCKED ON META
 
@@ -72,7 +71,7 @@ Passwordless `sudo` available. PHP-FPM service is `php8.3-fpm` (not 8.2, despite
 `deploy/README.md` says — the setup script apparently installed 8.3). DB creds are in the server's
 own `.env`, not reproduced here.
 
-### Track B: Make.com bridge — BACKEND BUILT AND TESTED, ONBOARDING STILL MANUAL
+### Track B: Make.com bridge — DEPLOYED, VERIFIED LIVE FOR SONIA-CRM (2026-08-14)
 
 Two or three real customers are waiting on Lead Ads *now* and can't wait on Meta's unknown timeline.
 Decided this session: route leads through Make.com instead (Make's own app already has Meta's
@@ -105,11 +104,53 @@ and activates for free once/if Meta's permissions open up.
   spec's Non-goals. It's called manually (curl/Tinker) by whoever sets up a customer's Make scenario
   during onboarding.
 
+**Deployed to production (2026-08-14):** `git pull` on the VPS, `composer install`, then
+`sudo -u www-data php artisan config:clear && config:cache`, `sudo systemctl restart php8.3-fpm`.
+`fb_leadgen_id` migration was already applied from an earlier Track A deploy (`Nothing to migrate`).
+
+**New deploy gotcha found this session — route cache.** After deploying, the Make scenario's HTTP
+call returned a `404` with a large HTML body (not our controller's small JSON 404) even though the
+route existed in the pulled code. Cause: `bootstrap/cache/routes-v7.php` was stale (dated before this
+deploy) — `config:clear`/`config:cache` do **not** touch the route cache. Fix:
+`sudo -u www-data php artisan route:clear && sudo -u www-data php artisan route:cache`, then restart
+php-fpm. **Every future backend deploy that adds/changes routes must run `route:clear`+`route:cache`
+in addition to the `config:clear`+`config:cache` step already documented above (Track A) and in
+`deploy/README.md` — the README doesn't mention this yet, worth fixing there.**
+
+**sonia-crm's `make_lead_webhook_secret`** was generated via `php artisan tinker` on the server
+(scoped to tenant id 2 with `app()->instance('current_tenant_id', 2)`) rather than through the real
+HTTP endpoint, since no admin session was available at the time — functionally identical (same
+`SettingsService::set` call the endpoint makes), but worth knowing the value wasn't generated through
+the "real" path if that matters later. Value is in `sonia-crm`'s `tenant_settings` row; not
+reproduced here.
+
+**Make scenario for sonia-crm:** built manually in Make's UI (team id `1047106`, name "Sonia CRM -
+Facebook Lead Ads Bridge") — trigger `facebook-lead-ads:WatchLeads` (v2) connected via הראל's
+Facebook connection to Page "אוטוביז פרו ישראל (Netivot)", form "בדיקה" (**test page/form — not
+sonia's real Page/form yet**, swap before relying on this for real customer leads), action
+`http:ActionSendData` POSTing to `https://sonia-crm.duckdns.org/api/integrations/make/lead/sonia-crm`
+with the secret above. **Verified live**: a real test lead submitted via Meta's Lead Ads Testing Tool
+(https://developers.facebook.com/tools/lead-ads-testing/) flowed through Make → the endpoint → landed
+in the CRM as a real `Lead` with `source = 'פייסבוק (Make)'`.
+
+Note: the Claude-side Make MCP connector's OAuth grant has no organization/app-read scope (confirmed
+via the "Show scopes" screen on the Claude OAuth connection in Make's API access settings — no
+"Organizations" section exists in the grantable scopes at all for this connector), so
+`scenarios_list`/`connections_list`/`apps_list`/`app-modules_list` all fail with "Insufficient rights,
+admin permission organization view is needed" regardless of team/org ID passed. Scenario building for
+this tenant was done by hand in Make's UI instead — a hand-built `scenarios_create` blueprint attempt
+with a guessed trigger module (`facebook-lead-ads:watchLeads` v3) failed to import; the real module
+turned out to be `facebook-lead-ads:WatchLeads` (capital W, v2) with a real Facebook connection and
+`{{N.data.full_name}}`-style nested field paths (fields live under a `data` collection in the actual
+interface, not top-level) — useful to know if attempting this again for another customer.
+
 **Next steps when resuming:**
-1. Build the first real customer's Make.com scenario (manual, in Make's UI, not code) and verify one
-   real lead flows end-to-end into their tenant. This is the one remaining step — it's operational,
-   not a coding task.
-2. If a self-serve secret-generation UI is ever wanted, that's new scope beyond the current spec.
+1. Swap sonia-crm's Make scenario from the test Page/form ("אוטוביז פרו ישראל (Netivot)" / "בדיקה")
+   to the customer's real Facebook Page and real lead form, then verify one real (non-test) lead.
+2. Repeat this onboarding (secret generation + Make scenario) for the other 1-2 waiting customers.
+3. If a self-serve secret-generation UI is ever wanted, that's new scope beyond the current spec.
+4. Consider fixing `deploy/README.md` to include the `route:clear`+`route:cache` step (see gotcha
+   above) — every deploy that touches `routes/api.php` needs it, not just this one.
 
 ---
 
