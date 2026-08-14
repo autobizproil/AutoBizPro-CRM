@@ -83,12 +83,17 @@ class OnboardFacebookBridge extends Command
 
         try {
             $result = $makeApi->createScenario($scenarioName, $blueprint);
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             $this->error('Make API error: ' . $e->getMessage());
             return 1;
         }
 
         $scenarioId = $result['scenario']['id'] ?? null;
+        if ($scenarioId === null) {
+            $this->error('Make returned an unexpected response: ' . json_encode($result));
+            return 1;
+        }
+
         $teamId = config('services.make.team_id');
         $scenarioUrl = "https://eu1.make.com/{$teamId}/scenarios/{$scenarioId}";
 

@@ -127,4 +127,32 @@ class OnboardFacebookBridgeCommandTest extends TestCase
             ->assertExitCode(1)
             ->expectsOutputToContain('Bad blueprint');
     }
+
+    public function test_unexpected_response_shape_aborts_without_printing_broken_url(): void
+    {
+        $this->configureMake();
+        Tenant::create(['name' => 'Sonia', 'subdomain' => 'sonia-crm', 'status' => 'active']);
+
+        Http::fake([
+            'eu1.make.com/api/v2/scenarios*' => Http::response(['unexpected' => true], 200),
+        ]);
+
+        $this->artisan('make:onboard-facebook-bridge', ['tenant' => 'sonia-crm'])
+            ->assertExitCode(1)
+            ->expectsOutputToContain('unexpected response');
+    }
+
+    public function test_connection_failure_is_handled_cleanly(): void
+    {
+        $this->configureMake();
+        Tenant::create(['name' => 'Sonia', 'subdomain' => 'sonia-crm', 'status' => 'active']);
+
+        Http::fake(function () {
+            throw new \Illuminate\Http\Client\ConnectionException('Connection timed out');
+        });
+
+        $this->artisan('make:onboard-facebook-bridge', ['tenant' => 'sonia-crm'])
+            ->assertExitCode(1)
+            ->expectsOutputToContain('Make API error');
+    }
 }
