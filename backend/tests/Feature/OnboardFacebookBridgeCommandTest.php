@@ -67,8 +67,7 @@ class OnboardFacebookBridgeCommandTest extends TestCase
         $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $secret->value);
 
         Http::assertSent(function ($request) use ($secret) {
-            $blueprintJson = collect($request->data())->firstWhere('name', 'blueprint')['contents'] ?? null;
-            $blueprint = json_decode($blueprintJson, true);
+            $blueprint = $request['blueprint'];
             $httpModule = $blueprint['flow'][1];
             return $httpModule['module'] === 'http:ActionSendData'
                 && $httpModule['mapper']['url'] === 'https://autobiz-crm.duckdns.org/api/integrations/make/lead/sonia-crm'
