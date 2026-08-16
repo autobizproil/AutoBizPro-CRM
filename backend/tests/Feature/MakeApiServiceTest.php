@@ -65,4 +65,50 @@ class MakeApiServiceTest extends TestCase
 
         $service->createScenario('Test Scenario', ['name' => 'Test Scenario', 'flow' => [], 'metadata' => ['version' => 1]]);
     }
+
+    public function test_activate_scenario_sends_correct_request(): void
+    {
+        $this->configureMake();
+
+        Http::fake(['eu1.make.com/api/v2/scenarios/555/start*' => Http::response(['scenario' => ['id' => 555]], 200)]);
+
+        $service = app(MakeApiService::class);
+        $service->activateScenario(555);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://eu1.make.com/api/v2/scenarios/555/start'
+                && $request->method() === 'POST'
+                && $request->hasHeader('Authorization', 'Token test-token-abc');
+        });
+    }
+
+    public function test_activate_scenario_treats_already_running_as_success(): void
+    {
+        $this->configureMake();
+
+        Http::fake([
+            'eu1.make.com/api/v2/scenarios/555/start*' => Http::response(['message' => 'Scenario is already running'], 400),
+        ]);
+
+        $service = app(MakeApiService::class);
+        $service->activateScenario(555); // must not throw
+
+        $this->assertTrue(true);
+    }
+
+    public function test_activate_scenario_throws_on_other_failure(): void
+    {
+        $this->configureMake();
+
+        Http::fake([
+            'eu1.make.com/api/v2/scenarios/555/start*' => Http::response(['message' => 'Scenario not found'], 404),
+        ]);
+
+        $service = app(MakeApiService::class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Scenario not found');
+
+        $service->activateScenario(555);
+    }
 }

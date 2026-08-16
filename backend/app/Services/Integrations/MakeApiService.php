@@ -49,4 +49,35 @@ class MakeApiService
 
         return $response->json();
     }
+
+    /**
+     * Activate a scenario (start it running) — only meaningful once its trigger module
+     * has a real connection/page/form configured, which only a human can do (Facebook's
+     * own OAuth consent). Treats "already running" as success, not an error.
+     *
+     * @throws \RuntimeException on any other non-2xx response.
+     */
+    public function activateScenario(int $scenarioId): void
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Token ' . config('services.make.api_token'),
+        ])->post(
+            rtrim(config('services.make.api_base_url'), '/') . "/scenarios/{$scenarioId}/start"
+        );
+
+        if ($response->successful()) {
+            return;
+        }
+
+        $message = $response->json('message') ?? $response->body();
+        if (str_contains($message, 'already running') || str_contains($message, 'already active')) {
+            return;
+        }
+
+        Log::error('Make API: scenario activation failed', [
+            'status' => $response->status(),
+            'body'   => $response->body(),
+        ]);
+        throw new \RuntimeException($message);
+    }
 }
