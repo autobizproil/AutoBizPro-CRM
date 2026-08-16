@@ -38,11 +38,15 @@ class MakeApiServiceTest extends TestCase
         $this->assertSame(999, $result['scenario']['id']);
 
         Http::assertSent(function ($request) {
+            $find = fn (string $name) => collect($request->data())->firstWhere('name', $name)['contents'] ?? null;
+
             return $request->url() === 'https://eu1.make.com/api/v2/scenarios?teamId=1047106'
                 && $request->method() === 'POST'
                 && $request->hasHeader('Authorization', 'Token test-token-abc')
-                && $request['blueprint'] === json_encode(['name' => 'Test Scenario', 'flow' => [], 'metadata' => ['version' => 1]])
-                && $request['scheduling'] === json_encode(['type' => 'on-demand']);
+                && $request->isMultipart()
+                && $find('teamId') === '1047106'
+                && $find('blueprint') === json_encode(['name' => 'Test Scenario', 'flow' => [], 'metadata' => ['version' => 1]])
+                && $find('scheduling') === json_encode(['type' => 'on-demand']);
         });
     }
 

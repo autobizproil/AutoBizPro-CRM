@@ -30,11 +30,12 @@ class MakeApiService
 
         $response = Http::withHeaders([
             'Authorization' => 'Token ' . config('services.make.api_token'),
-        ])->asForm()->post(
+        ])->asMultipart()->post(
             rtrim(config('services.make.api_base_url'), '/') . '/scenarios?teamId=' . $teamId,
             [
-                'blueprint'  => json_encode($blueprint),
-                'scheduling' => json_encode(['type' => 'on-demand']),
+                ['name' => 'teamId', 'contents' => (string) $teamId],
+                ['name' => 'blueprint', 'contents' => json_encode($blueprint)],
+                ['name' => 'scheduling', 'contents' => json_encode(['type' => 'on-demand'])],
             ]
         );
 
