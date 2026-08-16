@@ -96,7 +96,10 @@ class OnboardFacebookBridge extends Command
                     'metadata' => ['designer' => ['x' => 300, 'y' => 0]],
                 ],
             ],
-            'metadata' => ['version' => 1],
+            // instant:true marks this as a webhook-driven scenario (Facebook pushes leads to
+            // Make's hook the moment they're submitted) rather than a polling one — without it,
+            // an activated scenario won't actually fire automatically on new leads.
+            'metadata' => ['instant' => true, 'version' => 1],
         ];
 
         try {
