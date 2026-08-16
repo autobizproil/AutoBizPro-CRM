@@ -53,8 +53,10 @@ class OnboardFacebookBridge extends Command
                     'id' => 1,
                     'module' => 'facebook-lead-ads:WatchLeads',
                     'version' => 2,
-                    'parameters' => [],
-                    'mapper' => [],
+                    // Make's schema requires {} not [] here — PHP's json_encode() emits [] for
+                    // an empty array, so this must be an object explicitly.
+                    'parameters' => (object) [],
+                    'mapper' => (object) [],
                     'metadata' => ['designer' => ['x' => 0, 'y' => 0]],
                 ],
                 [
