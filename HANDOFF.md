@@ -144,26 +144,52 @@ turned out to be `facebook-lead-ads:WatchLeads` (capital W, v2) with a real Face
 `{{N.data.full_name}}`-style nested field paths (fields live under a `data` collection in the actual
 interface, not top-level) — useful to know if attempting this again for another customer.
 
-**New: `make:onboard-facebook-bridge` command.** This session also built
-`php artisan make:onboard-facebook-bridge {tenant}` (flag: `--regenerate-secret`), which replaces the
-manual Make-UI scenario building done by hand above for sonia-crm — it generates the per-tenant secret
-and creates the Make scenario (trigger + HTTP action module) via Make's API instead of clicking through
-the UI. Built and unit-tested (224/224 backend tests passing), but it has **never been run against
-Make's real API** — only against `Http::fake()`. Before it can run for real, production `.env` needs
-two new vars: `MAKE_API_TOKEN` (a Make **personal API token**, generated from Make's own UI — NOT the
-Claude/MCP OAuth connection, which has no organization/app-read scope, see note above) and
-`MAKE_TEAM_ID=1047106`. The first real run against Make's API is Task 3 of
-`docs/superpowers/plans/2026-08-14-make-onboarding-automation.md` — a manual/human task, not something
-to automate further.
+**`make:onboard-facebook-bridge` command — built, deployed, VERIFIED LIVE (2026-08-14).**
+`php artisan make:onboard-facebook-bridge {tenant}` (flag: `--regenerate-secret`) replaces the manual
+Make-UI scenario building done by hand above for sonia-crm — it generates the per-tenant secret and
+creates the Make scenario (trigger + HTTP action module) via Make's REST API instead of clicking
+through the UI. Production `.env` has `MAKE_API_TOKEN` (a Make **personal API token**, generated from
+Make's own UI — NOT the Claude/MCP OAuth connection, which has no organization/app-read scope, see
+note above) and `MAKE_TEAM_ID=1047106` set.
+
+**First real run** was for the `autobiz-crm` tenant ("דמו דלתות", a demo tenant — safe first test, not
+a real customer) and took **4 wire-format correction rounds** against Make's real API before it
+worked (exactly the risk `docs/superpowers/plans/2026-08-14-make-onboarding-automation.md`'s Task 3
+flagged — the original request shape was never verified against a live token while writing the plan).
+All 4 fixes are in `backend/app/Services/Integrations/MakeApiService.php` and
+`backend/app/Console/Commands/OnboardFacebookBridge.php`, commits `2c0b192`→`62e64e1`:
+1. `Http::asForm()` (urlencoded) → Make rejected with "Missing value of required parameter" for
+   `teamId`/`blueprint`/`scheduling`, even though all three were sent.
+2. `Http::asMultipart()` → same error, verbatim.
+3. Plain JSON body with `blueprint`/`scheduling` as nested JSON objects → progress (`teamId` now
+   accepted) but "Invalid json string in parameter 'blueprint'. Value has to be string."
+4. JSON body with `blueprint`/`scheduling` values each `json_encode()`'d into a **string** (so: JSON
+   envelope, string-typed inner fields) → progress again, but `flow[0].parameters` rejected as
+   "should be object, type: 'object'" — PHP's `json_encode([])` on an empty array emits `[]`, not
+   `{}`. Fixed by casting empty `parameters`/`mapper` fields to `(object) []`.
+
+**Confirmed working wire format** (for the next time this needs touching): `POST
+{api_base_url}/scenarios?teamId={id}`, `Content-Type: application/json`, body
+`{"teamId": <int>, "blueprint": "<json-encoded string>", "scheduling": "<json-encoded string>"}`,
+every empty object field inside the blueprint cast to `(object) []` not `[]`.
+
+Real output from the live run: `Scenario created: https://eu1.make.com/1047106/scenarios/6967712` for
+autobiz-crm — this scenario now exists in Make with the HTTP action fully wired, trigger module
+present but unconnected (as designed). Not yet connected to a real Facebook Page or activated — that
+part was left for the actual next real customer, since autobiz-crm was just the wire-format proof.
 
 **Next steps when resuming:**
 1. Swap sonia-crm's Make scenario from the test Page/form ("אוטוביז פרו ישראל (Netivot)" / "בדיקה")
    to the customer's real Facebook Page and real lead form, then verify one real (non-test) lead.
-2. Add `MAKE_API_TOKEN`/`MAKE_TEAM_ID` to production `.env`, then run
-   `php artisan make:onboard-facebook-bridge {tenant}` for the other 1-2 waiting customers (its first
-   real-API run — see above) instead of repeating the manual Make-UI process.
-3. If a self-serve secret-generation UI is ever wanted, that's new scope beyond the current spec.
-4. Consider fixing `deploy/README.md` to include the `route:clear`+`route:cache` step (see gotcha
+2. Run `php artisan make:onboard-facebook-bridge {tenant}` for the other 1-2 waiting customers — the
+   command is now proven end-to-end, no more wire-format surprises expected. Then open the printed
+   Make URL, connect that customer's real Facebook Page + form, Activate, and verify one real lead
+   (same pattern already proven for sonia-crm).
+3. The `autobiz-crm` demo scenario created during this session's live verification
+   (https://eu1.make.com/1047106/scenarios/6967712) can be deleted if not wanted, or left as a
+   reference example — it's not connected to anything live.
+4. If a self-serve secret-generation UI is ever wanted, that's new scope beyond the current spec.
+5. Consider fixing `deploy/README.md` to include the `route:clear`+`route:cache` step (see gotcha
    above) — every deploy that touches `routes/api.php` needs it, not just this one.
 
 ---
