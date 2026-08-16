@@ -64,8 +64,13 @@ class OnboardFacebookBridge extends Command
                     'module' => 'http:ActionSendData',
                     'version' => 3,
                     'parameters' => ['handleErrors' => false, 'useNewZLibDeCompress' => true],
+                    // Full field set required by Make's http:ActionSendData v3 schema — confirmed
+                    // against the real working blueprint built by hand for sonia-crm this session.
+                    // A partial mapper (missing any of these) fails scenario save with
+                    // BundleValidationError "Missing value of required parameter '...'".
                     'mapper' => [
                         'url' => $endpointUrl,
+                        'serializeUrl' => false,
                         'method' => 'post',
                         'headers' => [
                             ['name' => 'X-Webhook-Secret', 'value' => $secret],
@@ -74,8 +79,19 @@ class OnboardFacebookBridge extends Command
                         'qs' => [],
                         'bodyType' => 'raw',
                         'parseResponse' => true,
+                        'authUser' => '',
+                        'authPass' => '',
+                        'timeout' => '',
+                        'shareCookies' => false,
+                        'ca' => '',
+                        'rejectUnauthorized' => true,
+                        'followRedirect' => true,
+                        'useQuerystring' => false,
+                        'gzip' => true,
+                        'useMtls' => false,
                         'contentType' => 'application/json',
                         'data' => "{\n  \"name\": \"{{1.data.full_name}}\",\n  \"phone\": \"{{1.data.phone_number}}\",\n  \"email\": \"{{1.data.email}}\",\n  \"form_name\": \"\"\n}",
+                        'followAllRedirects' => false,
                     ],
                     'metadata' => ['designer' => ['x' => 300, 'y' => 0]],
                 ],
