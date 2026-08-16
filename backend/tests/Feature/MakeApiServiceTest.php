@@ -43,8 +43,8 @@ class MakeApiServiceTest extends TestCase
                 && $request->hasHeader('Authorization', 'Token test-token-abc')
                 && $request->isJson()
                 && $request['teamId'] === 1047106
-                && $request['blueprint'] === ['name' => 'Test Scenario', 'flow' => [], 'metadata' => ['version' => 1]]
-                && $request['scheduling'] === ['type' => 'on-demand'];
+                && $request['blueprint'] === json_encode(['name' => 'Test Scenario', 'flow' => [], 'metadata' => ['version' => 1]])
+                && $request['scheduling'] === json_encode(['type' => 'on-demand']);
         });
     }
 

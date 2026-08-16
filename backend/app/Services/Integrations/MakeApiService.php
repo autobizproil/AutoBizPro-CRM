@@ -34,8 +34,8 @@ class MakeApiService
             rtrim(config('services.make.api_base_url'), '/') . '/scenarios?teamId=' . $teamId,
             [
                 'teamId'     => $teamId,
-                'blueprint'  => $blueprint,
-                'scheduling' => ['type' => 'on-demand'],
+                'blueprint'  => json_encode($blueprint),
+                'scheduling' => json_encode(['type' => 'on-demand']),
             ]
         );
 
