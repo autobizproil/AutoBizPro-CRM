@@ -51,11 +51,23 @@ class OnboardFacebookBridge extends Command
             'flow' => [
                 [
                     'id' => 1,
-                    'module' => 'facebook-lead-ads:WatchLeads',
+                    // NewLeadMultiple (not WatchLeads) is the module that actually supports
+                    // instant/webhook execution — confirmed against sonia-crm's real, live-verified
+                    // scenario. WatchLeads looked equivalent on paper (same hook-typed __IMTHOOK__
+                    // parameter) but does not fire instantly in practice.
+                    'module' => 'facebook-lead-ads:NewLeadMultiple',
                     'version' => 2,
+                    'parameters' => [
+                        'v' => '2',
+                        'fields' => [
+                            'id', 'ad_id', 'ad_name', 'adset_id', 'adset_name', 'campaign_id',
+                            'campaign_name', 'created_time', 'custom_disclaimer_responses',
+                            'field_data', 'form_id', 'home_listing', 'is_organic', 'partner_name',
+                            'platform', 'retailer_item_id', 'vehicle',
+                        ],
+                    ],
                     // Make's schema requires {} not [] here — PHP's json_encode() emits [] for
                     // an empty array, so this must be an object explicitly.
-                    'parameters' => (object) [],
                     'mapper' => (object) [],
                     'metadata' => ['designer' => ['x' => 0, 'y' => 0]],
                 ],
