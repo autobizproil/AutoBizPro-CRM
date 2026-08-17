@@ -128,7 +128,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col max-h-[90vh] overflow-hidden"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-5xl mx-4 flex flex-col max-h-[92vh] overflow-hidden"
         dir="rtl"
       >
         {/* Header */}
@@ -161,7 +161,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
         <div className="flex flex-1 overflow-hidden min-h-0">
 
           {/* Right panel — form */}
-          <div className="w-72 flex-shrink-0 border-l border-gray-100 dark:border-gray-700 p-6 overflow-y-auto space-y-5">
+          <div className="w-96 flex-shrink-0 border-l border-gray-100 dark:border-gray-700 p-6 overflow-y-auto space-y-5">
 
             {/* Title */}
             <div>
@@ -233,25 +233,23 @@ export default function AddWidgetModal({ onSave, onClose }) {
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">סינון רשומות</label>
               <div className="space-y-2">
                 {conditions.map((row, i) => (
-                  <div key={i} className="space-y-1.5 border border-gray-100 dark:border-gray-700 rounded-lg p-2">
-                    <div className="flex items-center gap-1.5">
-                      <select value={row.field} onChange={e => updateCondition(i, { field: e.target.value })}
-                        className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-                        {CONDITION_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-                      </select>
-                      <select value={row.operator} onChange={e => updateCondition(i, { operator: e.target.value })}
-                        className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-                        {OPERATORS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                      </select>
-                      <button type="button" onClick={() => removeCondition(i)}
-                        className="text-gray-300 hover:text-red-500 flex-shrink-0 px-0.5">×</button>
-                    </div>
+                  <div key={i} className="flex items-center gap-1.5">
+                    <select value={row.field} onChange={e => updateCondition(i, { field: e.target.value })}
+                      className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                      {CONDITION_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                    </select>
+                    <select value={row.operator} onChange={e => updateCondition(i, { operator: e.target.value })}
+                      className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                      {OPERATORS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                    </select>
                     {needsValue(row.operator) && (
                       <input type="text" value={row.value} onChange={e => updateCondition(i, { value: e.target.value })}
                         placeholder="ערך..."
-                        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                        className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         dir="auto" />
                     )}
+                    <button type="button" onClick={() => removeCondition(i)}
+                      className="text-gray-300 hover:text-red-500 flex-shrink-0 px-0.5">×</button>
                   </div>
                 ))}
               </div>
