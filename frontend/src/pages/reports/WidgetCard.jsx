@@ -285,6 +285,60 @@ function ChartTable({ data }) {
   )
 }
 
+// ── Per-widget date override ─────────────────────────────────────────────────
+
+function DateOverridePopover({ widget, onUpdate }) {
+  const [open, setOpen] = useState(false)
+  const active = !!(widget.dateFrom || widget.dateTo)
+
+  if (!onUpdate) return null
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        title={active ? 'טווח תאריכים מותאם ל-widget זה' : 'התאם טווח תאריכים ל-widget זה'}
+        className={`text-xs leading-none ${active ? 'text-[#2398c2]' : 'text-gray-300 hover:text-gray-500'}`}
+      >
+        🕐
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 top-6 z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 w-52 space-y-2"
+          onMouseLeave={() => setOpen(false)}
+        >
+          <label className="block text-[11px] text-gray-500 dark:text-gray-400">
+            מתאריך
+            <input
+              type="date"
+              value={widget.dateFrom ?? ''}
+              onChange={e => onUpdate(widget.id, { dateFrom: e.target.value })}
+              className="w-full mt-0.5 text-xs border border-gray-200 dark:border-gray-700 rounded px-1.5 py-1 bg-transparent"
+            />
+          </label>
+          <label className="block text-[11px] text-gray-500 dark:text-gray-400">
+            עד תאריך
+            <input
+              type="date"
+              value={widget.dateTo ?? ''}
+              onChange={e => onUpdate(widget.id, { dateTo: e.target.value })}
+              className="w-full mt-0.5 text-xs border border-gray-200 dark:border-gray-700 rounded px-1.5 py-1 bg-transparent"
+            />
+          </label>
+          {active && (
+            <button
+              onClick={() => onUpdate(widget.id, { dateFrom: '', dateTo: '' })}
+              className="text-[11px] text-[#2398c2] hover:underline"
+            >
+              נקה — חזרה לטווח הכללי
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── KPI card ──────────────────────────────────────────────────────────────────
 
 function KpiCard({ widget, onDelete, data, isLoading }) {
@@ -322,7 +376,7 @@ function KpiCard({ widget, onDelete, data, isLoading }) {
 
 // ── Chart widget card ─────────────────────────────────────────────────────────
 
-function ChartWidgetCard({ widget, onDelete, data, isLoading }) {
+function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading }) {
   const [hovered, setHovered] = useState(false)
 
   return (
@@ -335,14 +389,19 @@ function ChartWidgetCard({ widget, onDelete, data, isLoading }) {
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{widget.title}</h3>
-        {hovered && onDelete && (
-          <button
-            onClick={onDelete}
-            className="text-gray-300 hover:text-red-400 text-lg leading-none ml-2"
-            title="הסר widget"
-          >
-            ×
-          </button>
+        {hovered && (
+          <div className="flex items-center gap-2">
+            <DateOverridePopover widget={widget} onUpdate={onUpdate} />
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="text-gray-300 hover:text-red-400 text-lg leading-none"
+                title="הסר widget"
+              >
+                ×
+              </button>
+            )}
+          </div>
         )}
       </div>
       {isLoading ? <Skeleton /> : renderChart(widget, data)}
@@ -386,10 +445,15 @@ function renderPreviewChart(widget, data, isLoading) {
 
 // ── Main WidgetCard export ────────────────────────────────────────────────────
 
-export default function WidgetCard({ widget, onDelete, dateParams, preview = false }) {
+export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, preview = false }) {
+  // A widget with its own date override ignores the board's global range entirely.
+  const effectiveParams = (widget.dateFrom || widget.dateTo)
+    ? { date_from: widget.dateFrom || undefined, date_to: widget.dateTo || undefined }
+    : (dateParams ?? {})
+
   const { data, isLoading } = useQuery({
-    queryKey: ['widget', widget.dataSource, dateParams?.date_from, dateParams?.date_to],
-    queryFn: () => fetchWidgetData(widget.dataSource, dateParams ?? {}),
+    queryKey: ['widget', widget.dataSource, effectiveParams.date_from, effectiveParams.date_to],
+    queryFn: () => fetchWidgetData(widget.dataSource, effectiveParams),
     staleTime: 60_000,
   })
 
@@ -416,6 +480,7 @@ export default function WidgetCard({ widget, onDelete, dateParams, preview = fal
     <ChartWidgetCard
       widget={widget}
       onDelete={onDelete}
+      onUpdate={onUpdate}
       data={data}
       isLoading={isLoading}
     />

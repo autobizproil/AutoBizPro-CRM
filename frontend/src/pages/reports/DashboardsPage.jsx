@@ -6,16 +6,6 @@ import { useToast } from '../../context/ToastContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function monthAgoStr() {
-  const d = new Date()
-  d.setMonth(d.getMonth() - 1)
-  return d.toISOString().slice(0, 10)
-}
-
 function makeId() {
   return (typeof crypto !== 'undefined' && crypto.randomUUID)
     ? crypto.randomUUID()
@@ -146,11 +136,12 @@ export default function DashboardsPage() {
   const [boards, setBoards]         = useState(loadBoards)
   const [activeBoardId, setActive]  = useState(() => loadBoards()[0]?.id ?? 'default')
   const [showAddWidget, setShowAdd] = useState(false)
-  const [dateFrom, setDateFrom]     = useState(monthAgoStr)
-  const [dateTo, setDateTo]         = useState(todayStr)
+  // Empty by default = all time. Only becomes a real filter once the user picks a date.
+  const [dateFrom, setDateFrom]     = useState('')
+  const [dateTo, setDateTo]         = useState('')
 
   const activeBoard = boards.find(b => b.id === activeBoardId) ?? boards[0]
-  const dateParams  = { date_from: dateFrom, date_to: dateTo }
+  const dateParams  = { date_from: dateFrom || undefined, date_to: dateTo || undefined }
 
   // Persist on every change
   useEffect(() => {
@@ -214,6 +205,14 @@ export default function DashboardsPage() {
     ))
   }
 
+  function handleUpdateWidget(widgetId, patch) {
+    setBoards(prev => prev.map(b =>
+      b.id === activeBoardId
+        ? { ...b, widgets: b.widgets.map(w => w.id === widgetId ? { ...w, ...patch } : w) }
+        : b
+    ))
+  }
+
   // ── Export ──────────────────────────────────────────────────────────────────
 
   function handleExport() {
@@ -222,7 +221,7 @@ export default function DashboardsPage() {
         const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv;charset=utf-8;' }))
         const a = document.createElement('a')
         a.href = url
-        a.download = `leads_export_${dateFrom}_${dateTo}.csv`
+        a.download = `leads_export_${dateFrom || 'all'}_${dateTo || 'now'}.csv`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
@@ -307,6 +306,7 @@ export default function DashboardsPage() {
                 key={widget.id}
                 widget={widget}
                 onDelete={() => handleDeleteWidget(widget.id)}
+                onUpdate={handleUpdateWidget}
                 dateParams={dateParams}
               />
             ))}

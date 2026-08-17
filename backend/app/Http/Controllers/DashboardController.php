@@ -65,7 +65,7 @@ class DashboardController extends Controller
 
     /**
      * Resolve date range from request params.
-     * Priority: explicit date_from/date_to > period keyword > default last 30 days.
+     * Priority: explicit date_from/date_to > period keyword > default all time.
      *
      * @return array{0: Carbon, 1: Carbon}
      */
@@ -91,7 +91,8 @@ class DashboardController extends Controller
             'month'   => [$now->copy()->subDays(30)->startOfDay(),  $now->copy()->endOfDay()],
             'quarter' => [$now->copy()->subDays(90)->startOfDay(),  $now->copy()->endOfDay()],
             'year'    => [$now->copy()->subDays(365)->startOfDay(), $now->copy()->endOfDay()],
-            default   => [$now->copy()->subDays(30)->startOfDay(),  $now->copy()->endOfDay()],
+            // No period and no explicit dates → all time, not a 30-day guess.
+            default   => [Carbon::createFromTimestamp(0), $now->copy()->endOfDay()],
         };
 
         return [$from, $to];

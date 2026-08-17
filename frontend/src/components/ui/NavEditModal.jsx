@@ -61,10 +61,18 @@ export default function NavEditModal({ open, onClose, pinned, more, onSave, tr }
         {items.map((item, i) => (
           <div key={item.key}
             draggable
-            onDragStart={() => setDragKey(item.key)}
+            onDragStart={e => {
+              // Native drag ghost renders as a stray duplicate — use a blank
+              // image instead and show drag state via opacity, like a real app.
+              e.dataTransfer.setDragImage(new Image(), 0, 0)
+              setDragKey(item.key)
+            }}
+            onDragEnd={() => setDragKey(null)}
             onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
             onDrop={e => { e.stopPropagation(); dropInto(group, i) }}
-            className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm cursor-move flex items-center gap-2">
+            className={`bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm cursor-move flex items-center gap-2 transition-all duration-150 ease-out ${
+              dragKey === item.key ? 'opacity-30 scale-95' : 'opacity-100 scale-100'
+            }`}>
             <span className="text-gray-300 dark:text-gray-500">⠿</span>
             {item.icon && <span>{item.icon}</span>}
             {itemLabel(item, tr)}
