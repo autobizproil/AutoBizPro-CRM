@@ -35,6 +35,43 @@ const TYPE_DEFAULT_SOURCE = {
   kpi:   'kpi_total',
 }
 
+// ── Filtering (Fireberry-style) ──────────────────────────────────────────────
+
+const PERIOD_PRESETS = [
+  { id: '',        label: 'כל הזמן' },
+  { id: 'today',   label: 'היום' },
+  { id: 'week',    label: '7 ימים' },
+  { id: 'month',   label: '30 ימים' },
+  { id: 'quarter', label: '90 ימים' },
+  { id: 'year',    label: 'שנה' },
+  { id: 'custom',  label: 'טווח מותאם' },
+]
+
+const CONDITION_FIELDS = [
+  { key: 'name',              label: 'שם' },
+  { key: 'phone',             label: 'טלפון' },
+  { key: 'email',             label: 'אימייל' },
+  { key: 'source',            label: 'מקור' },
+  { key: 'status',            label: 'סטטוס' },
+  { key: 'pipeline_stage_id', label: 'שלב' },
+  { key: 'assigned_to',       label: 'נציג' },
+  { key: 'created_at',        label: 'תאריך יצירה' },
+]
+
+const OPERATORS = [
+  { id: 'equals',     label: 'שווה ל' },
+  { id: 'not_equals', label: 'שונה מ' },
+  { id: 'contains',   label: 'מכיל' },
+  { id: 'gt',         label: 'גדול מ' },
+  { id: 'gte',        label: 'גדול או שווה' },
+  { id: 'lt',         label: 'קטן מ' },
+  { id: 'lte',        label: 'קטן או שווה' },
+  { id: 'empty',      label: 'ריק' },
+  { id: 'not_empty',  label: 'לא ריק' },
+]
+
+const needsValue = (op) => op !== 'empty' && op !== 'not_empty'
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AddWidgetModal({ onSave, onClose }) {
@@ -43,10 +80,29 @@ export default function AddWidgetModal({ onSave, onClose }) {
   const [title, setTitle]       = useState('')
   const [dataSource, setSource] = useState(TYPE_DEFAULT_SOURCE['bar'])
   const [color, setColor]       = useState('#2398c2')
+  const [period, setPeriod]     = useState('')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo]     = useState('')
+  const [conditions, setConditions] = useState([])
 
   function handleTypeChange(newType) {
     setType(newType)
     setSource(TYPE_DEFAULT_SOURCE[newType] ?? 'leads_by_source')
+  }
+
+  const addCondition    = () => setConditions(c => [...c, { field: 'name', operator: 'equals', value: '' }])
+  const removeCondition = (i) => setConditions(c => c.filter((_, idx) => idx !== i))
+  const updateCondition = (i, patch) => setConditions(c => c.map((row, idx) => idx === i ? { ...row, ...patch } : row))
+
+  const validConditions = conditions.filter(c =>
+    c.field && c.operator && (!needsValue(c.operator) || String(c.value).trim() !== '')
+  )
+
+  const filterProps = {
+    period:     period && period !== 'custom' ? period : undefined,
+    dateFrom:   period === 'custom' ? customFrom : undefined,
+    dateTo:     period === 'custom' ? customTo : undefined,
+    conditions: validConditions.length ? validConditions : undefined,
   }
 
   const previewWidget = {
@@ -55,6 +111,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
     title: title || 'תצוגה מקדימה',
     dataSource,
     color,
+    ...filterProps,
   }
 
   function handleSave() {
@@ -62,7 +119,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
       toast.warn('נא להזין כותרת')
       return
     }
-    onSave({ type, title: title.trim(), dataSource, color })
+    onSave({ type, title: title.trim(), dataSource, color, ...filterProps })
   }
 
   return (
@@ -144,6 +201,62 @@ export default function AddWidgetModal({ onSave, onClose }) {
                 />
                 <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">{color}</span>
               </div>
+            </div>
+
+            {/* Time period */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">תקופת זמן</label>
+              <div className="flex flex-wrap gap-1.5">
+                {PERIOD_PRESETS.map(p => (
+                  <button key={p.id} type="button" onClick={() => setPeriod(p.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
+                      period === p.id
+                        ? 'bg-[#2398c2] text-white border-[#2398c2]'
+                        : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {period === 'custom' && (
+                <div className="flex gap-2 mt-2">
+                  <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                    className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" dir="ltr" />
+                  <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                    className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" dir="ltr" />
+                </div>
+              )}
+            </div>
+
+            {/* Record conditions */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">סינון רשומות</label>
+              <div className="space-y-2">
+                {conditions.map((row, i) => (
+                  <div key={i} className="space-y-1.5 border border-gray-100 dark:border-gray-700 rounded-lg p-2">
+                    <div className="flex items-center gap-1.5">
+                      <select value={row.field} onChange={e => updateCondition(i, { field: e.target.value })}
+                        className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                        {CONDITION_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                      </select>
+                      <select value={row.operator} onChange={e => updateCondition(i, { operator: e.target.value })}
+                        className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                        {OPERATORS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                      </select>
+                      <button type="button" onClick={() => removeCondition(i)}
+                        className="text-gray-300 hover:text-red-500 flex-shrink-0 px-0.5">×</button>
+                    </div>
+                    {needsValue(row.operator) && (
+                      <input type="text" value={row.value} onChange={e => updateCondition(i, { value: e.target.value })}
+                        placeholder="ערך..."
+                        className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                        dir="auto" />
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={addCondition}
+                className="mt-1.5 text-xs text-[#2398c2] hover:underline">+ הוסף תנאי</button>
             </div>
           </div>
 

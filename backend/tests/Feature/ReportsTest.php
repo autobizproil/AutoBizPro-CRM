@@ -139,6 +139,26 @@ class ReportsTest extends TestCase
         $this->assertNotContains('mar', $sources);
     }
 
+    public function test_leads_by_source_conditions_filter(): void
+    {
+        [$tenant, $admin] = $this->setupTenant('srccond');
+
+        Lead::create(['tenant_id' => $tenant->id, 'name' => 'דני כהן', 'source' => 'match']);
+        Lead::create(['tenant_id' => $tenant->id, 'name' => 'רוני לוי', 'source' => 'nomatch']);
+
+        $conditions = json_encode([['field' => 'name', 'operator' => 'contains', 'value' => 'כהן']]);
+
+        $resp = $this->actingAs($admin)
+            ->withHeaders(['X-Tenant' => 'srccond'])
+            ->getJson('/api/dashboard/reports/leads-by-source?conditions=' . urlencode($conditions));
+
+        $resp->assertOk();
+        $sources = collect($resp->json('data'))->pluck('source')->all();
+
+        $this->assertContains('match', $sources);
+        $this->assertNotContains('nomatch', $sources);
+    }
+
     public function test_leads_by_source_agent_scope(): void
     {
         [$tenant, $admin] = $this->setupTenant('src4');

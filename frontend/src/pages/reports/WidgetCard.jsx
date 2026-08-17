@@ -289,7 +289,7 @@ function ChartTable({ data }) {
 
 function DateOverridePopover({ widget, onUpdate }) {
   const [open, setOpen] = useState(false)
-  const active = !!(widget.dateFrom || widget.dateTo)
+  const active = !!(widget.dateFrom || widget.dateTo || widget.period)
 
   if (!onUpdate) return null
 
@@ -312,7 +312,7 @@ function DateOverridePopover({ widget, onUpdate }) {
             <input
               type="date"
               value={widget.dateFrom ?? ''}
-              onChange={e => onUpdate(widget.id, { dateFrom: e.target.value })}
+              onChange={e => onUpdate(widget.id, { dateFrom: e.target.value, period: '' })}
               className="w-full mt-0.5 text-xs border border-gray-200 dark:border-gray-700 rounded px-1.5 py-1 bg-transparent"
             />
           </label>
@@ -321,16 +321,16 @@ function DateOverridePopover({ widget, onUpdate }) {
             <input
               type="date"
               value={widget.dateTo ?? ''}
-              onChange={e => onUpdate(widget.id, { dateTo: e.target.value })}
+              onChange={e => onUpdate(widget.id, { dateTo: e.target.value, period: '' })}
               className="w-full mt-0.5 text-xs border border-gray-200 dark:border-gray-700 rounded px-1.5 py-1 bg-transparent"
             />
           </label>
           {active && (
             <button
-              onClick={() => onUpdate(widget.id, { dateFrom: '', dateTo: '' })}
+              onClick={() => onUpdate(widget.id, { dateFrom: '', dateTo: '', period: '' })}
               className="text-[11px] text-[#2398c2] hover:underline"
             >
-              נקה — חזרה לטווח הכללי
+              נקה — כל הזמן
             </button>
           )}
         </div>
@@ -446,13 +446,20 @@ function renderPreviewChart(widget, data, isLoading) {
 // ── Main WidgetCard export ────────────────────────────────────────────────────
 
 export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, preview = false }) {
-  // A widget with its own date override ignores the board's global range entirely.
-  const effectiveParams = (widget.dateFrom || widget.dateTo)
-    ? { date_from: widget.dateFrom || undefined, date_to: widget.dateTo || undefined }
-    : (dateParams ?? {})
+  // A widget with its own filter (period/date/conditions) ignores the board's global range.
+  const effectiveParams = {
+    ...((widget.period || widget.dateFrom || widget.dateTo)
+      ? {
+          period:    widget.period || undefined,
+          date_from: widget.dateFrom || undefined,
+          date_to:   widget.dateTo || undefined,
+        }
+      : (dateParams ?? {})),
+    ...(widget.conditions?.length ? { conditions: JSON.stringify(widget.conditions) } : {}),
+  }
 
   const { data, isLoading } = useQuery({
-    queryKey: ['widget', widget.dataSource, effectiveParams.date_from, effectiveParams.date_to],
+    queryKey: ['widget', widget.dataSource, effectiveParams.period, effectiveParams.date_from, effectiveParams.date_to, effectiveParams.conditions],
     queryFn: () => fetchWidgetData(widget.dataSource, effectiveParams),
     staleTime: 60_000,
   })

@@ -47,6 +47,7 @@ class DashboardController extends Controller
         $user  = $request->user();
         [$from, $to] = $this->dateRange($request);
         $query = Lead::query()->whereBetween('created_at', [$from, $to]);
+        $this->applyLeadConditions($query, $request);
 
         if ($user->role === 'agent') {
             $query->ownedBy($user->id);
@@ -99,6 +100,24 @@ class DashboardController extends Controller
     }
 
     /**
+     * Apply Fireberry-style per-widget record conditions (?conditions=JSON) to a lead query.
+     * Same whitelist as the leads list so dashboard widgets can't filter on more than it can.
+     */
+    private function applyLeadConditions($query, Request $request): void
+    {
+        if (! $request->filled('conditions')) {
+            return;
+        }
+        $decoded = json_decode($request->input('conditions'), true);
+        \App\Services\ConditionFilter::apply(
+            $query,
+            is_array($decoded) ? $decoded : [],
+            ['name', 'phone', 'email', 'source', 'status', 'pipeline_stage_id', 'assigned_to', 'created_at'],
+            'custom_fields'
+        );
+    }
+
+    /**
      * GET /dashboard/reports/leads-by-source
      * Returns lead counts grouped by source, with percentage of total.
      */
@@ -109,6 +128,7 @@ class DashboardController extends Controller
 
         $query = Lead::query()
             ->whereBetween('created_at', [$from, $to]);
+        $this->applyLeadConditions($query, $request);
 
         if ($user->role === 'agent') {
             $query->ownedBy($user->id);
@@ -146,6 +166,7 @@ class DashboardController extends Controller
 
         $query = Lead::query()
             ->whereBetween('leads.created_at', [$from, $to]);
+        $this->applyLeadConditions($query, $request);
 
         // Agents only see themselves
         if ($user->role === 'agent') {
@@ -229,6 +250,7 @@ class DashboardController extends Controller
 
         $leadQuery = Lead::query()
             ->whereBetween('leads.created_at', [$from, $to]);
+        $this->applyLeadConditions($leadQuery, $request);
 
         if ($user->role === 'agent') {
             $leadQuery->ownedBy($user->id);
@@ -277,6 +299,7 @@ class DashboardController extends Controller
 
         $query = Lead::with(['stage:id,name', 'assignedUser:id,name'])
             ->whereBetween('leads.created_at', [$from, $to]);
+        $this->applyLeadConditions($query, $request);
 
         if ($user->role === 'agent') {
             $query->ownedBy($user->id);

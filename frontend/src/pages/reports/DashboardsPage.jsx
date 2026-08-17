@@ -136,12 +136,10 @@ export default function DashboardsPage() {
   const [boards, setBoards]         = useState(loadBoards)
   const [activeBoardId, setActive]  = useState(() => loadBoards()[0]?.id ?? 'default')
   const [showAddWidget, setShowAdd] = useState(false)
-  // Empty by default = all time. Only becomes a real filter once the user picks a date.
-  const [dateFrom, setDateFrom]     = useState('')
-  const [dateTo, setDateTo]         = useState('')
 
   const activeBoard = boards.find(b => b.id === activeBoardId) ?? boards[0]
-  const dateParams  = { date_from: dateFrom || undefined, date_to: dateTo || undefined }
+  // No global range — all time by default; each widget carries its own filter.
+  const dateParams  = {}
 
   // Persist on every change
   useEffect(() => {
@@ -221,7 +219,7 @@ export default function DashboardsPage() {
         const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv;charset=utf-8;' }))
         const a = document.createElement('a')
         a.href = url
-        a.download = `leads_export_${dateFrom || 'all'}_${dateTo || 'now'}.csv`
+        a.download = `leads_export_${new Date().toISOString().slice(0, 10)}.csv`
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
@@ -246,25 +244,6 @@ export default function DashboardsPage() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{activeBoard?.name ?? 'לוח בקרה'}</h2>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Date range */}
-            <div className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 shadow-sm">
-              <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">מתאריך</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={e => setDateFrom(e.target.value)}
-                className="text-xs text-gray-700 dark:text-gray-300 outline-none bg-transparent"
-              />
-            </div>
-            <div className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 shadow-sm">
-              <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">עד תאריך</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={e => setDateTo(e.target.value)}
-                className="text-xs text-gray-700 dark:text-gray-300 outline-none bg-transparent"
-              />
-            </div>
             {/* Export */}
             <button
               onClick={handleExport}
