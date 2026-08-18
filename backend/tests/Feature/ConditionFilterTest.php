@@ -101,4 +101,50 @@ class ConditionFilterTest extends TestCase
         $this->assertCount(1, $results);
         $this->assertSame('A', $results->first()->name);
     }
+
+    public function test_or_boolean_wraps_conditions_in_a_single_orwhere_group(): void
+    {
+        // Two leads: one matches condition A only, one matches condition B only.
+        // Applying [A, B] with boolean='or' inside one where-closure must match both.
+        $tenant = \App\Models\Tenant::create(['name' => 'CF', 'subdomain' => 'cf-or', 'status' => 'active']);
+        app()->instance('current_tenant_id', $tenant->id);
+
+        \App\Models\Lead::create(['tenant_id' => $tenant->id, 'name' => 'Matches A', 'source' => 'facebook']);
+        \App\Models\Lead::create(['tenant_id' => $tenant->id, 'name' => 'Matches B', 'source' => 'website']);
+        \App\Models\Lead::create(['tenant_id' => $tenant->id, 'name' => 'Matches Neither', 'source' => 'referral']);
+
+        $query = \App\Models\Lead::query();
+        \App\Services\ConditionFilter::apply(
+            $query,
+            [['field' => 'source', 'operator' => 'equals', 'value' => 'facebook'],
+             ['field' => 'source', 'operator' => 'equals', 'value' => 'website']],
+            ['source'],
+            null,
+            false,
+            'or'
+        );
+
+        $names = $query->pluck('name')->sort()->values()->all();
+        $this->assertSame(['Matches A', 'Matches B'], $names);
+    }
+
+    public function test_default_boolean_is_and_unchanged_from_before(): void
+    {
+        $tenant = \App\Models\Tenant::create(['name' => 'CF2', 'subdomain' => 'cf-and', 'status' => 'active']);
+        app()->instance('current_tenant_id', $tenant->id);
+
+        \App\Models\Lead::create(['tenant_id' => $tenant->id, 'name' => 'Both', 'source' => 'facebook', 'status' => 'open']);
+        \App\Models\Lead::create(['tenant_id' => $tenant->id, 'name' => 'Source only', 'source' => 'facebook', 'status' => 'won']);
+
+        $query = \App\Models\Lead::query();
+        \App\Services\ConditionFilter::apply(
+            $query,
+            [['field' => 'source', 'operator' => 'equals', 'value' => 'facebook'],
+             ['field' => 'status', 'operator' => 'equals', 'value' => 'open']],
+            ['source', 'status']
+        );
+
+        $names = $query->pluck('name')->all();
+        $this->assertSame(['Both'], $names);
+    }
 }

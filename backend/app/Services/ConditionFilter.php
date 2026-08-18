@@ -14,8 +14,11 @@ class ConditionFilter
      * @param  string|null  $jsonColumn  column name holding JSON fields, or null if this entity has none
      * @param  bool  $allFieldsAreJson  true when every field (no 'cf_' prefix) resolves through $jsonColumn,
      *                                  e.g. custom record types where everything lives in `data`
+     * @param  string  $boolean  'and' (default) applies each condition with WHERE; 'or' applies each
+     *                            with orWHERE — pass 'or' only inside a caller-supplied where-closure so
+     *                            the OR group stays isolated from surrounding AND conditions.
      */
-    public static function apply($query, array $conditions, array $systemFields, ?string $jsonColumn = null, bool $allFieldsAreJson = false): void
+    public static function apply($query, array $conditions, array $systemFields, ?string $jsonColumn = null, bool $allFieldsAreJson = false, string $boolean = 'and'): void
     {
         foreach ($conditions as $cond) {
             $field    = $cond['field'] ?? null;
@@ -41,16 +44,18 @@ class ConditionFilter
                     : $field;
             }
 
+            $w = $boolean === 'or' ? 'orWhere' : 'where';
+
             match ($operator) {
-                'equals'     => $query->where($column, '=', $value),
-                'not_equals' => $query->where($column, '!=', $value),
-                'contains'   => $query->where($column, 'like', "%{$value}%"),
-                'gt'         => $query->where($column, '>', $value),
-                'gte'        => $query->where($column, '>=', $value),
-                'lt'         => $query->where($column, '<', $value),
-                'lte'        => $query->where($column, '<=', $value),
-                'empty'      => $query->where(fn ($q) => $q->whereNull($column)->orWhere($column, '=', '')),
-                'not_empty'  => $query->where(fn ($q) => $q->whereNotNull($column)->where($column, '!=', '')),
+                'equals'     => $query->{$w}($column, '=', $value),
+                'not_equals' => $query->{$w}($column, '!=', $value),
+                'contains'   => $query->{$w}($column, 'like', "%{$value}%"),
+                'gt'         => $query->{$w}($column, '>', $value),
+                'gte'        => $query->{$w}($column, '>=', $value),
+                'lt'         => $query->{$w}($column, '<', $value),
+                'lte'        => $query->{$w}($column, '<=', $value),
+                'empty'      => $query->{$w}(fn ($q) => $q->whereNull($column)->orWhere($column, '=', '')),
+                'not_empty'  => $query->{$w}(fn ($q) => $q->whereNotNull($column)->where($column, '!=', '')),
                 default      => null,
             };
         }

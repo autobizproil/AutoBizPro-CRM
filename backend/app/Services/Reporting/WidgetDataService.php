@@ -48,6 +48,15 @@ class WidgetDataService
             );
         }
 
+        if (! empty($config['orConditions']) && is_array($config['orConditions'])) {
+            $orConditions = $config['orConditions'];
+            $filterFields = array_keys($descriptor['filterFields']);
+            $jsonColumn   = $descriptor['jsonColumn'];
+            $query->where(function ($q) use ($orConditions, $filterFields, $jsonColumn) {
+                ConditionFilter::apply($q, $orConditions, $filterFields, $jsonColumn, false, 'or');
+            });
+        }
+
         $aggregation = in_array($config['aggregation'] ?? 'count', self::AGGREGATIONS, true)
             ? ($config['aggregation'] ?? 'count')
             : 'count';

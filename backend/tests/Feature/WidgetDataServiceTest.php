@@ -396,4 +396,37 @@ class WidgetDataServiceTest extends TestCase
 
         $this->assertSame(1.0, $result['total']);
     }
+
+    public function test_or_conditions_widen_results_beyond_and_conditions(): void
+    {
+        // AND(status=open) AND OR(source=website): only a lead satisfying BOTH the
+        // AND-group and at least one OR-group condition qualifies. 'A' satisfies both;
+        // 'B' satisfies only the OR-group (fails the AND-group's status=open); 'C'
+        // satisfies neither.
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'website', 'status' => 'open']);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'B', 'source' => 'website', 'status' => 'won']);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'C', 'source' => 'referral', 'status' => 'lost']);
+
+        $result = $this->service()->aggregate([
+            'entity'       => 'lead',
+            'displayField' => 'source',
+            'conditions'   => [['field' => 'status', 'operator' => 'equals', 'value' => 'open']],
+            'orConditions' => [['field' => 'source', 'operator' => 'equals', 'value' => 'website']],
+        ], $this->admin);
+
+        $sources = collect($result['rows'])->pluck('key')->all();
+        $this->assertSame(['website'], $sources);
+    }
+
+    public function test_empty_or_conditions_is_a_no_op(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'facebook']);
+
+        $result = $this->service()->aggregate([
+            'entity'       => 'lead',
+            'orConditions' => [],
+        ], $this->admin);
+
+        $this->assertSame(1.0, $result['total']);
+    }
 }
