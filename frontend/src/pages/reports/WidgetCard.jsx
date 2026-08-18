@@ -501,7 +501,7 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
   })
 
   if (preview) {
-    const previewData = legacy ? data : data?.rows
+    const previewData = legacy ? data : (widget.type === 'kpi' ? data : data?.rows)
     return (
       <div className="w-full">
         {renderPreviewChart(widget, previewData, isLoading)}
