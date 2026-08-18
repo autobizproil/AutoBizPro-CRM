@@ -137,6 +137,44 @@ class WidgetDataServiceTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_resolved_range_is_echoed_when_time_period_set(): void
+    {
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-19 12:00:00'));
+
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A']);
+
+        $result = $this->service()->aggregate([
+            'entity'     => 'lead',
+            'timePeriod' => ['field' => 'created_at', 'operator' => 'current_month'],
+        ], $this->admin);
+
+        $this->assertSame('2026-08-01', $result['resolvedRange']['from']);
+        $this->assertSame('2026-08-31', $result['resolvedRange']['to']);
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    public function test_resolved_range_is_null_without_time_period(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A']);
+
+        $result = $this->service()->aggregate(['entity' => 'lead'], $this->admin);
+
+        $this->assertNull($result['resolvedRange']);
+    }
+
+    public function test_resolved_range_is_null_for_unresolvable_operator(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A']);
+
+        $result = $this->service()->aggregate([
+            'entity'     => 'lead',
+            'timePeriod' => ['field' => 'created_at', 'operator' => 'not_a_real_operator'],
+        ], $this->admin);
+
+        $this->assertNull($result['resolvedRange']);
+    }
+
     public function test_time_period_with_unknown_date_field_is_ignored(): void
     {
         Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A']);

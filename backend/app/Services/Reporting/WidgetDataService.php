@@ -33,7 +33,11 @@ class WidgetDataService
         $query = $descriptor['model']::query();
 
         $this->applyOwnerScope($query, $descriptor, $entity, $user);
-        $this->applyTimePeriod($query, $descriptor, $table, $config['timePeriod'] ?? null);
+        $resolvedRange = $this->applyTimePeriod($query, $descriptor, $table, $config['timePeriod'] ?? null);
+        $resolvedRangeOut = $resolvedRange === null ? null : [
+            'from' => $resolvedRange[0]->format('Y-m-d'),
+            'to'   => $resolvedRange[1]->format('Y-m-d'),
+        ];
 
         if (! empty($config['conditions']) && is_array($config['conditions'])) {
             ConditionFilter::apply(
@@ -66,6 +70,7 @@ class WidgetDataService
             return [
                 'rows'  => [['key' => null, 'label' => 'סה״כ', 'color' => null, 'total' => $total]],
                 'total' => $total,
+                'resolvedRange' => $resolvedRangeOut,
             ];
         }
 
@@ -94,7 +99,7 @@ class WidgetDataService
 
         $total = (float) $totalQuery->selectRaw("{$aggregateSql} as total")->value('total');
 
-        return ['rows' => $mapped, 'total' => $total];
+        return ['rows' => $mapped, 'total' => $total, 'resolvedRange' => $resolvedRangeOut];
     }
 
     /**
@@ -125,18 +130,19 @@ class WidgetDataService
     /**
      * @param  array<string, mixed>  $descriptor
      * @param  array<string, mixed>|null  $timePeriod
+     * @return array{0: \Carbon\Carbon, 1: \Carbon\Carbon}|null
      */
-    private function applyTimePeriod($query, array $descriptor, string $table, ?array $timePeriod): void
+    private function applyTimePeriod($query, array $descriptor, string $table, ?array $timePeriod): ?array
     {
         if (! $timePeriod) {
-            return;
+            return null;
         }
 
         $field    = $timePeriod['field'] ?? null;
         $operator = $timePeriod['operator'] ?? null;
 
         if (! $field || ! $operator || ! isset($descriptor['dateFields'][$field])) {
-            return;
+            return null;
         }
 
         $column = "{$table}.{$field}";
@@ -145,15 +151,20 @@ class WidgetDataService
             $range = RelativeDateRange::resolve('equals', $timePeriod['value'] ?? null);
             if ($range !== null) {
                 $query->whereNotBetween($column, $range);
+                // not_equals excludes a range rather than selecting one — nothing
+                // sensible to echo as "the" resolved range, so report none.
+                return null;
             }
 
-            return;
+            return null;
         }
 
         $range = RelativeDateRange::resolve($operator, $timePeriod['value'] ?? null);
         if ($range !== null) {
             $query->whereBetween($column, $range);
         }
+
+        return $range;
     }
 
     /**
