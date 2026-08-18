@@ -271,6 +271,8 @@ class WidgetDataServiceTest extends TestCase
         ], $this->admin);
 
         $this->assertLessThanOrEqual(50, count($result['rows']));
+        $this->assertSame(50, count($result['rows']));
+        $this->assertSame(60.0, $result['total']);
     }
 
     // --- Fix 3: whitelist rejection paths + agent scoping ---

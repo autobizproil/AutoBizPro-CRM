@@ -69,6 +69,8 @@ class WidgetDataService
             ];
         }
 
+        $totalQuery = $query->clone();
+
         $rows = $query
             ->select("{$table}.{$displayField} as group_key", DB::raw("{$aggregateSql} as total"))
             ->groupBy("{$table}.{$displayField}")
@@ -90,7 +92,9 @@ class WidgetDataService
             ];
         })->values()->all();
 
-        return ['rows' => $mapped, 'total' => (float) array_sum(array_column($mapped, 'total'))];
+        $total = (float) $totalQuery->selectRaw("{$aggregateSql} as total")->value('total');
+
+        return ['rows' => $mapped, 'total' => $total];
     }
 
     /**
