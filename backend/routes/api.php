@@ -19,6 +19,7 @@ use App\Http\Controllers\BulkDeleteController;
 use App\Http\Controllers\SavedViewController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WidgetController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public routes (no auth) ────────────────────────────────────────────────
@@ -338,6 +339,12 @@ Route::middleware(['auth:sanctum', 'tenant', 'agent.ability'])->group(function (
     Route::get('/dashboard/reports/conversion', [DashboardController::class, 'reportConversion'])
         ->middleware('permission:reports,can_read');
     Route::get('/dashboard/reports/export', [DashboardController::class, 'exportLeads'])
+        ->middleware('permission:reports,can_read');
+
+    // Dashboard — Generic widget builder (Fireberry-parity)
+    Route::get('/dashboard/widget-fields', [WidgetController::class, 'fields'])
+        ->middleware('permission:reports,can_read');
+    Route::get('/dashboard/widget-data', [WidgetController::class, 'data'])
         ->middleware('permission:reports,can_read');
 
     // ── PDF / Digital Signature — Protected routes ─────────────────────────
