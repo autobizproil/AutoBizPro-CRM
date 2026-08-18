@@ -40,7 +40,7 @@ class WidgetDataService
                 $query,
                 $config['conditions'],
                 array_keys($descriptor['filterFields']),
-                'custom_fields'
+                $descriptor['jsonColumn']
             );
         }
 
@@ -73,6 +73,7 @@ class WidgetDataService
             ->select("{$table}.{$displayField} as group_key", DB::raw("{$aggregateSql} as total"))
             ->groupBy("{$table}.{$displayField}")
             ->orderByDesc('total')
+            ->limit(50)
             ->get();
 
         $labels = $this->labelResolver($groupMeta);

@@ -24,6 +24,7 @@ class EntityDescriptor
                 'model'       => Lead::class,
                 'table'       => 'leads',
                 'ownerColumn' => 'assigned_to',
+                'jsonColumn'  => 'custom_fields',
                 'valueFields' => [],
                 'groupFields' => [
                     'source'            => ['label' => 'מקור', 'type' => 'enum', 'options' => [
@@ -58,6 +59,7 @@ class EntityDescriptor
                 'model'       => Client::class,
                 'table'       => 'clients',
                 'ownerColumn' => 'assigned_to',
+                'jsonColumn'  => 'custom_fields',
                 'valueFields' => [],
                 'groupFields' => [
                     'source'      => ['label' => 'מקור', 'type' => 'enum', 'options' => [
@@ -86,6 +88,7 @@ class EntityDescriptor
                 'model'       => Contact::class,
                 'table'       => 'contacts',
                 'ownerColumn' => null,
+                'jsonColumn'  => 'custom_fields',
                 'valueFields' => [],
                 'groupFields' => [
                     'company'    => ['label' => 'חברה', 'type' => 'text'],
@@ -108,6 +111,7 @@ class EntityDescriptor
                 'model'       => Task::class,
                 'table'       => 'tasks',
                 'ownerColumn' => 'assigned_to',
+                'jsonColumn'  => null,
                 'valueFields' => [],
                 'groupFields' => [
                     'status'      => ['label' => 'סטטוס', 'type' => 'enum', 'options' => [
@@ -142,6 +146,7 @@ class EntityDescriptor
                 // Activities are scoped through the lead they belong to, not a column
                 // on the row itself — WidgetDataService special-cases this.
                 'ownerColumn' => null,
+                'jsonColumn'  => null,
                 'valueFields' => [],
                 'groupFields' => [
                     'type'        => ['label' => 'סוג', 'type' => 'enum', 'options' => [

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Activity;
+use App\Models\Client;
 use App\Models\Lead;
 use App\Models\PipelineStage;
 use App\Models\Task;
@@ -205,5 +207,153 @@ class WidgetDataServiceTest extends TestCase
         $byStatus = collect($result['rows'])->keyBy('key');
         $this->assertSame(2.0, $byStatus['open']['total']);
         $this->assertSame('פתוחה', $byStatus['open']['label']);
+    }
+
+    // --- Fix 1: cf_* condition against an entity with no JSON column must not 500 ---
+
+    public function test_custom_field_condition_on_task_entity_is_dropped_not_errored(): void
+    {
+        Task::create(['tenant_id' => $this->tenant->id, 'title' => 'T1', 'status' => 'open', 'priority' => 'high']);
+        Task::create(['tenant_id' => $this->tenant->id, 'title' => 'T2', 'status' => 'done', 'priority' => 'low']);
+
+        // tasks has no custom_fields column; ConditionFilter must drop the cf_* condition
+        // (same as any other field not in the whitelist) rather than build SQL against
+        // a nonexistent column.
+        $result = $this->service()->aggregate([
+            'entity'     => 'task',
+            'conditions' => [['field' => 'cf_anything', 'operator' => 'equals', 'value' => '1']],
+        ], $this->admin);
+
+        // Condition is ignored entirely -> both rows still counted.
+        $this->assertSame(2.0, $result['total']);
+    }
+
+    public function test_custom_field_condition_on_activity_entity_is_dropped_not_errored(): void
+    {
+        $lead = Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A']);
+        Activity::create([
+            'tenant_id' => $this->tenant->id, 'entity_type' => 'lead', 'entity_id' => $lead->id,
+            'type' => 'note', 'body' => 'hi', 'user_id' => $this->admin->id,
+        ]);
+
+        $result = $this->service()->aggregate([
+            'entity'     => 'activity',
+            'conditions' => [['field' => 'cf_anything', 'operator' => 'equals', 'value' => '1']],
+        ], $this->admin);
+
+        $this->assertSame(1.0, $result['total']);
+    }
+
+    public function test_custom_field_condition_on_lead_entity_still_filters(): void
+    {
+        // leads DO have custom_fields, so a cf_* condition should still be honoured.
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'custom_fields' => ['budget' => '100']]);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'B', 'custom_fields' => ['budget' => '200']]);
+
+        $result = $this->service()->aggregate([
+            'entity'     => 'lead',
+            'conditions' => [['field' => 'cf_budget', 'operator' => 'equals', 'value' => '100']],
+        ], $this->admin);
+
+        $this->assertSame(1.0, $result['total']);
+    }
+
+    // --- Fix 2: grouped results are capped at 50 rows ---
+
+    public function test_grouped_results_are_capped_at_50_rows(): void
+    {
+        for ($i = 0; $i < 60; $i++) {
+            Lead::create(['tenant_id' => $this->tenant->id, 'name' => "Lead {$i}", 'source' => "source-{$i}"]);
+        }
+
+        $result = $this->service()->aggregate([
+            'entity' => 'lead', 'displayField' => 'source',
+        ], $this->admin);
+
+        $this->assertLessThanOrEqual(50, count($result['rows']));
+    }
+
+    // --- Fix 3: whitelist rejection paths + agent scoping ---
+
+    public function test_rejected_aggregation_value_falls_back_to_count(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A']);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'B']);
+
+        $result = $this->service()->aggregate([
+            'entity' => 'lead', 'aggregation' => 'drop_table',
+        ], $this->admin);
+
+        $this->assertSame(2.0, $result['total']);
+    }
+
+    public function test_condition_with_field_outside_whitelist_is_ignored(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A']);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'B']);
+
+        $result = $this->service()->aggregate([
+            'entity'     => 'lead',
+            'conditions' => [['field' => 'not_a_real_field', 'operator' => 'equals', 'value' => 'x']],
+        ], $this->admin);
+
+        // ConditionFilter::apply() drops conditions on fields outside $systemFields
+        // (and not a valid cf_* field) — matches the same behavior as an unknown
+        // display/date field elsewhere in this suite.
+        $this->assertSame(2.0, $result['total']);
+    }
+
+    public function test_agent_scoping_on_client_entity(): void
+    {
+        $agent = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'Agent',
+            'email' => 'agent-client@widget.test', 'password' => Hash::make('password'), 'role' => 'agent',
+        ]);
+
+        Client::create(['tenant_id' => $this->tenant->id, 'name' => 'Mine', 'assigned_to' => $agent->id]);
+        Client::create(['tenant_id' => $this->tenant->id, 'name' => 'Theirs']);
+
+        $result = $this->service()->aggregate(['entity' => 'client'], $agent);
+
+        $this->assertSame(1.0, $result['total']);
+    }
+
+    public function test_agent_scoping_on_task_entity(): void
+    {
+        $agent = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'Agent',
+            'email' => 'agent-task@widget.test', 'password' => Hash::make('password'), 'role' => 'agent',
+        ]);
+
+        Task::create(['tenant_id' => $this->tenant->id, 'title' => 'Mine', 'status' => 'open', 'assigned_to' => $agent->id]);
+        Task::create(['tenant_id' => $this->tenant->id, 'title' => 'Theirs', 'status' => 'open']);
+
+        $result = $this->service()->aggregate(['entity' => 'task'], $agent);
+
+        $this->assertSame(1.0, $result['total']);
+    }
+
+    public function test_agent_scoping_on_activity_entity_scopes_through_owned_leads(): void
+    {
+        $agent = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'Agent',
+            'email' => 'agent-activity@widget.test', 'password' => Hash::make('password'), 'role' => 'agent',
+        ]);
+
+        $myLead      = Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'Mine', 'assigned_to' => $agent->id]);
+        $theirLead   = Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'Theirs']);
+
+        Activity::create([
+            'tenant_id' => $this->tenant->id, 'entity_type' => 'lead', 'entity_id' => $myLead->id,
+            'type' => 'note', 'body' => 'mine', 'user_id' => $agent->id,
+        ]);
+        Activity::create([
+            'tenant_id' => $this->tenant->id, 'entity_type' => 'lead', 'entity_id' => $theirLead->id,
+            'type' => 'note', 'body' => 'theirs', 'user_id' => $this->admin->id,
+        ]);
+
+        $result = $this->service()->aggregate(['entity' => 'activity'], $agent);
+
+        $this->assertSame(1.0, $result['total']);
     }
 }
