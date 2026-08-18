@@ -53,6 +53,21 @@ describe('widgetDataParams', () => {
     expect(widgetDataParams({ entity: 'lead', aggregation: 'sum', valueField: 'amount' }).valueField)
       .toBe('amount')
   })
+
+  it('includes orConditions when present', () => {
+    const params = widgetDataParams({
+      entity: 'lead',
+      orConditions: [{ field: 'source', operator: 'equals', value: 'website' }],
+    })
+
+    expect(JSON.parse(params.orConditions)).toEqual([{ field: 'source', operator: 'equals', value: 'website' }])
+  })
+
+  it('omits orConditions when empty', () => {
+    const params = widgetDataParams({ entity: 'lead', orConditions: [] })
+
+    expect(params.orConditions).toBeUndefined()
+  })
 })
 
 describe('emptyWidgetDraft', () => {
@@ -71,5 +86,9 @@ describe('emptyWidgetDraft', () => {
     a.conditions.push({ field: 'name', operator: 'equals', value: 'x' })
 
     expect(emptyWidgetDraft().conditions).toEqual([])
+  })
+
+  it('includes an empty orConditions array', () => {
+    expect(emptyWidgetDraft().orConditions).toEqual([])
   })
 })

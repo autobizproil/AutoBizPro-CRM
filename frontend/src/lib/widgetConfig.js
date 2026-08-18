@@ -21,6 +21,9 @@ export function widgetDataParams(widget) {
   if (widget.conditions?.length) {
     params.conditions = JSON.stringify(widget.conditions)
   }
+  if (widget.orConditions?.length) {
+    params.orConditions = JSON.stringify(widget.orConditions)
+  }
 
   return params
 }
@@ -36,6 +39,7 @@ export function emptyWidgetDraft() {
     displayField: 'source',
     timePeriod:   { field: 'created_at', operator: '', value: '' },
     conditions:   [],
+    orConditions: [],
   }
 }
 

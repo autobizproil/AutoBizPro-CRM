@@ -29,6 +29,26 @@ const CONDITION_OPERATORS = [
 
 const needsConditionValue = (op) => op !== 'empty' && op !== 'not_empty'
 
+function ConditionRow({ row, filterFields, lookups, onChange, onRemove }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <select value={row.field} onChange={e => onChange({ field: e.target.value, value: '' })}
+        className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+        {Object.entries(filterFields).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
+      </select>
+      <select value={row.operator} onChange={e => onChange({ operator: e.target.value })}
+        className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+        {CONDITION_OPERATORS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+      </select>
+      {needsConditionValue(row.operator) && (
+        <FilterValueInput field={filterFields[row.field]} lookups={lookups} value={row.value}
+          onChange={v => onChange({ value: v })} />
+      )}
+      <button type="button" onClick={onRemove} className="text-gray-300 hover:text-red-500 flex-shrink-0 px-0.5">×</button>
+    </div>
+  )
+}
+
 const LABEL_CLASS  = 'block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1'
 const SELECT_CLASS = 'w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30'
 
@@ -65,6 +85,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
       aggregation:  'count',
       timePeriod:   { field: firstDate, operator: '', value: '' },
       conditions:   [],
+      orConditions: [],
     })
   }
 
@@ -82,7 +103,14 @@ export default function AddWidgetModal({ onSave, onClose }) {
   const removeCondition = (i) => patch({ conditions: draft.conditions.filter((_, idx) => idx !== i) })
   const updateCondition = (i, p) => patch({ conditions: draft.conditions.map((c, idx) => idx === i ? { ...c, ...p } : c) })
 
+  const addOrCondition    = () => patch({ orConditions: [...draft.orConditions, { field: Object.keys(filterFields)[0] ?? '', operator: 'equals', value: '' }] })
+  const removeOrCondition = (i) => patch({ orConditions: draft.orConditions.filter((_, idx) => idx !== i) })
+  const updateOrCondition = (i, p) => patch({ orConditions: draft.orConditions.map((c, idx) => idx === i ? { ...c, ...p } : c) })
+
   const validConditions = draft.conditions.filter(c =>
+    c.field && c.operator && (!needsConditionValue(c.operator) || String(c.value ?? '').trim() !== '')
+  )
+  const validOrConditions = draft.orConditions.filter(c =>
     c.field && c.operator && (!needsConditionValue(c.operator) || String(c.value ?? '').trim() !== '')
   )
 
@@ -93,6 +121,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
     id:         '__preview__',
     title:      draft.title || 'תצוגה מקדימה',
     conditions: validConditions,
+    orConditions: validOrConditions,
   }
 
   function handleSave() {
@@ -100,7 +129,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
       toast.warn('נא להזין כותרת')
       return
     }
-    onSave({ ...draft, title: draft.title.trim(), conditions: validConditions })
+    onSave({ ...draft, title: draft.title.trim(), conditions: validConditions, orConditions: validOrConditions })
   }
 
   return (
@@ -204,33 +233,36 @@ export default function AddWidgetModal({ onSave, onClose }) {
 
             <div>
               <label className={LABEL_CLASS}>סינון רשומות</label>
-              <div className="space-y-2">
-                {draft.conditions.map((row, i) => (
-                  <div key={i} className="flex items-center gap-1.5">
-                    <select value={row.field} onChange={e => updateCondition(i, { field: e.target.value, value: '' })}
-                      className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-                      {Object.entries(filterFields).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
-                    </select>
-                    <select value={row.operator} onChange={e => updateCondition(i, { operator: e.target.value })}
-                      className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-                      {CONDITION_OPERATORS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                    </select>
-                    {needsConditionValue(row.operator) && (
-                      <FilterValueInput
-                        field={filterFields[row.field]}
-                        lookups={meta?.lookups}
-                        value={row.value}
-                        onChange={v => updateCondition(i, { value: v })}
-                      />
-                    )}
-                    <button type="button" onClick={() => removeCondition(i)}
-                      className="text-gray-300 hover:text-red-500 flex-shrink-0 px-0.5">×</button>
-                  </div>
-                ))}
+
+              <div className="mb-3">
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1.5 underline decoration-dotted">
+                  התנאים שכולם חייבים להתקיים
+                </p>
+                <div className="space-y-2">
+                  {draft.conditions.map((row, i) => (
+                    <ConditionRow key={i} row={row} filterFields={filterFields} lookups={meta?.lookups}
+                      onChange={p => updateCondition(i, p)} onRemove={() => removeCondition(i)} />
+                  ))}
+                </div>
+                <button type="button" onClick={addCondition} className="mt-1.5 text-xs text-[#2398c2] hover:underline">
+                  + הוסף סינון
+                </button>
               </div>
-              <button type="button" onClick={addCondition} className="mt-1.5 text-xs text-[#2398c2] hover:underline">
-                + הוסף סינון
-              </button>
+
+              <div>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1.5 underline decoration-dotted">
+                  תנאים שלפחות אחד מהם מתקיים
+                </p>
+                <div className="space-y-2">
+                  {draft.orConditions.map((row, i) => (
+                    <ConditionRow key={i} row={row} filterFields={filterFields} lookups={meta?.lookups}
+                      onChange={p => updateOrCondition(i, p)} onRemove={() => removeOrCondition(i)} />
+                  ))}
+                </div>
+                <button type="button" onClick={addOrCondition} className="mt-1.5 text-xs text-[#2398c2] hover:underline">
+                  + הוסף סינון
+                </button>
+              </div>
             </div>
           </div>
 
