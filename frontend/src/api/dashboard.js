@@ -11,4 +11,12 @@ export const dashboardApi = {
   widgetFields:       ()       => client.get('/dashboard/widget-fields'),
   widgetData:         (params) => client.get('/dashboard/widget-data', { params }),
   entityList:         (route, params) => client.get(route, { params }),
+
+  listBoards:   ()             => client.get('/dashboards'),
+  createBoard:  (name)         => client.post('/dashboards', { name }),
+  updateBoard:  (id, name)     => client.put(`/dashboards/${id}`, { name }),
+  deleteBoard:  (id)           => client.delete(`/dashboards/${id}`),
+  createWidget: (boardId, config) => client.post(`/dashboards/${boardId}/widgets`, { config }),
+  updateWidget: (boardId, widgetId, config) => client.put(`/dashboards/${boardId}/widgets/${widgetId}`, { config }),
+  deleteWidget: (boardId, widgetId) => client.delete(`/dashboards/${boardId}/widgets/${widgetId}`),
 }

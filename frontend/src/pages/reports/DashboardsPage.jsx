@@ -32,29 +32,50 @@ const DEFAULT_BOARDS = [
   },
 ]
 
-// ── localStorage persistence ──────────────────────────────────────────────────
+// ── Server persistence, with a one-time localStorage upload ────────────────────
 
 const STORAGE_KEY = 'crm_boards_v2'
 
-function loadBoards() {
+// Normalizes a server board (widgets carry {id, config, position}) into the
+// flat shape the rest of this file already works with ({id, name, widgets: [widgetConfig, ...]}),
+// where each widget object keeps its server `id` merged into its own config.
+function fromServerBoard(board) {
+  return {
+    id:   board.id,
+    name: board.name,
+    widgets: (board.widgets ?? []).map(w => ({ ...w.config, id: w.id })),
+  }
+}
+
+async function migrateLocalStorageIfNeeded() {
+  let localBoards = null
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      if (Array.isArray(parsed) && parsed.length > 0) localBoards = parsed
     }
   } catch {
-    // ignore
+    return
   }
-  return DEFAULT_BOARDS
-}
+  if (!localBoards) return
 
-function saveBoards(boards) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(boards))
-  } catch {
-    // ignore
+  const existing = await dashboardApi.listBoards()
+  if (existing.data.data.length > 0) {
+    // Server already has boards (e.g. migrated from another browser) — don't duplicate.
+    localStorage.removeItem(STORAGE_KEY)
+    return
   }
+
+  for (const board of localBoards) {
+    const created = await dashboardApi.createBoard(board.name)
+    const boardId = created.data.data.id
+    for (const widget of board.widgets ?? []) {
+      const { id: _localId, ...config } = widget
+      await dashboardApi.createWidget(boardId, config)
+    }
+  }
+  localStorage.removeItem(STORAGE_KEY)
 }
 
 // ── Inline-rename board button ────────────────────────────────────────────────
@@ -133,82 +154,98 @@ function BoardItem({ board, isActive, onClick, onRename, onDelete, onDuplicate, 
 
 export default function DashboardsPage() {
   const toast                       = useToast()
-  const [boards, setBoards]         = useState(loadBoards)
-  const [activeBoardId, setActive]  = useState(() => loadBoards()[0]?.id ?? 'default')
+  const [boards, setBoards]         = useState([])
+  const [activeBoardId, setActive]  = useState(null)
   const [showAddWidget, setShowAdd] = useState(false)
+  const [loaded, setLoaded]         = useState(false)
 
   const activeBoard = boards.find(b => b.id === activeBoardId) ?? boards[0]
   // No global range — all time by default; each widget carries its own filter.
   const dateParams  = {}
 
-  // Persist on every change
+  async function refreshBoards(preferredActiveId) {
+    const resp = await dashboardApi.listBoards()
+    let serverBoards = resp.data.data.map(fromServerBoard)
+
+    if (serverBoards.length === 0) {
+      // Brand-new tenant/user with nothing migrated and nothing created yet — seed
+      // the same starter board P1 used to ship via DEFAULT_BOARDS, but through the API.
+      for (const seed of DEFAULT_BOARDS) {
+        const created = await dashboardApi.createBoard(seed.name)
+        const boardId = created.data.data.id
+        for (const widget of seed.widgets) {
+          const { id: _localId, ...config } = widget
+          await dashboardApi.createWidget(boardId, config)
+        }
+      }
+      const reseeded = await dashboardApi.listBoards()
+      serverBoards = reseeded.data.data.map(fromServerBoard)
+    }
+
+    setBoards(serverBoards)
+    setActive(preferredActiveId && serverBoards.some(b => b.id === preferredActiveId)
+      ? preferredActiveId
+      : serverBoards[0]?.id ?? null)
+  }
+
   useEffect(() => {
-    saveBoards(boards)
-  }, [boards])
+    migrateLocalStorageIfNeeded()
+      .catch(() => { /* migration is best-effort; a failed upload just leaves the old localStorage data in place for a retry next load */ })
+      .finally(() => refreshBoards().finally(() => setLoaded(true)))
+  }, [])
 
   // ── Boards CRUD ─────────────────────────────────────────────────────────────
 
-  function addBoard() {
-    const newBoard = { id: makeId(), name: 'לוח בקרה חדש', widgets: [] }
-    setBoards(prev => [...prev, newBoard])
-    setActive(newBoard.id)
+  async function addBoard() {
+    const created = await dashboardApi.createBoard('לוח בקרה חדש')
+    await refreshBoards(created.data.data.id)
   }
 
-  function renameBoard(id, name) {
-    setBoards(prev => prev.map(b => b.id === id ? { ...b, name } : b))
+  async function renameBoard(id, name) {
+    await dashboardApi.updateBoard(id, name)
+    await refreshBoards(activeBoardId)
   }
 
-  function deleteBoard(id) {
+  async function deleteBoard(id) {
     const board = boards.find(b => b.id === id)
     if (!board) return
     if (boards.length <= 1) { toast.error('חייב להישאר לפחות לוח אחד'); return }
     if (!confirm(`למחוק את הלוח "${board.name}"? הפעולה אינה הפיכה.`)) return
-    setBoards(prev => {
-      const next = prev.filter(b => b.id !== id)
-      if (activeBoardId === id) setActive(next[0].id)
-      return next
-    })
+    await dashboardApi.deleteBoard(id)
+    await refreshBoards()
   }
 
-  function duplicateBoard(id) {
+  async function duplicateBoard(id) {
     const board = boards.find(b => b.id === id)
     if (!board) return
-    const copy = {
-      ...board,
-      id: makeId(),
-      name: `${board.name} (עותק)`,
-      widgets: board.widgets.map(w => ({ ...w, id: makeId() })),
+    const created = await dashboardApi.createBoard(`${board.name} (עותק)`)
+    const boardId = created.data.data.id
+    for (const widget of board.widgets) {
+      const { id: _oldId, ...config } = widget
+      await dashboardApi.createWidget(boardId, config)
     }
-    setBoards(prev => [...prev, copy])
-    setActive(copy.id)
+    await refreshBoards(boardId)
   }
 
   // ── Widget CRUD ─────────────────────────────────────────────────────────────
 
-  function handleAddWidget(widgetConfig) {
-    const widget = { ...widgetConfig, id: makeId() }
-    setBoards(prev => prev.map(b =>
-      b.id === activeBoardId
-        ? { ...b, widgets: [...b.widgets, widget] }
-        : b
-    ))
+  async function handleAddWidget(widgetConfig) {
+    await dashboardApi.createWidget(activeBoardId, widgetConfig)
     setShowAdd(false)
+    await refreshBoards(activeBoardId)
   }
 
-  function handleDeleteWidget(widgetId) {
-    setBoards(prev => prev.map(b =>
-      b.id === activeBoardId
-        ? { ...b, widgets: b.widgets.filter(w => w.id !== widgetId) }
-        : b
-    ))
+  async function handleDeleteWidget(widgetId) {
+    await dashboardApi.deleteWidget(activeBoardId, widgetId)
+    await refreshBoards(activeBoardId)
   }
 
-  function handleUpdateWidget(widgetId, patch) {
-    setBoards(prev => prev.map(b =>
-      b.id === activeBoardId
-        ? { ...b, widgets: b.widgets.map(w => w.id === widgetId ? { ...w, ...patch } : w) }
-        : b
-    ))
+  async function handleUpdateWidget(widgetId, patch) {
+    const widget = activeBoard.widgets.find(w => w.id === widgetId)
+    if (!widget) return
+    const { id: _id, ...config } = { ...widget, ...patch }
+    await dashboardApi.updateWidget(activeBoardId, widgetId, config)
+    await refreshBoards(activeBoardId)
   }
 
   // ── Export ──────────────────────────────────────────────────────────────────
@@ -230,8 +267,12 @@ export default function DashboardsPage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  const kpiWidgets   = activeBoard?.widgets?.filter(w => w.type === 'kpi')  ?? []
-  const chartWidgets = activeBoard?.widgets?.filter(w => w.type !== 'kpi')  ?? []
+  if (!loaded) {
+    return <div className="flex items-center justify-center h-full text-gray-400 text-sm">טוען לוחות בקרה...</div>
+  }
+
+  const kpiWidgets   = activeBoard?.widgets?.filter(w => w.type === 'kpi' || w.type === 'metrics_table')  ?? []
+  const chartWidgets = activeBoard?.widgets?.filter(w => w.type !== 'kpi' && w.type !== 'metrics_table')  ?? []
 
   return (
     <div dir="rtl" className="flex" style={{ height: 'calc(100vh - 0px)', minHeight: 0 }}>
