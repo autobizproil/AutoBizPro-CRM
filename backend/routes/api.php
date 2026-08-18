@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AutomationController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\DashboardBoardController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FormController;
 use App\Http\Controllers\IntegrationsController;
@@ -258,6 +259,15 @@ Route::middleware(['auth:sanctum', 'tenant', 'agent.ability'])->group(function (
     Route::put('/saved-views/{savedView}',              [SavedViewController::class, 'update']);
     Route::delete('/saved-views/{savedView}',           [SavedViewController::class, 'destroy']);
     Route::post('/saved-views/{savedView}/set-default', [SavedViewController::class, 'setDefault']);
+
+    // Dashboard boards — server-side persistence for the widget builder
+    Route::get('/dashboards',                              [DashboardBoardController::class, 'index']);
+    Route::post('/dashboards',                              [DashboardBoardController::class, 'store']);
+    Route::put('/dashboards/{board}',                       [DashboardBoardController::class, 'update']);
+    Route::delete('/dashboards/{board}',                    [DashboardBoardController::class, 'destroy']);
+    Route::post('/dashboards/{board}/widgets',               [DashboardBoardController::class, 'storeWidget']);
+    Route::put('/dashboards/{board}/widgets/{widget}',       [DashboardBoardController::class, 'updateWidget']);
+    Route::delete('/dashboards/{board}/widgets/{widget}',    [DashboardBoardController::class, 'destroyWidget']);
 
     // Custom field definitions
     Route::get('/custom-fields',                              [CustomFieldController::class, 'index'])
