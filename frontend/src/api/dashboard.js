@@ -8,4 +8,6 @@ export const dashboardApi = {
   reportsActivities:  (params) => client.get('/dashboard/reports/activities',       { params }),
   reportsConversion:  (params) => client.get('/dashboard/reports/conversion',       { params }),
   exportLeads:        (params) => client.get('/dashboard/reports/export',           { params, responseType: 'blob' }),
+  widgetFields:       ()       => client.get('/dashboard/widget-fields'),
+  widgetData:         (params) => client.get('/dashboard/widget-data', { params }),
 }
