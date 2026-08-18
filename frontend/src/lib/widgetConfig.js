@@ -24,6 +24,9 @@ export function widgetDataParams(widget) {
   if (widget.orConditions?.length) {
     params.orConditions = JSON.stringify(widget.orConditions)
   }
+  if (widget.groupBy?.field) {
+    params.groupBy = JSON.stringify(widget.groupBy)
+  }
 
   return params
 }
@@ -40,6 +43,8 @@ export function emptyWidgetDraft() {
     timePeriod:   { field: 'created_at', operator: '', value: '' },
     conditions:   [],
     orConditions: [],
+    groupBy:      { field: '', granularity: 'month' },
+    variant:      'grouped',
   }
 }
 
@@ -61,4 +66,16 @@ export function drillDownParams(widget, segment, resolvedRange) {
   if (resolvedRange?.to) params.date_to = resolvedRange.to
 
   return params
+}
+
+export function pivotSeriesRows(rows, seriesKeys) {
+  const labelByKey = Object.fromEntries(seriesKeys.map(s => [s.key, s.label]))
+
+  return rows.map(row => {
+    const pivoted = { name: row.label }
+    for (const s of seriesKeys) {
+      pivoted[labelByKey[s.key]] = row.series?.[s.key] ?? 0
+    }
+    return pivoted
+  })
 }

@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { dashboardApi } from '../../api/dashboard'
-import { isLegacyWidget, widgetDataParams } from '../../lib/widgetConfig'
+import { isLegacyWidget, widgetDataParams, pivotSeriesRows } from '../../lib/widgetConfig'
 import DrillDownModal from './DrillDownModal'
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ const TICK  = '#9ca3af'
 const GRID  = '#374151'
 const TT_STYLE = { borderRadius: '8px', border: '1px solid #374151', background: '#1f2937', color: '#f9fafb', fontSize: 11 }
 
-function ChartBar({ data, color, preview, onSegmentClick }) {
+function ChartBar({ data, color, preview, onSegmentClick, seriesLabels, stacked }) {
   if (!data?.length) return <Empty />
   const h = preview ? 160 : 220
   const hasMultiBars = data[0]?.open !== undefined && data[0]?.closed !== undefined
@@ -160,7 +160,15 @@ function ChartBar({ data, color, preview, onSegmentClick }) {
           <XAxis dataKey={nameKey} tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
           <Tooltip contentStyle={TT_STYLE} />
-          {hasMultiBars ? (
+          {seriesLabels ? (
+            <>
+              {seriesLabels.map((label, i) => (
+                <Bar key={label} dataKey={label} name={label} fill={PIE_COLORS[i % PIE_COLORS.length]}
+                  radius={[4, 4, 0, 0]} stackId={stacked ? 'stack' : undefined} />
+              ))}
+              <Legend formatter={v => <span style={{ fontSize: 11, color: TICK }}>{v}</span>} />
+            </>
+          ) : hasMultiBars ? (
             <>
               <Bar dataKey="total"  name="סה״כ"    fill="#2398c2" radius={[4, 4, 0, 0]} />
               <Bar dataKey="open"   name="פתוחים"  fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -178,7 +186,7 @@ function ChartBar({ data, color, preview, onSegmentClick }) {
   )
 }
 
-function ChartBarH({ data, color, preview, onSegmentClick }) {
+function ChartBarH({ data, color, preview, onSegmentClick, seriesLabels, stacked }) {
   if (!data?.length) return <Empty />
   const h = preview ? 160 : 240
   const nameKey = Object.keys(data[0] ?? {}).find(k =>
@@ -193,9 +201,19 @@ function ChartBarH({ data, color, preview, onSegmentClick }) {
           <XAxis type="number" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
           <YAxis type="category" dataKey={nameKey} tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} width={70} />
           <Tooltip contentStyle={TT_STYLE} />
-          <Bar dataKey="total" fill={color ?? '#8b5cf6'} radius={[0, 4, 4, 0]}
-            cursor={onSegmentClick ? 'pointer' : 'default'}
-            onClick={onSegmentClick ? (d) => onSegmentClick(d?.key ?? d?.name ?? null) : undefined} />
+          {seriesLabels ? (
+            <>
+              {seriesLabels.map((label, i) => (
+                <Bar key={label} dataKey={label} name={label} fill={PIE_COLORS[i % PIE_COLORS.length]}
+                  radius={[0, 4, 4, 0]} stackId={stacked ? 'stack' : undefined} />
+              ))}
+              <Legend formatter={v => <span style={{ fontSize: 11, color: TICK }}>{v}</span>} />
+            </>
+          ) : (
+            <Bar dataKey="total" fill={color ?? '#8b5cf6'} radius={[0, 4, 4, 0]}
+              cursor={onSegmentClick ? 'pointer' : 'default'}
+              onClick={onSegmentClick ? (d) => onSegmentClick(d?.key ?? d?.name ?? null) : undefined} />
+          )}
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -384,7 +402,7 @@ function KpiCard({ widget, onDelete, data, isLoading }) {
 
 // ── Chart widget card ─────────────────────────────────────────────────────────
 
-function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading, resolvedRange }) {
+function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading, resolvedRange, seriesLabels }) {
   const [hovered, setHovered]   = useState(false)
   const [drillDown, setDrillDown] = useState(null)
 
@@ -413,7 +431,7 @@ function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading, resolved
           </div>
         )}
       </div>
-      {isLoading ? <Skeleton /> : renderChart(widget, data, key => setDrillDown({ key, label: key ?? 'ריק' }))}
+      {isLoading ? <Skeleton /> : renderChart(widget, data, key => setDrillDown({ key, label: key ?? 'ריק' }), seriesLabels)}
       {drillDown && (
         <DrillDownModal
           widget={widget}
@@ -426,10 +444,10 @@ function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading, resolved
   )
 }
 
-function renderChart(widget, data, onSegmentClick) {
+function renderChart(widget, data, onSegmentClick, seriesLabels) {
   switch (widget.type) {
-    case 'bar':   return <ChartBar  data={data} color={widget.color} onSegmentClick={onSegmentClick} />
-    case 'bar_h': return <ChartBarH data={data} color={widget.color} onSegmentClick={onSegmentClick} />
+    case 'bar':   return <ChartBar  data={data} color={widget.color} onSegmentClick={onSegmentClick} seriesLabels={seriesLabels} stacked={widget.variant === 'stacked'} />
+    case 'bar_h': return <ChartBarH data={data} color={widget.color} onSegmentClick={onSegmentClick} seriesLabels={seriesLabels} stacked={widget.variant === 'stacked'} />
     case 'pie':   return <ChartPie  data={data} onSegmentClick={onSegmentClick} />
     case 'line':  return <ChartLine data={data} color={widget.color} onSegmentClick={onSegmentClick} />
     case 'table': return <ChartTable data={data} onSegmentClick={onSegmentClick} />
@@ -492,8 +510,12 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
           // KPI widgets read a single number; charts read the grouped rows plus
           // the resolved date range (drill-down needs it to scope its own query).
           if (widget.type === 'kpi') return payload.total
+          const rows = payload.seriesKeys
+            ? pivotSeriesRows(payload.rows, payload.seriesKeys)
+            : payload.rows.map(row => ({ name: row.label, key: row.key, total: row.total, color: row.color }))
           return {
-            rows: payload.rows.map(row => ({ name: row.label, key: row.key, total: row.total, color: row.color })),
+            rows,
+            seriesLabels: payload.seriesKeys?.map(s => s.label) ?? null,
             resolvedRange: payload.resolvedRange ?? null,
           }
         }),
@@ -522,6 +544,7 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
 
   const chartData     = legacy ? data : data?.rows
   const resolvedRange = legacy ? null : data?.resolvedRange
+  const seriesLabels  = legacy ? null : data?.seriesLabels
 
   return (
     <ChartWidgetCard
@@ -531,6 +554,7 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
       data={chartData}
       isLoading={isLoading}
       resolvedRange={resolvedRange}
+      seriesLabels={seriesLabels}
     />
   )
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isLegacyWidget, widgetDataParams, emptyWidgetDraft } from './widgetConfig'
+import { isLegacyWidget, widgetDataParams, emptyWidgetDraft, pivotSeriesRows } from './widgetConfig'
 
 describe('isLegacyWidget', () => {
   it('treats dataSource-only widgets as legacy', () => {
@@ -68,6 +68,18 @@ describe('widgetDataParams', () => {
 
     expect(params.orConditions).toBeUndefined()
   })
+
+  it('includes groupBy when a second dimension is set', () => {
+    const params = widgetDataParams({ entity: 'lead', groupBy: { field: 'assigned_to' } })
+
+    expect(JSON.parse(params.groupBy)).toEqual({ field: 'assigned_to' })
+  })
+
+  it('omits groupBy when its field is empty', () => {
+    const params = widgetDataParams({ entity: 'lead', groupBy: { field: '' } })
+
+    expect(params.groupBy).toBeUndefined()
+  })
 })
 
 describe('emptyWidgetDraft', () => {
@@ -90,5 +102,29 @@ describe('emptyWidgetDraft', () => {
 
   it('includes an empty orConditions array', () => {
     expect(emptyWidgetDraft().orConditions).toEqual([])
+  })
+})
+
+describe('pivotSeriesRows', () => {
+  it('turns backend series rows into Recharts multi-series rows', () => {
+    const rows = [
+      { key: 'facebook', label: 'פייסבוק', color: null, series: { '1': 2, '2': 1 } },
+      { key: 'website',  label: 'אתר',      color: null, series: { '1': 0, '2': 3 } },
+    ]
+    const seriesKeys = [{ key: '1', label: 'דנה' }, { key: '2', label: 'יוסי' }]
+
+    const pivoted = pivotSeriesRows(rows, seriesKeys)
+
+    expect(pivoted).toEqual([
+      { name: 'פייסבוק', 'דנה': 2, 'יוסי': 1 },
+      { name: 'אתר', 'דנה': 0, 'יוסי': 3 },
+    ])
+  })
+
+  it('defaults a missing series value to 0', () => {
+    const rows = [{ key: 'a', label: 'א', color: null, series: { '1': 5 } }]
+    const seriesKeys = [{ key: '1', label: 'X' }, { key: '2', label: 'Y' }]
+
+    expect(pivotSeriesRows(rows, seriesKeys)).toEqual([{ name: 'א', X: 5, Y: 0 }])
   })
 })

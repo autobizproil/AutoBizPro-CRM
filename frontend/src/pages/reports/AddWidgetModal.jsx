@@ -86,6 +86,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
       timePeriod:   { field: firstDate, operator: '', value: '' },
       conditions:   [],
       orConditions: [],
+      groupBy:      { field: '', granularity: 'month' },
     })
   }
 
@@ -197,6 +198,45 @@ export default function AddWidgetModal({ onSave, onClose }) {
                 <select value={draft.displayField} onChange={e => patch({ displayField: e.target.value })} className={SELECT_CLASS}>
                   {Object.entries(groupFields).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
                 </select>
+              </div>
+            )}
+
+            {(draft.type === 'bar' || draft.type === 'bar_h') && (
+              <div>
+                <label className={LABEL_CLASS}>קיבוץ נתונים (סדרה שנייה)</label>
+                <div className="flex gap-2">
+                  <select value={draft.groupBy?.field ?? ''}
+                    onChange={e => patch({ groupBy: { field: e.target.value, granularity: 'month' } })}
+                    className={SELECT_CLASS}>
+                    <option value="">ללא</option>
+                    {Object.entries(groupFields).filter(([k]) => k !== draft.displayField)
+                      .map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
+                  </select>
+                  {groupFields[draft.groupBy?.field]?.type === 'date' && (
+                    <select value={draft.groupBy?.granularity ?? 'month'}
+                      onChange={e => patch({ groupBy: { ...draft.groupBy, granularity: e.target.value } })}
+                      className={SELECT_CLASS}>
+                      <option value="day">יום</option>
+                      <option value="week">שבוע</option>
+                      <option value="month">חודש</option>
+                      <option value="year">שנה</option>
+                    </select>
+                  )}
+                </div>
+                {draft.groupBy?.field && (
+                  <div className="flex gap-3 mt-2">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                      <input type="radio" name="variant" checked={draft.variant !== 'stacked'}
+                        onChange={() => patch({ variant: 'grouped' })} />
+                      זה לצד זה
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                      <input type="radio" name="variant" checked={draft.variant === 'stacked'}
+                        onChange={() => patch({ variant: 'stacked' })} />
+                      מוערם
+                    </label>
+                  </div>
+                )}
               </div>
             )}
 
