@@ -47,6 +47,27 @@ function fromServerBoard(board) {
   }
 }
 
+// Migrates boards from the pending localStorage array one at a time, shrinking
+// and re-persisting the array after each board's successful upload — so a crash
+// partway through leaves exactly the un-migrated remainder in localStorage for
+// the next page load to pick up. Deliberately does NOT use listBoards().length > 0
+// as a reason to skip-and-clear: that signal can't distinguish "user already had
+// server boards before this feature shipped" from "a previous migration attempt
+// partially succeeded", and treating it as "already migrated" was a data-loss bug
+// (it deleted the last copy of boards that never made it to the server). As long
+// as localStorage still has pending boards, we keep attempting them regardless of
+// what the server already has.
+// Known tradeoff: if a board's createBoard() succeeds but one of its createWidget()
+// calls throws, the whole board is left in the pending list for retry, since we
+// only track completion per board, not per widget. A retry will re-run createBoard
+// for that board, which can leave a duplicate (empty or partial) board server-side.
+// This is accepted as a rare, minor cost in exchange for keeping the migration logic
+// simple — the alternative (tracking per-widget completion) is not worth the
+// complexity for a one-time legacy-data upload path.
+export function shrinkPendingBoards(pending) {
+  return pending.slice(1)
+}
+
 async function migrateLocalStorageIfNeeded() {
   let localBoards = null
   try {
@@ -60,13 +81,7 @@ async function migrateLocalStorageIfNeeded() {
   }
   if (!localBoards) return
 
-  const existing = await dashboardApi.listBoards()
-  if (existing.data.data.length > 0) {
-    // Server already has boards (e.g. migrated from another browser) — don't duplicate.
-    localStorage.removeItem(STORAGE_KEY)
-    return
-  }
-
+  let pending = localBoards
   for (const board of localBoards) {
     const created = await dashboardApi.createBoard(board.name)
     const boardId = created.data.data.id
@@ -74,8 +89,16 @@ async function migrateLocalStorageIfNeeded() {
       const { id: _localId, ...config } = widget
       await dashboardApi.createWidget(boardId, config)
     }
+    // This board (and all its widgets) is now confirmed on the server —
+    // shrink the pending list and persist immediately, so a failure on the
+    // NEXT board leaves only the true remainder in localStorage.
+    pending = shrinkPendingBoards(pending)
+    if (pending.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(pending))
+    } else {
+      localStorage.removeItem(STORAGE_KEY)
+    }
   }
-  localStorage.removeItem(STORAGE_KEY)
 }
 
 // ── Inline-rename board button ────────────────────────────────────────────────
