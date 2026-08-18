@@ -52,18 +52,29 @@ export default function AddWidgetModal({ onSave, onClose }) {
 
   const patch = (p) => setDraft(d => ({ ...d, ...p }))
 
+  const firstGroupField = (entity) => Object.keys(meta?.fields?.[entity]?.groupFields ?? {})[0] ?? ''
+
   function handleEntityChange(entity) {
     // Field keys are entity-specific — reset every field-bound choice
     const nextFields = meta?.fields?.[entity]
-    const firstGroup = Object.keys(nextFields?.groupFields ?? {})[0] ?? ''
-    const firstDate  = Object.keys(nextFields?.dateFields ?? {})[0] ?? ''
+    const firstDate = Object.keys(nextFields?.dateFields ?? {})[0] ?? ''
     patch({
       entity,
-      displayField: firstGroup,
+      displayField: firstGroupField(entity),
       valueField:   '',
       aggregation:  'count',
       timePeriod:   { field: firstDate, operator: '', value: '' },
       conditions:   [],
+    })
+  }
+
+  function handleTypeChange(typeId) {
+    // KPI is ungrouped — a stale displayField would push the backend down the
+    // GROUP BY path and corrupt avg/max/min aggregations. Clear it on entry,
+    // restore a sensible default when switching back to a chart type.
+    patch({
+      type:         typeId,
+      displayField: typeId === 'kpi' ? '' : (draft.displayField || firstGroupField(draft.entity)),
     })
   }
 
@@ -106,7 +117,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
         {/* Chart type tabs */}
         <div className="flex gap-2 px-6 py-4 border-b border-gray-100 dark:border-gray-700 overflow-x-auto flex-shrink-0">
           {CHART_TYPES.map(ct => (
-            <button key={ct.id} onClick={() => patch({ type: ct.id })}
+            <button key={ct.id} onClick={() => handleTypeChange(ct.id)}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl border text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
                 draft.type === ct.id
                   ? 'border-[#2398c2] bg-[#2398c2]/10 text-[#2398c2]'

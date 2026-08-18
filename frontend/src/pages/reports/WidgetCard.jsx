@@ -292,7 +292,7 @@ function DateOverridePopover({ widget, onUpdate }) {
   const [open, setOpen] = useState(false)
   const active = !!(widget.dateFrom || widget.dateTo || widget.period)
 
-  if (!onUpdate) return null
+  if (!onUpdate || !isLegacyWidget(widget)) return null
 
   return (
     <div className="relative">
