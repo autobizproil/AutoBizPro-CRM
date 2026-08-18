@@ -140,10 +140,80 @@ value/target capped at 100%.
 - **P3** — "מתקדם" (AND/OR groups — pending screenshot), טבלת מדדים widget type,
   board persistence server-side instead of localStorage.
 
-## Open questions
+## Open questions (resolved)
 
-1. "מתקדם..." contents — awaiting screenshot (assumed AND/OR condition groups).
-2. טבלת מדדים — awaiting a live example (assumed: grid of KPI cells).
-3. Pie/line drill-down — assumed same modal as bars.
-4. Tail of the relative-date operator list beyond "רבעון 4 שנה נוכחית" — assumed
-   שנה נוכחית/קודמת/הבאה.
+1. **"מתקדם..." contents** — confirmed via screenshot: two independent condition
+   groups, "כל התנאים שכולם חייבים להתקיים" (AND) and "התנאים שלפחות אחד מהם
+   מתקיים" (OR), each with its own "+ הוסף סינון". Combined logic: the record
+   must satisfy ALL of the AND-group's conditions AND at least one of the
+   OR-group's conditions (when the OR group is non-empty). P3 design below.
+2. **טבלת מדדים** — no live example obtained; proceeding with the documented
+   default: a grid of KPI cells (each with its own dataSource/aggregation),
+   laid out in rows, matching Fireberry's general "collection of small stat
+   tiles" pattern seen in the one screenshot the user did share (החשבשבת
+   dashboard, "3. הנהלת חשבונות" section — many small number tiles in a grid).
+   Revisit if a real Fireberry example surfaces later.
+3. Pie/line drill-down — assumed same modal as bars (unchanged from P1 spec).
+4. Relative-date operator list — fully captured in P1 (42 operators,
+   implemented in `RelativeDateRange`). No remaining gap.
+
+## Phase 2 + 3 — combined design addendum (2026-08-17)
+
+User requested P2 and P3 be built together. Additions to the P1 foundation:
+
+### Drill-down (P2)
+Click a bar/pie-slice/line-point/table-row → modal titled
+`<widget title> - <segment label>` (add `- <series label>` when a second
+grouping dimension is active). Fetches the entity's existing list endpoint
+(`GET /api/leads`, `/api/clients`, etc.) with: the widget's own `conditions`
++ `timePeriod` (translated to `date_from`/`date_to` — this is why
+`WidgetDataService::aggregate()` must start echoing the *resolved* range in
+its return payload, not just apply it internally) + one additional
+equals-condition on the clicked segment's `displayField` = the row's raw
+`key`. Reuses each entity's existing table component/columns where one
+exists; falls back to a minimal generic table (checkbox column + all
+`filterFields` as columns + search) otherwise. No new backend endpoint
+needed — the existing list endpoints already support `conditions`.
+
+### Second grouping dimension + stacked/grouped (P2)
+Add `groupBy: { field, granularity? }` to the widget config — a second
+dimension building a `{series, group, total}` shape instead of flat
+`{key, total}`. `WidgetDataService::aggregate()` gets a second code path:
+when `groupBy` is set, `GROUP BY displayField, groupByField` (or
+`DATE_FORMAT(groupByField, ...)` for date granularity: day/week/month/year)
+and the response becomes `{rows: [...], series: [seriesKey,...]}` so the
+frontend can pivot into Recharts' multi-series shape. `variant` (`stacked`
+vs `grouped`) is purely a frontend rendering choice — no backend impact.
+
+### KPI target (P2)
+Add `target: number|null` to KPI widgets. `KpiCard` renders the value, a
+"יעד: X" line, and a slim progress bar (`value/target`, capped 100%,
+colored via the widget's existing `color`).
+
+### AND/OR condition groups (P3)
+Replace the flat `conditions: []` array with
+`conditionGroups: { and: Condition[], or: Condition[] }`. Empty arrays are
+no-ops (backward compatible — a widget with only `and` conditions behaves
+identically to P1's flat array). `WidgetDataService::applyConditions()`
+applies the `and` group as today (each condition AND'd via `ConditionFilter`)
+then wraps the `or` group's conditions in a single `orWhere` closure so at
+least one must match. UI: two labelled sections in the filter panel, each
+with its own field/operator/value row and its own "+ הוסף סינון" button,
+matching the screenshot exactly.
+
+### טבלת מדדים widget type (P3)
+A `type: 'metrics_table'` widget holds an array of mini-KPI configs (each
+with its own `entity`, `valueField`, `aggregation`, `title`, `timePeriod`).
+Renders as a grid of small tiles (title, value, optional trend-vs-previous-
+period indicator), reusing the single-KPI fetch path per tile. No new
+backend endpoint — N parallel calls to the existing `widget-data` endpoint,
+one per tile (small N in practice, same pattern Fireberry's own dashboards
+use).
+
+### Board persistence server-side (P3)
+Move boards/widgets from `localStorage` (`crm_boards_v2`) to the database:
+new `dashboard_boards` and `dashboard_widgets` tables (tenant-scoped,
+`HasTenantScope`), CRUD endpoints under `/api/dashboards`. Requires a
+migration in `SCHEMA_DB/` per project rule. One-time client-side migration
+on first load: if `localStorage` has boards and the server has none for
+this tenant, POST them up, then stop reading `localStorage`.
