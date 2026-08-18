@@ -192,6 +192,15 @@ export default function AddWidgetModal({ onSave, onClose }) {
               </div>
             </div>
 
+            {draft.type === 'kpi' && (
+              <div>
+                <label className={LABEL_CLASS}>יעד</label>
+                <input type="number" value={draft.target ?? ''}
+                  onChange={e => patch({ target: e.target.value === '' ? null : Number(e.target.value) })}
+                  placeholder="ללא יעד" className={SELECT_CLASS} dir="ltr" />
+              </div>
+            )}
+
             {draft.type !== 'kpi' && (
               <div>
                 <label className={LABEL_CLASS}>שדה להצגה</label>

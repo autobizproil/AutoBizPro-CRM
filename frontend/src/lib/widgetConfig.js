@@ -45,6 +45,7 @@ export function emptyWidgetDraft() {
     orConditions: [],
     groupBy:      { field: '', granularity: 'month' },
     variant:      'grouped',
+    target:       null,
   }
 }
 

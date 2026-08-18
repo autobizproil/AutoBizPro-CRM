@@ -369,7 +369,9 @@ function DateOverridePopover({ widget, onUpdate }) {
 
 function KpiCard({ widget, onDelete, data, isLoading }) {
   const [hovered, setHovered] = useState(false)
-  const value = typeof data === 'number' ? data : (data?.[0]?.total ?? '—')
+  const value  = typeof data === 'number' ? data : (data?.[0]?.total ?? '—')
+  const target = widget.target
+  const pct    = (typeof value === 'number' && target > 0) ? Math.min(100, (value / target) * 100) : null
 
   return (
     <div
@@ -394,6 +396,14 @@ function KpiCard({ widget, onDelete, data, isLoading }) {
           <p className="text-3xl font-bold tabular-nums" style={{ color: widget.color ?? '#2398c2' }}>
             {typeof value === 'number' ? value.toLocaleString() : value}
           </p>
+          {pct !== null && (
+            <>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">יעד: {target.toLocaleString()}</p>
+              <div className="mt-1.5 h-1.5 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: widget.color ?? '#2398c2' }} />
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
