@@ -429,4 +429,83 @@ class WidgetDataServiceTest extends TestCase
 
         $this->assertSame(1.0, $result['total']);
     }
+
+    public function test_group_by_second_dimension_produces_series_shape(): void
+    {
+        $agentA = User::create(['tenant_id' => $this->tenant->id, 'name' => 'Agent A', 'email' => 'a@widget.test', 'password' => Hash::make('x'), 'role' => 'agent']);
+        $agentB = User::create(['tenant_id' => $this->tenant->id, 'name' => 'Agent B', 'email' => 'b@widget.test', 'password' => Hash::make('x'), 'role' => 'agent']);
+
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A1', 'source' => 'facebook', 'assigned_to' => $agentA->id]);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A2', 'source' => 'facebook', 'assigned_to' => $agentB->id]);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A3', 'source' => 'website',  'assigned_to' => $agentA->id]);
+
+        $result = $this->service()->aggregate([
+            'entity'       => 'lead',
+            'displayField' => 'source',
+            'groupBy'      => ['field' => 'assigned_to'],
+        ], $this->admin);
+
+        $this->assertArrayHasKey('seriesKeys', $result);
+        $seriesLabels = collect($result['seriesKeys'])->pluck('label')->sort()->values()->all();
+        $this->assertSame(['Agent A', 'Agent B'], $seriesLabels);
+
+        $facebookRow = collect($result['rows'])->firstWhere('key', 'facebook');
+        $this->assertNotNull($facebookRow);
+        $this->assertArrayHasKey('series', $facebookRow);
+        $this->assertSame(1.0, $facebookRow['series'][(string) $agentA->id]);
+        $this->assertSame(1.0, $facebookRow['series'][(string) $agentB->id]);
+
+        $this->assertSame(3.0, $result['total']);
+    }
+
+    public function test_group_by_date_field_uses_granularity(): void
+    {
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-19'));
+
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'facebook'])
+            ->forceFill(['created_at' => \Carbon\Carbon::parse('2026-08-01')])->saveQuietly();
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'B', 'source' => 'facebook'])
+            ->forceFill(['created_at' => \Carbon\Carbon::parse('2026-08-15')])->saveQuietly();
+
+        $result = $this->service()->aggregate([
+            'entity'       => 'lead',
+            'displayField' => 'source',
+            'groupBy'      => ['field' => 'created_at', 'granularity' => 'month'],
+        ], $this->admin);
+
+        // Both leads fall in the same month bucket
+        $facebookRow = collect($result['rows'])->firstWhere('key', 'facebook');
+        $this->assertCount(1, $facebookRow['series']);
+        $this->assertSame(2.0, array_sum($facebookRow['series']));
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    public function test_group_by_unknown_field_is_ignored_falls_back_to_flat_shape(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'facebook']);
+
+        $result = $this->service()->aggregate([
+            'entity'       => 'lead',
+            'displayField' => 'source',
+            'groupBy'      => ['field' => 'password'],
+        ], $this->admin);
+
+        $this->assertArrayNotHasKey('seriesKeys', $result);
+        $this->assertSame(1.0, $result['rows'][0]['total']);
+    }
+
+    public function test_group_by_without_display_field_is_ignored(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A']);
+
+        $result = $this->service()->aggregate([
+            'entity'  => 'lead',
+            'groupBy' => ['field' => 'source'],
+        ], $this->admin);
+
+        // No displayField at all → ungrouped branch, groupBy never even consulted.
+        $this->assertArrayNotHasKey('seriesKeys', $result);
+        $this->assertSame(1.0, $result['rows'][0]['total']);
+    }
 }

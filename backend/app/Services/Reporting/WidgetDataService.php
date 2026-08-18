@@ -84,31 +84,91 @@ class WidgetDataService
         }
 
         $totalQuery = $query->clone();
+        $total      = (float) $totalQuery->selectRaw("{$aggregateSql} as total")->value('total');
+
+        $groupByField = $config['groupBy']['field'] ?? null;
+        $groupByMeta  = $groupByField !== null ? ($descriptor['groupFields'][$groupByField] ?? null) : null;
+
+        if ($groupByMeta === null) {
+            $rows = $query
+                ->select("{$table}.{$displayField} as group_key", DB::raw("{$aggregateSql} as total"))
+                ->groupBy("{$table}.{$displayField}")
+                ->orderByDesc('total')
+                ->limit(50)
+                ->get();
+
+            $labels = $this->labelResolver($groupMeta);
+
+            $mapped = $rows->map(function ($row) use ($labels) {
+                $key = $row->group_key;
+                [$label, $color] = $labels($key);
+
+                return [
+                    'key'   => $key === null ? null : (string) $key,
+                    'label' => $label,
+                    'color' => $color,
+                    'total' => (float) $row->total,
+                ];
+            })->values()->all();
+
+            return ['rows' => $mapped, 'total' => $total, 'resolvedRange' => $resolvedRangeOut];
+        }
+
+        // Second dimension present — build a two-column GROUP BY and pivot into
+        // {rows: [{key,label,color,series:{seriesKey: total}}], seriesKeys: [...]}.
+        $secondExpr = "{$table}.{$groupByField}";
+        if (($groupByMeta['type'] ?? null) === 'date') {
+            $granularity = $config['groupBy']['granularity'] ?? 'day';
+            $pattern = match ($granularity) {
+                'week'  => '%x-W%v',
+                'month' => '%Y-%m',
+                'year'  => '%Y',
+                default => '%Y-%m-%d',
+            };
+            $secondExpr = "DATE_FORMAT({$table}.{$groupByField}, '{$pattern}')";
+        }
 
         $rows = $query
-            ->select("{$table}.{$displayField} as group_key", DB::raw("{$aggregateSql} as total"))
-            ->groupBy("{$table}.{$displayField}")
+            ->select(
+                "{$table}.{$displayField} as group_key",
+                DB::raw("{$secondExpr} as series_key"),
+                DB::raw("{$aggregateSql} as total")
+            )
+            ->groupBy("{$table}.{$displayField}", DB::raw($secondExpr))
             ->orderByDesc('total')
-            ->limit(50)
+            ->limit(200)
             ->get();
 
-        $labels = $this->labelResolver($groupMeta);
+        $groupLabels  = $this->labelResolver($groupMeta);
+        $seriesLabels = $this->labelResolver($groupByMeta);
 
-        $mapped = $rows->map(function ($row) use ($labels) {
-            $key = $row->group_key;
-            [$label, $color] = $labels($key);
+        $seenSeries = [];
+        $pivoted    = [];
 
-            return [
-                'key'   => $key === null ? null : (string) $key,
-                'label' => $label,
-                'color' => $color,
-                'total' => (float) $row->total,
-            ];
-        })->values()->all();
+        foreach ($rows as $row) {
+            $groupKey  = $row->group_key === null ? null : (string) $row->group_key;
+            $seriesKey = $row->series_key === null ? null : (string) $row->series_key;
 
-        $total = (float) $totalQuery->selectRaw("{$aggregateSql} as total")->value('total');
+            if (! isset($pivoted[$groupKey ?? '__null__'])) {
+                [$label, $color] = $groupLabels($row->group_key);
+                $pivoted[$groupKey ?? '__null__'] = [
+                    'key' => $groupKey, 'label' => $label, 'color' => $color, 'series' => [],
+                ];
+            }
+            $pivoted[$groupKey ?? '__null__']['series'][$seriesKey ?? '__null__'] = (float) $row->total;
 
-        return ['rows' => $mapped, 'total' => $total, 'resolvedRange' => $resolvedRangeOut];
+            if (! isset($seenSeries[$seriesKey ?? '__null__'])) {
+                [$seriesLabel] = $seriesLabels($row->series_key);
+                $seenSeries[$seriesKey ?? '__null__'] = ['key' => $seriesKey, 'label' => $seriesLabel];
+            }
+        }
+
+        return [
+            'rows'          => array_values($pivoted),
+            'seriesKeys'    => array_values($seenSeries),
+            'total'         => $total,
+            'resolvedRange' => $resolvedRangeOut,
+        ];
     }
 
     /**
