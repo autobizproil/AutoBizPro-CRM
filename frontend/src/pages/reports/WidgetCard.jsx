@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { dashboardApi } from '../../api/dashboard'
+import { isLegacyWidget, widgetDataParams } from '../../lib/widgetConfig'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -446,8 +447,12 @@ function renderPreviewChart(widget, data, isLoading) {
 // ── Main WidgetCard export ────────────────────────────────────────────────────
 
 export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, preview = false }) {
+  const legacy = isLegacyWidget(widget)
+
   // A widget with its own filter (period/date/conditions) ignores the board's global range.
-  const effectiveParams = {
+  // Legacy preset widgets keep their per-report fetchers; new entity widgets
+  // go through the generic aggregation endpoint.
+  const legacyParams = {
     ...((widget.period || widget.dateFrom || widget.dateTo)
       ? {
           period:    widget.period || undefined,
@@ -458,9 +463,21 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
     ...(widget.conditions?.length ? { conditions: JSON.stringify(widget.conditions) } : {}),
   }
 
+  const newParams = legacy ? null : widgetDataParams(widget)
+
   const { data, isLoading } = useQuery({
-    queryKey: ['widget', widget.dataSource, effectiveParams.period, effectiveParams.date_from, effectiveParams.date_to, effectiveParams.conditions],
-    queryFn: () => fetchWidgetData(widget.dataSource, effectiveParams),
+    queryKey: legacy
+      ? ['widget', widget.dataSource, legacyParams.period, legacyParams.date_from, legacyParams.date_to, legacyParams.conditions]
+      : ['widget-data', newParams],
+    queryFn: () => legacy
+      ? fetchWidgetData(widget.dataSource, legacyParams)
+      : dashboardApi.widgetData(newParams).then(r => {
+          const payload = r.data.data
+          // KPI widgets read a single number; charts read the grouped rows
+          return widget.type === 'kpi'
+            ? payload.total
+            : payload.rows.map(row => ({ name: row.label, total: row.total, color: row.color }))
+        }),
     staleTime: 60_000,
   })
 
