@@ -9,6 +9,7 @@ import {
 } from 'recharts'
 import { dashboardApi } from '../../api/dashboard'
 import { isLegacyWidget, widgetDataParams } from '../../lib/widgetConfig'
+import DrillDownModal from './DrillDownModal'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ const TICK  = '#9ca3af'
 const GRID  = '#374151'
 const TT_STYLE = { borderRadius: '8px', border: '1px solid #374151', background: '#1f2937', color: '#f9fafb', fontSize: 11 }
 
-function ChartBar({ data, color, preview }) {
+function ChartBar({ data, color, preview, onSegmentClick }) {
   if (!data?.length) return <Empty />
   const h = preview ? 160 : 220
   const hasMultiBars = data[0]?.open !== undefined && data[0]?.closed !== undefined
@@ -167,7 +168,9 @@ function ChartBar({ data, color, preview }) {
               <Legend formatter={v => <span style={{ fontSize: 11, color: TICK }}>{v}</span>} />
             </>
           ) : (
-            <Bar dataKey="total" fill={color ?? '#2398c2'} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="total" fill={color ?? '#2398c2'} radius={[4, 4, 0, 0]}
+              cursor={onSegmentClick ? 'pointer' : 'default'}
+              onClick={onSegmentClick ? (d) => onSegmentClick(d?.key ?? d?.name ?? null) : undefined} />
           )}
         </BarChart>
       </ResponsiveContainer>
@@ -175,7 +178,7 @@ function ChartBar({ data, color, preview }) {
   )
 }
 
-function ChartBarH({ data, color, preview }) {
+function ChartBarH({ data, color, preview, onSegmentClick }) {
   if (!data?.length) return <Empty />
   const h = preview ? 160 : 240
   const nameKey = Object.keys(data[0] ?? {}).find(k =>
@@ -190,14 +193,16 @@ function ChartBarH({ data, color, preview }) {
           <XAxis type="number" tick={{ fontSize: 10, fill: TICK }} axisLine={false} tickLine={false} allowDecimals={false} />
           <YAxis type="category" dataKey={nameKey} tick={{ fontSize: 11, fill: TICK }} axisLine={false} tickLine={false} width={70} />
           <Tooltip contentStyle={TT_STYLE} />
-          <Bar dataKey="total" fill={color ?? '#8b5cf6'} radius={[0, 4, 4, 0]} />
+          <Bar dataKey="total" fill={color ?? '#8b5cf6'} radius={[0, 4, 4, 0]}
+            cursor={onSegmentClick ? 'pointer' : 'default'}
+            onClick={onSegmentClick ? (d) => onSegmentClick(d?.key ?? d?.name ?? null) : undefined} />
         </BarChart>
       </ResponsiveContainer>
     </div>
   )
 }
 
-function ChartPie({ data, preview }) {
+function ChartPie({ data, preview, onSegmentClick }) {
   if (!data?.length) return <Empty />
   const h = preview ? 160 : 220
   const total = data.reduce((s, d) => s + (d.total ?? 0), 0)
@@ -210,7 +215,9 @@ function ChartPie({ data, preview }) {
       <ResponsiveContainer width="100%" height={h}>
         <PieChart>
           <Pie data={data} dataKey="total" nameKey={nameKey} cx="50%" cy="50%"
-            outerRadius={preview ? 60 : 85} labelLine={false} label={makePieLabel(total)}>
+            outerRadius={preview ? 60 : 85} labelLine={false} label={makePieLabel(total)}
+            cursor={onSegmentClick ? 'pointer' : 'default'}
+            onClick={onSegmentClick ? (d) => onSegmentClick(d?.key ?? d?.name ?? null) : undefined}>
             {data.map((_, i) => (
               <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
             ))}
@@ -225,7 +232,7 @@ function ChartPie({ data, preview }) {
   )
 }
 
-function ChartLine({ data, color, preview }) {
+function ChartLine({ data, color, preview, onSegmentClick }) {
   if (!data?.length) return <Empty />
   const h = preview ? 160 : 220
   const formatted = data.map(d => ({
@@ -248,7 +255,7 @@ function ChartLine({ data, color, preview }) {
   )
 }
 
-function ChartTable({ data }) {
+function ChartTable({ data, onSegmentClick }) {
   if (!data?.length) return <Empty />
   const cols = Object.keys(data[0] ?? {}).filter(k =>
     !['user_id', 'stage_id', 'color'].includes(k)
@@ -377,8 +384,9 @@ function KpiCard({ widget, onDelete, data, isLoading }) {
 
 // ── Chart widget card ─────────────────────────────────────────────────────────
 
-function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading }) {
-  const [hovered, setHovered] = useState(false)
+function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading, resolvedRange }) {
+  const [hovered, setHovered]   = useState(false)
+  const [drillDown, setDrillDown] = useState(null)
 
   return (
     <div
@@ -405,18 +413,26 @@ function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading }) {
           </div>
         )}
       </div>
-      {isLoading ? <Skeleton /> : renderChart(widget, data)}
+      {isLoading ? <Skeleton /> : renderChart(widget, data, key => setDrillDown({ key, label: key ?? 'ריק' }))}
+      {drillDown && (
+        <DrillDownModal
+          widget={widget}
+          segment={drillDown}
+          resolvedRange={resolvedRange}
+          onClose={() => setDrillDown(null)}
+        />
+      )}
     </div>
   )
 }
 
-function renderChart(widget, data) {
+function renderChart(widget, data, onSegmentClick) {
   switch (widget.type) {
-    case 'bar':   return <ChartBar  data={data} color={widget.color} />
-    case 'bar_h': return <ChartBarH data={data} color={widget.color} />
-    case 'pie':   return <ChartPie  data={data} />
-    case 'line':  return <ChartLine data={data} color={widget.color} />
-    case 'table': return <ChartTable data={data} />
+    case 'bar':   return <ChartBar  data={data} color={widget.color} onSegmentClick={onSegmentClick} />
+    case 'bar_h': return <ChartBarH data={data} color={widget.color} onSegmentClick={onSegmentClick} />
+    case 'pie':   return <ChartPie  data={data} onSegmentClick={onSegmentClick} />
+    case 'line':  return <ChartLine data={data} color={widget.color} onSegmentClick={onSegmentClick} />
+    case 'table': return <ChartTable data={data} onSegmentClick={onSegmentClick} />
     default:      return <Empty />
   }
 }
@@ -473,18 +489,22 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
       ? fetchWidgetData(widget.dataSource, legacyParams)
       : dashboardApi.widgetData(newParams).then(r => {
           const payload = r.data.data
-          // KPI widgets read a single number; charts read the grouped rows
-          return widget.type === 'kpi'
-            ? payload.total
-            : payload.rows.map(row => ({ name: row.label, total: row.total, color: row.color }))
+          // KPI widgets read a single number; charts read the grouped rows plus
+          // the resolved date range (drill-down needs it to scope its own query).
+          if (widget.type === 'kpi') return payload.total
+          return {
+            rows: payload.rows.map(row => ({ name: row.label, key: row.key, total: row.total, color: row.color })),
+            resolvedRange: payload.resolvedRange ?? null,
+          }
         }),
     staleTime: 60_000,
   })
 
   if (preview) {
+    const previewData = legacy ? data : data?.rows
     return (
       <div className="w-full">
-        {renderPreviewChart(widget, data, isLoading)}
+        {renderPreviewChart(widget, previewData, isLoading)}
       </div>
     )
   }
@@ -500,13 +520,17 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
     )
   }
 
+  const chartData     = legacy ? data : data?.rows
+  const resolvedRange = legacy ? null : data?.resolvedRange
+
   return (
     <ChartWidgetCard
       widget={widget}
       onDelete={onDelete}
       onUpdate={onUpdate}
-      data={data}
+      data={chartData}
       isLoading={isLoading}
+      resolvedRange={resolvedRange}
     />
   )
 }

@@ -10,4 +10,5 @@ export const dashboardApi = {
   exportLeads:        (params) => client.get('/dashboard/reports/export',           { params, responseType: 'blob' }),
   widgetFields:       ()       => client.get('/dashboard/widget-fields'),
   widgetData:         (params) => client.get('/dashboard/widget-data', { params }),
+  entityList:         (route, params) => client.get(route, { params }),
 }

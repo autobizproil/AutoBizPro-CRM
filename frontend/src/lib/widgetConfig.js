@@ -38,3 +38,23 @@ export function emptyWidgetDraft() {
     conditions:   [],
   }
 }
+
+const DRILL_DOWN_ROUTES = { lead: '/leads', client: '/clients', contact: '/contacts', task: '/tasks' }
+
+export function drillDownEntityRoute(entity) {
+  return DRILL_DOWN_ROUTES[entity] ?? null
+}
+
+export function drillDownParams(widget, segment, resolvedRange) {
+  const conditions = [...(widget.conditions ?? [])]
+  if (widget.displayField && segment?.key !== null && segment?.key !== undefined) {
+    conditions.push({ field: widget.displayField, operator: 'equals', value: segment.key })
+  }
+
+  const params = { conditions: JSON.stringify(conditions) }
+  if (widget.orConditions?.length) params.orConditions = JSON.stringify(widget.orConditions)
+  if (resolvedRange?.from) params.date_from = resolvedRange.from
+  if (resolvedRange?.to) params.date_to = resolvedRange.to
+
+  return params
+}
