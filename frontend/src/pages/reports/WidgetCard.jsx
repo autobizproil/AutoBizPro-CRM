@@ -10,6 +10,7 @@ import {
 import { dashboardApi } from '../../api/dashboard'
 import { isLegacyWidget, widgetDataParams, pivotSeriesRows } from '../../lib/widgetConfig'
 import DrillDownModal from './DrillDownModal'
+import MetricsTableWidget from './MetricsTableWidget'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -491,6 +492,15 @@ function renderPreviewChart(widget, data, isLoading) {
 // ── Main WidgetCard export ────────────────────────────────────────────────────
 
 export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, preview = false }) {
+  if (widget.type === 'metrics_table') {
+    return (
+      <div className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4 ${preview ? '' : 'lg:col-span-2'}`}>
+        {!preview && <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">{widget.title}</h3>}
+        <MetricsTableWidget tiles={widget.tiles} />
+      </div>
+    )
+  }
+
   const legacy = isLegacyWidget(widget)
 
   // A widget with its own filter (period/date/conditions) ignores the board's global range.
