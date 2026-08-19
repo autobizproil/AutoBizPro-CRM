@@ -18,9 +18,10 @@ function MetricTile({ tile, createdLabel, meta }) {
   const caption = widgetCaption(tile, meta)
 
   return (
-    <div className="border border-gray-100 dark:border-gray-700 rounded-lg p-3">
+    <div className="border border-gray-100 dark:border-gray-700 rounded-lg p-3 overflow-hidden">
       <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 truncate">{tile.title}</p>
-      <p className="text-xl font-bold tabular-nums text-gray-800 dark:text-gray-100">
+      <p className="text-xl font-bold tabular-nums text-gray-800 dark:text-gray-100 truncate"
+        title={typeof data === 'number' ? data.toLocaleString() : undefined}>
         {isLoading ? '…' : (typeof data === 'number' ? data.toLocaleString() : '—')}
       </p>
       {caption?.aggLine && (

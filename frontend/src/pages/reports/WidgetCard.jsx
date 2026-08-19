@@ -375,6 +375,17 @@ function formatCreatedAt(createdAt) {
   return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+// A fixed text-3xl KPI number overflows its own card's rounded border once the
+// value gets long (e.g. a 7-digit "all time" total) — shrink the font as the
+// formatted string grows instead of letting it spill into the neighboring tile.
+function kpiValueSizeClass(formatted) {
+  const len = String(formatted).length
+  if (len > 10) return 'text-lg'
+  if (len > 8)  return 'text-xl'
+  if (len > 6)  return 'text-2xl'
+  return 'text-3xl'
+}
+
 function KpiCard({ widget, onDelete, data, isLoading, meta }) {
   const [hovered, setHovered] = useState(false)
   const value  = typeof data === 'number' ? data : (data?.[0]?.total ?? '—')
@@ -385,7 +396,7 @@ function KpiCard({ widget, onDelete, data, isLoading, meta }) {
 
   return (
     <div
-      className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 flex-1 min-w-[140px] relative"
+      className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 flex-1 min-w-[140px] overflow-hidden relative"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -403,9 +414,14 @@ function KpiCard({ widget, onDelete, data, isLoading, meta }) {
       ) : (
         <>
           <p className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">{widget.title}</p>
-          <p className="text-3xl font-bold tabular-nums" style={{ color: widget.color ?? '#2398c2' }}>
-            {typeof value === 'number' ? value.toLocaleString() : value}
-          </p>
+          {(() => {
+            const formatted = typeof value === 'number' ? value.toLocaleString() : value
+            return (
+              <p className={`${kpiValueSizeClass(formatted)} font-bold tabular-nums truncate`} style={{ color: widget.color ?? '#2398c2' }} title={String(formatted)}>
+                {formatted}
+              </p>
+            )
+          })()}
           {pct !== null && (
             <>
               <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">יעד: {target.toLocaleString()}</p>
