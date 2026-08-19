@@ -59,11 +59,11 @@ class ImportService
             }
         }
         if ($customFields) $data['custom_fields'] = $customFields;
-        if (empty($data['name'])) return 'skipped';
+        if (empty($data['name'])) return 'skipped:no_name';
 
         $normalized = PhoneNormalizer::normalize($data['phone'] ?? '');
         if ($normalized && Lead::where('phone_normalized', $normalized)->exists()) {
-            return 'skipped';
+            return 'skipped:duplicate_phone';
         }
 
         // CSV creation date+time overrides the system creation timestamp
@@ -105,7 +105,7 @@ class ImportService
             }
         }
         if ($customFields) $data['custom_fields'] = $customFields;
-        if (empty($data['name'])) return 'skipped';
+        if (empty($data['name'])) return 'skipped:no_name';
 
         $createdAt = null;
         if (! empty($data['created_at'])) {
@@ -135,13 +135,13 @@ class ImportService
             }
         }
         if ($customFields) $data['custom_fields'] = $customFields;
-        if (empty($data['name'])) return 'skipped';
+        if (empty($data['name'])) return 'skipped:no_name';
 
         // Client::booted() normalizes phone_normalized on save, so this dedupe check
         // only needs a raw normalize() to match what's already stored.
         $normalized = PhoneNormalizer::normalize($data['phone'] ?? '');
         if ($normalized && Client::where('phone_normalized', $normalized)->exists()) {
-            return 'skipped';
+            return 'skipped:duplicate_phone';
         }
 
         $createdAt = null;
@@ -169,7 +169,7 @@ class ImportService
             if ($field === 'created_at') { $createdAtRaw = $value; continue; }
             if ($value !== '') $data[$field] = $value;
         }
-        if (empty($data['title'])) return 'skipped';
+        if (empty($data['title'])) return 'skipped:no_name';
 
         $record = Record::create([
             'tenant_id'      => app('current_tenant_id'),

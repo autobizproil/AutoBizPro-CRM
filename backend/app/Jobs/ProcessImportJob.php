@@ -30,7 +30,12 @@ class ProcessImportJob implements ShouldQueue
         $csv->setHeaderOffset(0);
         $mapping = $job->field_mapping;
 
-        $imported = 0; $skipped = 0; $errors = [];
+        $imported = 0; $skipped = 0; $errors = []; $skipReasons = [];
+        $tally = function (string $result) use (&$skipReasons) {
+            if ($result !== 'imported') {
+                $skipReasons[$result] = ($skipReasons[$result] ?? 0) + 1;
+            }
+        };
 
         if ($job->entity === 'leads') {
             // Resolve status_mapping to concrete stage IDs, creating any new stages once up front
@@ -51,9 +56,11 @@ class ProcessImportJob implements ShouldQueue
             foreach ($csv->getRecords() as $i => $row) {
                 try {
                     $res = $svc->importRow($row, $mapping, $statusMap);
+                    $tally($res);
                     $res === 'imported' ? $imported++ : $skipped++;
                 } catch (\Throwable $e) {
                     $skipped++;
+                    $skipReasons['skipped:error'] = ($skipReasons['skipped:error'] ?? 0) + 1;
                     $errors[] = ['row' => $i, 'error' => $e->getMessage()];
                 }
             }
@@ -61,9 +68,11 @@ class ProcessImportJob implements ShouldQueue
             foreach ($csv->getRecords() as $i => $row) {
                 try {
                     $res = $svc->importContactRow($row, $mapping);
+                    $tally($res);
                     $res === 'imported' ? $imported++ : $skipped++;
                 } catch (\Throwable $e) {
                     $skipped++;
+                    $skipReasons['skipped:error'] = ($skipReasons['skipped:error'] ?? 0) + 1;
                     $errors[] = ['row' => $i, 'error' => $e->getMessage()];
                 }
             }
@@ -71,9 +80,11 @@ class ProcessImportJob implements ShouldQueue
             foreach ($csv->getRecords() as $i => $row) {
                 try {
                     $res = $svc->importClientRow($row, $mapping);
+                    $tally($res);
                     $res === 'imported' ? $imported++ : $skipped++;
                 } catch (\Throwable $e) {
                     $skipped++;
+                    $skipReasons['skipped:error'] = ($skipReasons['skipped:error'] ?? 0) + 1;
                     $errors[] = ['row' => $i, 'error' => $e->getMessage()];
                 }
             }
@@ -81,9 +92,11 @@ class ProcessImportJob implements ShouldQueue
             foreach ($csv->getRecords() as $i => $row) {
                 try {
                     $res = $svc->importRecordRow($row, $mapping, $job->record_type_id, $job->user_id);
+                    $tally($res);
                     $res === 'imported' ? $imported++ : $skipped++;
                 } catch (\Throwable $e) {
                     $skipped++;
+                    $skipReasons['skipped:error'] = ($skipReasons['skipped:error'] ?? 0) + 1;
                     $errors[] = ['row' => $i, 'error' => $e->getMessage()];
                 }
             }
@@ -95,6 +108,7 @@ class ProcessImportJob implements ShouldQueue
             'imported'   => $imported,
             'skipped'    => $skipped,
             'errors'     => $errors,
+            'skip_reasons' => $skipReasons,
         ]);
     }
 }

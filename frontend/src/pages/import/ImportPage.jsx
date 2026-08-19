@@ -53,6 +53,12 @@ const AUTO = {
 const CREATE_NEW = '__create__'
 const SKIP = '__skip__'
 
+const SKIP_REASON_LABELS = {
+  'skipped:no_name':         'חסר שם',
+  'skipped:duplicate_phone': 'כפילות טלפון (כבר קיים במערכת או חוזר על עצמו בקובץ)',
+  'skipped:error':           'שגיאה בשורה',
+}
+
 const SELECT_CLS = 'flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30'
 
 export default function ImportPage() {
@@ -244,28 +250,25 @@ export default function ImportPage() {
       {step === 3 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">מיפוי סטטוסים</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">לכל ערך סטטוס בקובץ, בחר לאיזה שלב קיים הוא מתאים או צור שלב חדש.</p>
-          <div className="space-y-2">
-            {statusValues.map(v => (
-              <div key={v} className="flex items-center gap-3">
-                <span className="w-40 text-sm text-gray-700 dark:text-gray-300 truncate" title={v}>{v}</span>
-                <select value={statusMapping[v] ?? SKIP}
-                  onChange={e => {
-                    const val = e.target.value
-                    setStatusMapping(m => ({ ...m, [v]: val === SKIP || val === CREATE_NEW ? val : Number(val) }))
-                  }}
-                  className={SELECT_CLS}>
-                  <option value={SKIP}>— דלג (אל תשייך לשלב) —</option>
-                  <option value={CREATE_NEW}>+ צור שלב חדש</option>
-                  {(pipeline ?? []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-                {statusMapping[v] === CREATE_NEW && (
-                  <input value={newStageLabels[v] ?? v}
-                    onChange={e => setNewStageLabels(m => ({ ...m, [v]: e.target.value }))}
-                    className={SELECT_CLS} placeholder="שם השלב החדש" />
-                )}
-              </div>
-            ))}
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            אוטומטי: ערך שמתאים בדיוק לשם שלב קיים ישויך אליו, כל ערך אחר ייצור שלב חדש עם אותו שם המדויק כפי שהוא מופיע בקובץ.
+          </p>
+          <div className="space-y-1.5">
+            {statusValues.map(v => {
+              const target = statusMapping[v]
+              const existing = typeof target === 'number' ? (pipeline ?? []).find(s => s.id === target) : null
+              return (
+                <div key={v} className="flex items-center gap-2 text-sm">
+                  <span className="w-40 text-gray-700 dark:text-gray-300 truncate" title={v}>{v}</span>
+                  <span className="text-gray-400">←</span>
+                  {existing ? (
+                    <span className="text-gray-600 dark:text-gray-300">שלב קיים: <b>{existing.name}</b></span>
+                  ) : (
+                    <span className="text-gray-600 dark:text-gray-300">ייווצר שלב חדש: <b>{v}</b></span>
+                  )}
+                </div>
+              )
+            })}
           </div>
           <div className="flex gap-2 mt-5">
             <button onClick={() => setStep(4)}
@@ -313,7 +316,14 @@ export default function ImportPage() {
             <>
               <div className="text-4xl mb-3">✅</div>
               <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 mb-2">הייבוא הושלם</h3>
-              <p className="text-gray-600 dark:text-gray-400">יובאו <b className="text-green-600">{job.imported}</b> · דולגו <b className="text-amber-600">{job.skipped}</b> (כפילויות)</p>
+              <p className="text-gray-600 dark:text-gray-400">יובאו <b className="text-green-600">{job.imported}</b> · דולגו <b className="text-amber-600">{job.skipped}</b></p>
+              {job.skipped > 0 && (
+                <ul className="text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-0.5">
+                  {Object.entries(job.skip_reasons ?? {}).map(([reason, count]) => (
+                    <li key={reason}>{SKIP_REASON_LABELS[reason] ?? reason}: {count}</li>
+                  ))}
+                </ul>
+              )}
               <button onClick={reset} className="mt-5 bg-[#2398c2] hover:bg-[#1d7fa3] text-white px-4 py-2 rounded-lg text-sm">ייבוא נוסף</button>
             </>
           ) : job?.status === 'failed' ? (

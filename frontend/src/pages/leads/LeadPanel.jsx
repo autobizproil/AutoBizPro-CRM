@@ -8,6 +8,7 @@ import { customFieldsApi } from '../../api/customFields'
 import { clientsApi } from '../../api/clients'
 import { tasksApi } from '../../api/tasks'
 import { useToast } from '../../context/ToastContext'
+import { SOURCES } from '../../lib/leadSources'
 
 const ACTIVITY_TYPES = {
   call:         { label: 'שיחה',  icon: '📞', color: '#3b82f6' },
@@ -314,7 +315,17 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 </Detail>
                 <EditableDetail label="טלפון" value={field('phone')} onChange={setField('phone')} onBlur={() => commit('phone')} disabled={!canEdit} type="tel" />
                 <EditableDetail label="אימייל" value={field('email')} onChange={setField('email')} onBlur={() => commit('email')} disabled={!canEdit} type="email" />
-                <EditableDetail label="מקור" value={field('source')} onChange={setField('source')} onBlur={() => commit('source')} disabled={!canEdit} />
+                <Detail label="מקור">
+                  <select value={field('source')} onChange={setField('source')} onBlur={() => commit('source')} disabled={!canEdit}
+                    className="border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 disabled:opacity-60 w-44">
+                    {/* Imported leads (e.g. from Fireberry) can carry a source value outside
+                        our fixed list — show it as-is instead of silently blanking it out. */}
+                    {!SOURCES.includes(field('source')) && field('source') && (
+                      <option value={field('source')}>{field('source')}</option>
+                    )}
+                    {SOURCES.map(s => <option key={s} value={s}>{s || '—'}</option>)}
+                  </select>
+                </Detail>
                 <div>
                   <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">הערות</label>
                   <textarea value={field('notes')} onChange={setField('notes')} onBlur={() => commit('notes')} disabled={!canEdit} rows={2}

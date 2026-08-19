@@ -35,6 +35,7 @@ class ProcessImportJobTest extends TestCase
         $this->assertSame('done', $job->status);
         $this->assertSame(2, $job->imported);
         $this->assertSame(1, $job->skipped);
+        $this->assertSame(['skipped:duplicate_phone' => 1], $job->skip_reasons);
         $this->assertSame(2, Lead::count());
     }
 }

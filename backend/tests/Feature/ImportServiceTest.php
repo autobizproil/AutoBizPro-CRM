@@ -45,7 +45,7 @@ class ImportServiceTest extends TestCase
         $mapping = ['name' => 'שם', 'phone' => 'טלפון'];
         $svc->importRow(['שם'=>'דני','טלפון'=>'050-1111111'], $mapping);
         $result = $svc->importRow(['שם'=>'דני שוב','טלפון'=>'0501111111'], $mapping);
-        $this->assertSame('skipped', $result);
+        $this->assertSame('skipped:duplicate_phone', $result);
         $this->assertSame(1, Lead::count());
     }
 
@@ -64,7 +64,7 @@ class ImportServiceTest extends TestCase
         $this->tenant();
         $svc = app(ImportService::class);
         $result = $svc->importContactRow(['טלפון'=>'050-2222222'], ['name' => 'שם', 'phone' => 'טלפון']);
-        $this->assertSame('skipped', $result);
+        $this->assertSame('skipped:no_name', $result);
         $this->assertSame(0, Contact::count());
     }
 
@@ -85,7 +85,7 @@ class ImportServiceTest extends TestCase
         $mapping = ['name' => 'שם', 'phone' => 'טלפון'];
         $svc->importClientRow(['שם'=>'לקוח א','טלפון'=>'050-3333333'], $mapping);
         $result = $svc->importClientRow(['שם'=>'לקוח א שוב','טלפון'=>'0503333333'], $mapping);
-        $this->assertSame('skipped', $result);
+        $this->assertSame('skipped:duplicate_phone', $result);
         $this->assertSame(1, Client::count());
     }
 }

@@ -12,18 +12,7 @@ import LeadPanel from './LeadPanel'
 import FilterPanel from './FilterPanel'
 import KanbanBoard from '../pipeline/KanbanBoard'
 import SavedViewsBar from '../../components/ui/SavedViewsBar'
-
-const SOURCES = ['', 'אתר', 'פייסבוק', 'גוגל', 'המלצה', 'אחר']
-
-// Fixed source badge colors — Fireberry-inspired (design system tokens/colors.css)
-const SOURCE_COLORS = {
-  'וואטסאפ': '#22c55e',
-  'טלפון':   '#8b5cf6',
-  'אתר':     '#3b82f6',
-  'פייסבוק': '#1d4ed8',
-  'גוגל':    '#ef4444',
-  'המלצה':   '#f59e0b',
-}
+import { SOURCES, SOURCE_COLORS } from '../../lib/leadSources'
 const EMPTY_FORM = { name: '', phone: '', email: '', source: '', pipeline_stage_id: '', notes: '', custom_fields: {} }
 
 // Fallback while field definitions load (or on fetch error) — real columns
