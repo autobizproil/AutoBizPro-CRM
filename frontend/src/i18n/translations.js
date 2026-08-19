@@ -39,6 +39,11 @@ export const translations = {
     english:      'English',
     normalSize:   'רגיל',
     largeSize:    'גדול',
+    created_at:       'נוצר בתאריך',
+    records:          'רשומות',
+    records_loading:  'טוען...',
+    no_records_yet:   'אין רשומות עדיין',
+    add_first_record: 'הוסף רשומה ראשונה',
   },
   en: {
     dashboard:    'Dashboard',
@@ -80,6 +85,11 @@ export const translations = {
     english:      'English',
     normalSize:   'Normal',
     largeSize:    'Large',
+    created_at:       'Created',
+    records:          'records',
+    records_loading:  'Loading...',
+    no_records_yet:   'No records yet',
+    add_first_record: 'Add first record',
   },
 }
 
