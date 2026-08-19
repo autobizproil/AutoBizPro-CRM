@@ -615,6 +615,23 @@ class WidgetDataServiceTest extends TestCase
         $this->assertSame(400.0, $result['total']);
     }
 
+    public function test_totals_and_numeric_labels_are_rounded_to_2_decimals(): void
+    {
+        $rt = $this->makeInvoiceType();
+        // JSON_EXTRACT on a numeric field can carry raw SQL-level precision far
+        // beyond 2 decimals — both the aggregated total and the group label
+        // itself (when grouping directly by a numeric field) must be capped.
+        Record::create(['tenant_id' => $this->tenant->id, 'record_type_id' => $rt->id, 'data' => ['amount' => 1234.5678, 'status' => 'open']]);
+
+        $result = $this->service()->aggregate([
+            'entity' => 'record:invoices', 'displayField' => 'amount',
+            'valueField' => 'amount', 'aggregation' => 'sum',
+        ], $this->admin);
+
+        $this->assertSame(1234.57, $result['rows'][0]['total']);
+        $this->assertSame('1234.57', $result['rows'][0]['label']);
+    }
+
     public function test_record_type_only_counts_its_own_records(): void
     {
         $invoices = $this->makeInvoiceType();

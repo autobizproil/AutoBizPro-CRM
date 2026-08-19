@@ -102,7 +102,7 @@ class WidgetDataService
         $groupMeta    = $displayField !== null ? ($descriptor['groupFields'][$displayField] ?? null) : null;
 
         if ($groupMeta === null) {
-            $total = (float) $query->clone()->selectRaw("{$aggregateSql} as total")->value('total');
+            $total = round((float) $query->clone()->selectRaw("{$aggregateSql} as total")->value('total'), 2);
 
             return [
                 'rows'  => [['key' => null, 'label' => 'סה״כ', 'color' => null, 'total' => $total]],
@@ -112,7 +112,7 @@ class WidgetDataService
         }
 
         $totalQuery = $query->clone();
-        $total      = (float) $totalQuery->selectRaw("{$aggregateSql} as total")->value('total');
+        $total      = round((float) $totalQuery->selectRaw("{$aggregateSql} as total")->value('total'), 2);
 
         $groupByField = $config['groupBy']['field'] ?? null;
         $groupByMeta  = $groupByField !== null ? ($descriptor['groupFields'][$groupByField] ?? null) : null;
@@ -137,7 +137,7 @@ class WidgetDataService
                     'key'   => $key === null ? null : (string) $key,
                     'label' => $label,
                     'color' => $color,
-                    'total' => (float) $row->total,
+                    'total' => round((float) $row->total, 2),
                 ];
             })->values()->all();
 
@@ -201,7 +201,7 @@ class WidgetDataService
                     'key' => $groupKey, 'label' => $label, 'color' => $color, 'series' => [],
                 ];
             }
-            $pivoted[$groupKey ?? '__null__']['series'][$seriesKey ?? '__null__'] = (float) $row->total;
+            $pivoted[$groupKey ?? '__null__']['series'][$seriesKey ?? '__null__'] = round((float) $row->total, 2);
 
             if (! isset($seenSeries[$seriesKey ?? '__null__'])) {
                 [$seriesLabel] = $seriesLabels($row->series_key);
@@ -399,9 +399,24 @@ class WidgetDataService
         if (($groupMeta['type'] ?? null) === 'enum') {
             $options = $groupMeta['options'] ?? [];
 
-            return fn ($key) => [$options[$key] ?? ($key === null || $key === '' ? 'ריק' : (string) $key), null];
+            return fn ($key) => [$options[$key] ?? ($key === null || $key === '' ? 'ריק' : self::formatKey($key)), null];
         }
 
-        return fn ($key) => [$key === null || $key === '' ? 'ריק' : (string) $key, null];
+        return fn ($key) => [$key === null || $key === '' ? 'ריק' : self::formatKey($key), null];
+    }
+
+    /**
+     * Group labels come straight from SQL (JSON_EXTRACT / DECIMAL columns can
+     * carry 4+ decimal places of raw precision) — numeric-looking values are
+     * rounded to 2 decimals for display, matching every other number shown in
+     * the widget builder (totals, KPI values).
+     */
+    private static function formatKey(mixed $key): string
+    {
+        if (is_numeric($key)) {
+            return (string) round((float) $key, 2);
+        }
+
+        return (string) $key;
     }
 }
