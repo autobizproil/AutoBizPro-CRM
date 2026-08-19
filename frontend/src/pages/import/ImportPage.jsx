@@ -336,7 +336,21 @@ export default function ImportPage() {
             <>
               <div className="text-4xl mb-3 animate-pulse">⏳</div>
               <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">מייבא...</h3>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">הקובץ מעובד ברקע, אנא המתן</p>
+              {job?.total_rows > 0 ? (
+                <>
+                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 mt-3 overflow-hidden" dir="ltr">
+                    <div
+                      className="h-full bg-[#2398c2] rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, Math.round((job.imported + job.skipped) / job.total_rows * 100))}%` }}
+                    />
+                  </div>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">
+                    {job.imported + job.skipped} מתוך {job.total_rows} שורות
+                  </p>
+                </>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">הקובץ מעובד ברקע, אנא המתן</p>
+              )}
             </>
           )}
         </div>

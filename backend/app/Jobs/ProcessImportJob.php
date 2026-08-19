@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 use League\Csv\Reader;
 
 class ProcessImportJob implements ShouldQueue
@@ -16,6 +17,11 @@ class ProcessImportJob implements ShouldQueue
 
     public int $timeout = 600;
 
+    // How often (in rows) the running imported/skipped counts are persisted while
+    // the job is still processing — lets the upload screen show real progress
+    // instead of an indefinite spinner, without a DB write per row.
+    private const PROGRESS_EVERY = 25;
+
     public function __construct(public int $importJobId) {}
 
     public function handle(ImportService $svc): void
@@ -23,23 +29,19 @@ class ProcessImportJob implements ShouldQueue
         $job = ImportJob::withoutGlobalScope('tenant')->findOrFail($this->importJobId);
         app()->instance('current_tenant_id', $job->tenant_id);
 
-        $job->update(['status' => 'processing']);
-
-        $path = \Illuminate\Support\Facades\Storage::path($job->storage_path);
-        $csv = Reader::createFromPath($path, 'r');
+        $path = Storage::path($job->storage_path);
+        $csv  = Reader::createFromPath($path, 'r');
         $csv->setHeaderOffset(0);
         $mapping = $job->field_mapping;
 
-        $imported = 0; $skipped = 0; $errors = []; $skipReasons = [];
-        $tally = function (string $result) use (&$skipReasons) {
-            if ($result !== 'imported') {
-                $skipReasons[$result] = ($skipReasons[$result] ?? 0) + 1;
-            }
-        };
+        // A first pass just to know the denominator for a progress bar — cheap
+        // relative to the row-by-row import work done in the second pass below.
+        $total = iterator_count($csv->getRecords());
+        $job->update(['status' => 'processing', 'total_rows' => $total]);
 
+        $statusMap = [];
         if ($job->entity === 'leads') {
             // Resolve status_mapping to concrete stage IDs, creating any new stages once up front
-            $statusMap = [];
             $maxPosition = PipelineStage::max('position') ?? 0;
             foreach ((array) $job->status_mapping as $csvValue => $target) {
                 if (is_array($target) && ! empty($target['create'])) {
@@ -52,62 +54,46 @@ class ProcessImportJob implements ShouldQueue
                     $statusMap[$csvValue] = (int) $target;
                 }
             }
+        }
 
-            foreach ($csv->getRecords() as $i => $row) {
-                try {
-                    $res = $svc->importRow($row, $mapping, $statusMap);
-                    $tally($res);
-                    $res === 'imported' ? $imported++ : $skipped++;
-                } catch (\Throwable $e) {
+        $importRow = match ($job->entity) {
+            'leads'    => fn (array $row) => $svc->importRow($row, $mapping, $statusMap),
+            'contacts' => fn (array $row) => $svc->importContactRow($row, $mapping),
+            'clients'  => fn (array $row) => $svc->importClientRow($row, $mapping),
+            default    => fn (array $row) => $svc->importRecordRow($row, $mapping, $job->record_type_id, $job->user_id),
+        };
+
+        $imported = 0; $skipped = 0; $errors = []; $skipReasons = [];
+        $processed = 0; $lastSaved = 0;
+
+        foreach ($csv->getRecords() as $i => $row) {
+            try {
+                $res = $importRow($row);
+                if ($res === 'imported') {
+                    $imported++;
+                } else {
                     $skipped++;
-                    $skipReasons['skipped:error'] = ($skipReasons['skipped:error'] ?? 0) + 1;
-                    $errors[] = ['row' => $i, 'error' => $e->getMessage()];
+                    $skipReasons[$res] = ($skipReasons[$res] ?? 0) + 1;
                 }
+            } catch (\Throwable $e) {
+                $skipped++;
+                $skipReasons['skipped:error'] = ($skipReasons['skipped:error'] ?? 0) + 1;
+                $errors[] = ['row' => $i, 'error' => $e->getMessage()];
             }
-        } elseif ($job->entity === 'contacts') {
-            foreach ($csv->getRecords() as $i => $row) {
-                try {
-                    $res = $svc->importContactRow($row, $mapping);
-                    $tally($res);
-                    $res === 'imported' ? $imported++ : $skipped++;
-                } catch (\Throwable $e) {
-                    $skipped++;
-                    $skipReasons['skipped:error'] = ($skipReasons['skipped:error'] ?? 0) + 1;
-                    $errors[] = ['row' => $i, 'error' => $e->getMessage()];
-                }
-            }
-        } elseif ($job->entity === 'clients') {
-            foreach ($csv->getRecords() as $i => $row) {
-                try {
-                    $res = $svc->importClientRow($row, $mapping);
-                    $tally($res);
-                    $res === 'imported' ? $imported++ : $skipped++;
-                } catch (\Throwable $e) {
-                    $skipped++;
-                    $skipReasons['skipped:error'] = ($skipReasons['skipped:error'] ?? 0) + 1;
-                    $errors[] = ['row' => $i, 'error' => $e->getMessage()];
-                }
-            }
-        } else {
-            foreach ($csv->getRecords() as $i => $row) {
-                try {
-                    $res = $svc->importRecordRow($row, $mapping, $job->record_type_id, $job->user_id);
-                    $tally($res);
-                    $res === 'imported' ? $imported++ : $skipped++;
-                } catch (\Throwable $e) {
-                    $skipped++;
-                    $skipReasons['skipped:error'] = ($skipReasons['skipped:error'] ?? 0) + 1;
-                    $errors[] = ['row' => $i, 'error' => $e->getMessage()];
-                }
+
+            $processed++;
+            if ($processed - $lastSaved >= self::PROGRESS_EVERY) {
+                $job->update(['imported' => $imported, 'skipped' => $skipped]);
+                $lastSaved = $processed;
             }
         }
 
         $job->update([
-            'status'     => 'done',
-            'total_rows' => $imported + $skipped,
-            'imported'   => $imported,
-            'skipped'    => $skipped,
-            'errors'     => $errors,
+            'status'       => 'done',
+            'total_rows'   => $imported + $skipped,
+            'imported'     => $imported,
+            'skipped'      => $skipped,
+            'errors'       => $errors,
             'skip_reasons' => $skipReasons,
         ]);
     }
