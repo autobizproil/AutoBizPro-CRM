@@ -14,11 +14,12 @@ class Lead extends Model
 
     protected $fillable = [
         'tenant_id', 'name', 'phone', 'phone_normalized', 'email', 'status',
-        'pipeline_stage_id', 'assigned_to', 'source', 'fb_leadgen_id', 'notes', 'custom_fields',
+        'pipeline_stage_id', 'assigned_to', 'source', 'fb_leadgen_id', 'deal_value', 'notes', 'custom_fields',
     ];
 
     protected $casts = [
         'custom_fields' => 'array', // Future: migrate to EAV table for advanced querying/filtering
+        'deal_value'    => 'decimal:2',
     ];
 
     protected static function booted(): void

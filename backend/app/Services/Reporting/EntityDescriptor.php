@@ -25,7 +25,9 @@ class EntityDescriptor
                 'table'       => 'leads',
                 'ownerColumn' => 'assigned_to',
                 'jsonColumn'  => 'custom_fields',
-                'valueFields' => [],
+                'valueFields' => [
+                    'deal_value' => ['label' => 'ערך עסקה', 'type' => 'number'],
+                ],
                 'groupFields' => [
                     'source'            => ['label' => 'מקור', 'type' => 'enum', 'options' => [
                         'facebook' => 'פייסבוק', 'website' => 'אתר', 'referral' => 'הפניה', 'phone' => 'טלפון',

@@ -28,6 +28,10 @@ class EntityDescriptorTest extends TestCase
         $this->assertSame('leads', $lead['table']);
         $this->assertSame('assigned_to', $lead['ownerColumn']);
 
+        // deal_value is the first real numeric field exposed to the widget builder
+        $this->assertSame('number', $lead['valueFields']['deal_value']['type']);
+        $this->assertSame('ערך עסקה', $lead['valueFields']['deal_value']['label']);
+
         // Group fields carry the metadata the UI needs to render smart inputs
         $this->assertSame('lookup', $lead['groupFields']['assigned_to']['type']);
         $this->assertSame('users', $lead['groupFields']['assigned_to']['lookup']);

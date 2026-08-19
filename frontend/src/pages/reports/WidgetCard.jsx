@@ -277,7 +277,7 @@ function ChartLine({ data, color, preview, onSegmentClick }) {
 function ChartTable({ data, onSegmentClick }) {
   if (!data?.length) return <Empty />
   const cols = Object.keys(data[0] ?? {}).filter(k =>
-    !['user_id', 'stage_id', 'color'].includes(k)
+    !['user_id', 'stage_id', 'color', 'key'].includes(k)
   )
 
   const colLabel = {
@@ -290,9 +290,9 @@ function ChartTable({ data, onSegmentClick }) {
     <div className="overflow-auto max-h-56">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-gray-100">
+          <tr className="border-b border-gray-100 dark:border-gray-700">
             {cols.map(c => (
-              <th key={c} className="text-right py-2 px-1 text-gray-500 font-medium whitespace-nowrap">
+              <th key={c} className="text-right py-2 px-1 text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">
                 {colLabel[c] ?? c}
               </th>
             ))}
@@ -300,9 +300,9 @@ function ChartTable({ data, onSegmentClick }) {
         </thead>
         <tbody>
           {data.map((row, i) => (
-            <tr key={i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+            <tr key={i} className="border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700">
               {cols.map(c => (
-                <td key={c} className="py-1.5 px-1 text-gray-700">{row[c] ?? '—'}</td>
+                <td key={c} className="py-1.5 px-1 text-gray-700 dark:text-gray-200">{row[c] ?? '—'}</td>
               ))}
             </tr>
           ))}

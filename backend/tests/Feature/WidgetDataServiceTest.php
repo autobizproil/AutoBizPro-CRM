@@ -49,6 +49,35 @@ class WidgetDataServiceTest extends TestCase
         $this->service()->aggregate(['entity' => 'invoice'], $this->admin);
     }
 
+    public function test_sum_aggregates_deal_value_grouped_by_source(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'facebook', 'deal_value' => 1000]);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'B', 'source' => 'facebook', 'deal_value' => 500]);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'C', 'source' => 'website', 'deal_value' => 250]);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'D', 'source' => 'website']); // null deal_value
+
+        $result = $this->service()->aggregate([
+            'entity' => 'lead', 'displayField' => 'source', 'valueField' => 'deal_value', 'aggregation' => 'sum',
+        ], $this->admin);
+
+        $bySource = collect($result['rows'])->keyBy('key');
+        $this->assertSame(1500.0, $bySource['facebook']['total']);
+        $this->assertSame(250.0, $bySource['website']['total']);
+        $this->assertSame(1750.0, $result['total']);
+    }
+
+    public function test_avg_aggregates_deal_value(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'deal_value' => 100]);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'B', 'deal_value' => 300]);
+
+        $result = $this->service()->aggregate([
+            'entity' => 'lead', 'valueField' => 'deal_value', 'aggregation' => 'avg',
+        ], $this->admin);
+
+        $this->assertSame(200.0, $result['rows'][0]['total']);
+    }
+
     public function test_counts_records_grouped_by_enum_field(): void
     {
         Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'facebook']);
