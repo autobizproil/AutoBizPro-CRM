@@ -212,6 +212,12 @@ export default function AddWidgetModal({ onSave, onClose }) {
 
           {/* Form — Fireberry field order */}
           <div className="w-96 flex-shrink-0 border-l border-gray-100 dark:border-gray-700 p-6 overflow-y-auto space-y-5">
+          <div>
+            <label className={LABEL_CLASS}>כותרת הגרף</label>
+            <input type="text" value={draft.title} onChange={e => patch({ title: e.target.value })}
+              placeholder="הזן כותרת..." className={SELECT_CLASS} />
+          </div>
+
           {draft.type === 'metrics_table' ? (
             <MetricsTileEditor tiles={draft.tiles ?? []} onChange={tiles => patch({ tiles })} entities={meta?.entities ?? []} fieldsByEntity={meta?.fields ?? {}} lookups={meta?.lookups} />
           ) : (
@@ -221,12 +227,6 @@ export default function AddWidgetModal({ onSave, onClose }) {
               <select value={draft.entity} onChange={e => handleEntityChange(e.target.value)} className={SELECT_CLASS}>
                 {(meta?.entities ?? []).map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
               </select>
-            </div>
-
-            <div>
-              <label className={LABEL_CLASS}>כותרת הגרף</label>
-              <input type="text" value={draft.title} onChange={e => patch({ title: e.target.value })}
-                placeholder="הזן כותרת..." className={SELECT_CLASS} />
             </div>
 
             <div>
