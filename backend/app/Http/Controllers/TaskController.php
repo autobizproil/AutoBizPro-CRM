@@ -34,15 +34,29 @@ class TaskController extends Controller
                   ->where('related_id', $request->get('related_id'));
         }
 
+        // Whitelisted date columns a drill-down's date_field may target (matches EntityDescriptor's task dateFields)
+        $dateField = in_array($request->input('date_field'), ['created_at', 'due_at', 'completed_at'], true)
+            ? $request->input('date_field')
+            : 'created_at';
+
         if ($request->filled('date_from')) {
-            $query->where('created_at', '>=', $request->input('date_from'));
+            $query->where($dateField, '>=', $request->input('date_from'));
         }
         if ($request->filled('date_to')) {
-            $query->where('created_at', '<=', $request->input('date_to'));
+            $query->where($dateField, '<=', $request->input('date_to'));
         }
+
+        $filterFields = ['title', 'priority', 'status', 'due_at', 'assigned_to', 'created_at'];
         if ($request->filled('conditions')) {
             $decoded = json_decode($request->input('conditions'), true);
-            \App\Services\ConditionFilter::apply($query, is_array($decoded) ? $decoded : [], ['title', 'priority', 'status', 'due_at', 'assigned_to', 'created_at']);
+            \App\Services\ConditionFilter::apply($query, is_array($decoded) ? $decoded : [], $filterFields);
+        }
+        if ($request->filled('orConditions')) {
+            $decoded = json_decode($request->input('orConditions'), true);
+            $orConditions = is_array($decoded) ? $decoded : [];
+            $query->where(function ($q) use ($orConditions, $filterFields) {
+                \App\Services\ConditionFilter::apply($q, $orConditions, $filterFields, null, false, 'or');
+            });
         }
 
         // Sort: open first, then by due date ascending (nulls last)

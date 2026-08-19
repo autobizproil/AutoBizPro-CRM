@@ -492,15 +492,7 @@ function renderPreviewChart(widget, data, isLoading) {
 // ── Main WidgetCard export ────────────────────────────────────────────────────
 
 export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, preview = false }) {
-  if (widget.type === 'metrics_table') {
-    return (
-      <div className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4 ${preview ? '' : 'lg:col-span-2'}`}>
-        {!preview && <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">{widget.title}</h3>}
-        <MetricsTableWidget tiles={widget.tiles} />
-      </div>
-    )
-  }
-
+  const isMetricsTable = widget.type === 'metrics_table'
   const legacy = isLegacyWidget(widget)
 
   // A widget with its own filter (period/date/conditions) ignores the board's global range.
@@ -540,7 +532,17 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
           }
         }),
     staleTime: 60_000,
+    enabled: !isMetricsTable,
   })
+
+  if (isMetricsTable) {
+    return (
+      <div className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4 ${preview ? '' : 'lg:col-span-2'}`}>
+        {!preview && <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">{widget.title}</h3>}
+        <MetricsTableWidget tiles={widget.tiles} />
+      </div>
+    )
+  }
 
   if (preview) {
     const previewData = legacy ? data : (widget.type === 'kpi' ? data : data?.rows)

@@ -52,4 +52,25 @@ class ContactFilterTest extends TestCase
         $this->assertCount(1, $resp->json('data.data'));
         $this->assertSame('New', $resp->json('data.data.0.name'));
     }
+
+    public function test_or_conditions_apply_as_an_or_group(): void
+    {
+        [$tenant, $admin, $sub] = $this->admin('contact-or');
+        app()->instance('current_tenant_id', $tenant->id);
+        Contact::create(['tenant_id' => $tenant->id, 'name' => 'Alice', 'company' => 'Acme', 'role' => 'ceo']);
+        Contact::create(['tenant_id' => $tenant->id, 'name' => 'Bob', 'company' => 'Other', 'role' => 'cto']);
+        Contact::create(['tenant_id' => $tenant->id, 'name' => 'Carl', 'company' => 'Third', 'role' => 'dev']);
+
+        $resp = $this->actingAs($admin)->withHeaders(['X-Tenant' => $sub])
+            ->getJson('/api/contacts?' . http_build_query([
+                'orConditions' => json_encode([
+                    ['field' => 'company', 'operator' => 'equals', 'value' => 'Acme'],
+                    ['field' => 'role', 'operator' => 'equals', 'value' => 'cto'],
+                ]),
+            ]));
+
+        $resp->assertOk();
+        $names = collect($resp->json('data.data'))->pluck('name')->sort()->values()->all();
+        $this->assertSame(['Alice', 'Bob'], $names);
+    }
 }

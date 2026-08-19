@@ -12,6 +12,9 @@ class LeadService
     // System fields a filter condition may target directly (not custom_fields JSON)
     private const FILTERABLE_FIELDS = ['name', 'phone', 'email', 'source', 'status', 'pipeline_stage_id', 'assigned_to', 'created_at'];
 
+    // Whitelisted date columns a drill-down's date_field may target (matches EntityDescriptor's lead dateFields)
+    private const DATE_FIELDS = ['created_at', 'updated_at'];
+
     public function list(array $filters, int $userId, string $role): LengthAwarePaginator
     {
         $query = Lead::with(['stage', 'assignedUser']);
@@ -35,14 +38,19 @@ class LeadService
                 ->orWhere('email', 'like', "%$q%")
                 ->orWhere('phone', 'like', "%$q%"));
         }
+        $dateField = ! empty($filters['date_field']) && in_array($filters['date_field'], self::DATE_FIELDS, true)
+            ? $filters['date_field']
+            : 'created_at';
+
         if (! empty($filters['date_from'])) {
-            $query->where('created_at', '>=', $filters['date_from']);
+            $query->where($dateField, '>=', $filters['date_from']);
         }
         if (! empty($filters['date_to'])) {
-            $query->where('created_at', '<=', $filters['date_to']);
+            $query->where($dateField, '<=', $filters['date_to']);
         }
 
         $this->applyConditions($query, $filters['conditions'] ?? []);
+        $this->applyOrConditions($query, $filters['orConditions'] ?? []);
 
         // Sorting — whitelisted columns only; JSON path for custom fields
         $sortable = ['name', 'phone', 'email', 'source', 'created_at', 'pipeline_stage_id', 'assigned_to'];
@@ -70,6 +78,22 @@ class LeadService
     private function applyConditions($query, array $conditions): void
     {
         ConditionFilter::apply($query, $conditions, self::FILTERABLE_FIELDS, 'custom_fields');
+    }
+
+    /**
+     * Apply the OR-group condition filter (mirrors WidgetDataService::aggregate()'s
+     * orConditions handling — the whole group is wrapped in its own where-closure so
+     * it stays isolated from the AND-group conditions above).
+     */
+    private function applyOrConditions($query, array $orConditions): void
+    {
+        if (empty($orConditions)) {
+            return;
+        }
+
+        $query->where(function ($q) use ($orConditions) {
+            ConditionFilter::apply($q, $orConditions, self::FILTERABLE_FIELDS, 'custom_fields', false, 'or');
+        });
     }
 
     public function create(array $data): Lead

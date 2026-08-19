@@ -23,15 +23,29 @@ class ContactController extends Controller
                 ->orWhere('company', 'like', "%$s%"));
         }
 
+        // Whitelisted date columns a drill-down's date_field may target (matches EntityDescriptor's contact dateFields)
+        $dateField = in_array($request->input('date_field'), ['created_at', 'updated_at'], true)
+            ? $request->input('date_field')
+            : 'created_at';
+
         if ($request->filled('date_from')) {
-            $query->where('created_at', '>=', $request->input('date_from'));
+            $query->where($dateField, '>=', $request->input('date_from'));
         }
         if ($request->filled('date_to')) {
-            $query->where('created_at', '<=', $request->input('date_to'));
+            $query->where($dateField, '<=', $request->input('date_to'));
         }
+
+        $filterFields = ['name', 'phone', 'email', 'company', 'role', 'created_at'];
         if ($request->filled('conditions')) {
             $decoded = json_decode($request->input('conditions'), true);
-            \App\Services\ConditionFilter::apply($query, is_array($decoded) ? $decoded : [], ['name', 'phone', 'email', 'company', 'role', 'created_at'], 'custom_fields');
+            \App\Services\ConditionFilter::apply($query, is_array($decoded) ? $decoded : [], $filterFields, 'custom_fields');
+        }
+        if ($request->filled('orConditions')) {
+            $decoded = json_decode($request->input('orConditions'), true);
+            $orConditions = is_array($decoded) ? $decoded : [];
+            $query->where(function ($q) use ($orConditions, $filterFields) {
+                \App\Services\ConditionFilter::apply($q, $orConditions, $filterFields, 'custom_fields', false, 'or');
+            });
         }
 
         return response()->json(['success' => true, 'data' => $query->latest()->paginate(25)]);

@@ -495,6 +495,36 @@ class WidgetDataServiceTest extends TestCase
         $this->assertSame(1.0, $result['rows'][0]['total']);
     }
 
+    public function test_group_by_caps_at_top_50_groups_with_complete_series_each(): void
+    {
+        $agentA = User::create(['tenant_id' => $this->tenant->id, 'name' => 'Agent A', 'email' => 'ga@widget.test', 'password' => Hash::make('x'), 'role' => 'agent']);
+        $agentB = User::create(['tenant_id' => $this->tenant->id, 'name' => 'Agent B', 'email' => 'gb@widget.test', 'password' => Hash::make('x'), 'role' => 'agent']);
+
+        // 60 distinct source values, each with a lead for BOTH agents (2 series per
+        // group) so a naive limit(200) on the group×series cross product (120 rows
+        // here) would truncate some groups to a single series instead of both.
+        for ($i = 0; $i < 60; $i++) {
+            Lead::create(['tenant_id' => $this->tenant->id, 'name' => "A{$i}", 'source' => "source-{$i}", 'assigned_to' => $agentA->id]);
+            Lead::create(['tenant_id' => $this->tenant->id, 'name' => "B{$i}", 'source' => "source-{$i}", 'assigned_to' => $agentB->id]);
+        }
+
+        $result = $this->service()->aggregate([
+            'entity'       => 'lead',
+            'displayField' => 'source',
+            'groupBy'      => ['field' => 'assigned_to'],
+        ], $this->admin);
+
+        $this->assertLessThanOrEqual(50, count($result['rows']));
+
+        // Every group that made the cut must have BOTH series represented — no
+        // group is allowed to appear with a partial series set.
+        foreach ($result['rows'] as $row) {
+            $this->assertCount(2, $row['series'], "group '{$row['key']}' is missing a series");
+            $this->assertSame(1.0, $row['series'][(string) $agentA->id]);
+            $this->assertSame(1.0, $row['series'][(string) $agentB->id]);
+        }
+    }
+
     public function test_group_by_without_display_field_is_ignored(): void
     {
         Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A']);

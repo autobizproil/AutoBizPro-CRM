@@ -53,27 +53,47 @@ function ConditionRow({ row, filterFields, lookups, onChange, onRemove }) {
 const LABEL_CLASS  = 'block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1'
 const SELECT_CLASS = 'w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30'
 
-function MetricsTileEditor({ tiles, onChange, entities, fieldsByEntity }) {
+function MetricsTileEditor({ tiles, onChange, entities, fieldsByEntity, lookups }) {
   const addTile    = () => onChange([...tiles, { title: '', entity: entities[0]?.key ?? 'lead', valueField: '', aggregation: 'count', conditions: [] }])
   const removeTile = (i) => onChange(tiles.filter((_, idx) => idx !== i))
   const updateTile = (i, p) => onChange(tiles.map((t, idx) => idx === i ? { ...t, ...p } : t))
 
+  const addTileCondition    = (i) => {
+    const filterFields = fieldsByEntity?.[tiles[i].entity]?.filterFields ?? {}
+    updateTile(i, { conditions: [...(tiles[i].conditions ?? []), { field: Object.keys(filterFields)[0] ?? '', operator: 'equals', value: '' }] })
+  }
+  const removeTileCondition = (i, ci) => updateTile(i, { conditions: (tiles[i].conditions ?? []).filter((_, idx) => idx !== ci) })
+  const updateTileCondition = (i, ci, p) => updateTile(i, { conditions: (tiles[i].conditions ?? []).map((c, idx) => idx === ci ? { ...c, ...p } : c) })
+
   return (
     <div className="space-y-3">
       <p className="text-xs font-medium text-gray-600 dark:text-gray-400">מדדים בטבלה</p>
-      {tiles.map((tile, i) => (
-        <div key={i} className="border border-gray-100 dark:border-gray-700 rounded-lg p-3 space-y-2">
-          <div className="flex items-center gap-1.5">
-            <input type="text" value={tile.title} onChange={e => updateTile(i, { title: e.target.value })}
-              placeholder="כותרת המדד..." className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
-            <button type="button" onClick={() => removeTile(i)} className="text-gray-300 hover:text-red-500 flex-shrink-0 px-0.5">×</button>
+      {tiles.map((tile, i) => {
+        const filterFields = fieldsByEntity?.[tile.entity]?.filterFields ?? {}
+        return (
+          <div key={i} className="border border-gray-100 dark:border-gray-700 rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <input type="text" value={tile.title} onChange={e => updateTile(i, { title: e.target.value })}
+                placeholder="כותרת המדד..." className="flex-1 min-w-0 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+              <button type="button" onClick={() => removeTile(i)} className="text-gray-300 hover:text-red-500 flex-shrink-0 px-0.5">×</button>
+            </div>
+            <select value={tile.entity} onChange={e => updateTile(i, { entity: e.target.value, conditions: [] })}
+              className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+              {entities.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
+            </select>
+
+            <div className="space-y-1.5">
+              {(tile.conditions ?? []).map((row, ci) => (
+                <ConditionRow key={ci} row={row} filterFields={filterFields} lookups={lookups}
+                  onChange={p => updateTileCondition(i, ci, p)} onRemove={() => removeTileCondition(i, ci)} />
+              ))}
+              <button type="button" onClick={() => addTileCondition(i)} className="text-[11px] text-[#2398c2] hover:underline">
+                + הוסף סינון
+              </button>
+            </div>
           </div>
-          <select value={tile.entity} onChange={e => updateTile(i, { entity: e.target.value })}
-            className="w-full border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-            {entities.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
-          </select>
-        </div>
-      ))}
+        )
+      })}
       <button type="button" onClick={addTile} className="text-xs text-[#2398c2] hover:underline">
         + הוסף מדד
       </button>
@@ -193,7 +213,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
           {/* Form — Fireberry field order */}
           <div className="w-96 flex-shrink-0 border-l border-gray-100 dark:border-gray-700 p-6 overflow-y-auto space-y-5">
           {draft.type === 'metrics_table' ? (
-            <MetricsTileEditor tiles={draft.tiles ?? []} onChange={tiles => patch({ tiles })} entities={meta?.entities ?? []} fieldsByEntity={meta?.fields ?? {}} />
+            <MetricsTileEditor tiles={draft.tiles ?? []} onChange={tiles => patch({ tiles })} entities={meta?.entities ?? []} fieldsByEntity={meta?.fields ?? {}} lookups={meta?.lookups} />
           ) : (
             <>
             <div>

@@ -104,6 +104,53 @@ class WidgetEndpointsTest extends TestCase
         $this->assertSame(['match'], $keys);
     }
 
+    public function test_widget_data_or_conditions_reach_the_aggregation(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'facebook', 'status' => 'open']);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'B', 'source' => 'website', 'status' => 'won']);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'C', 'source' => 'referral', 'status' => 'lost']);
+
+        // Without orConditions: no filter at all -> baseline of 3
+        $baseline = $this->asAdmin()->getJson('/api/dashboard/widget-data?entity=lead&displayField=source');
+        $baseline->assertOk();
+        $this->assertSame(3, (int) $baseline->json('data.total'));
+
+        // Two conditions OR'd together (no AND-group) -> union of both matches (A via
+        // source, B via status). Before this fix, the controller never read
+        // orConditions off the request at all, so this param had zero effect and the
+        // baseline (all 3 rows, unfiltered) would have leaked through unchanged.
+        $orConditions = json_encode([
+            ['field' => 'source', 'operator' => 'equals', 'value' => 'facebook'],
+            ['field' => 'status', 'operator' => 'equals', 'value' => 'won'],
+        ]);
+
+        $resp = $this->asAdmin()->getJson(
+            '/api/dashboard/widget-data?entity=lead&displayField=source&orConditions=' . urlencode($orConditions)
+        );
+
+        $resp->assertOk();
+        $this->assertSame(2, (int) $resp->json('data.total'));
+    }
+
+    public function test_widget_data_group_by_returns_series_keys(): void
+    {
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'facebook', 'status' => 'open']);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'B', 'source' => 'facebook', 'status' => 'won']);
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'C', 'source' => 'website', 'status' => 'lost']);
+
+        $groupBy = json_encode(['field' => 'status']);
+
+        $resp = $this->asAdmin()->getJson(
+            '/api/dashboard/widget-data?entity=lead&displayField=source&groupBy=' . urlencode($groupBy)
+        );
+
+        $resp->assertOk();
+        $resp->assertJsonStructure(['data' => ['rows', 'seriesKeys']]);
+        $seriesKeys = collect($resp->json('data.seriesKeys'))->pluck('key')->all();
+        sort($seriesKeys);
+        $this->assertSame(['lost', 'open', 'won'], $seriesKeys);
+    }
+
     public function test_widget_data_rejects_unknown_entity(): void
     {
         $resp = $this->asAdmin()->getJson('/api/dashboard/widget-data?entity=invoice');

@@ -77,6 +77,8 @@ class WidgetController extends Controller
             'displayField' => $request->input('displayField'),
             'timePeriod'   => $this->decodeJson($request->input('timePeriod')),
             'conditions'   => $this->decodeJson($request->input('conditions')) ?? [],
+            'orConditions' => $this->decodeJson($request->input('orConditions')) ?? [],
+            'groupBy'      => $this->decodeJson($request->input('groupBy')),
         ];
 
         try {

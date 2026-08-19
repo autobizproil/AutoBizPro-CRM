@@ -128,7 +128,24 @@ class WidgetDataService
             $secondExpr = "DATE_FORMAT({$table}.{$groupByField}, '{$pattern}')";
         }
 
+        // Cap the number of GROUPS (not group×series rows) at 50 — same limit as the
+        // single-dimension branch — so every group that makes the cut gets its full
+        // series coverage instead of an arbitrary cross-product row limit truncating
+        // some groups' series mid-way.
+        $topGroupKeys = $query->clone()
+            ->select("{$table}.{$displayField} as group_key", DB::raw("{$aggregateSql} as total"))
+            ->groupBy("{$table}.{$displayField}")
+            ->orderByDesc('total')
+            ->limit(50)
+            ->pluck('group_key')
+            ->all();
+
+        if (empty($topGroupKeys)) {
+            return ['rows' => [], 'seriesKeys' => [], 'total' => $total, 'resolvedRange' => $resolvedRangeOut];
+        }
+
         $rows = $query
+            ->whereIn("{$table}.{$displayField}", $topGroupKeys)
             ->select(
                 "{$table}.{$displayField} as group_key",
                 DB::raw("{$secondExpr} as series_key"),
@@ -136,7 +153,6 @@ class WidgetDataService
             )
             ->groupBy("{$table}.{$displayField}", DB::raw($secondExpr))
             ->orderByDesc('total')
-            ->limit(200)
             ->get();
 
         $groupLabels  = $this->labelResolver($groupMeta);

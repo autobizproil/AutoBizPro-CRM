@@ -68,7 +68,7 @@ export function shrinkPendingBoards(pending) {
   return pending.slice(1)
 }
 
-async function migrateLocalStorageIfNeeded() {
+export async function migrateLocalStorageIfNeeded() {
   let localBoards = null
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -214,19 +214,29 @@ export default function DashboardsPage() {
   useEffect(() => {
     migrateLocalStorageIfNeeded()
       .catch(() => { /* migration is best-effort; a failed upload just leaves the old localStorage data in place for a retry next load */ })
-      .finally(() => refreshBoards().finally(() => setLoaded(true)))
+      .finally(() => refreshBoards()
+        .catch(() => toast.error('שגיאה בטעינת לוחות הבקרה'))
+        .finally(() => setLoaded(true)))
   }, [])
 
   // ── Boards CRUD ─────────────────────────────────────────────────────────────
 
   async function addBoard() {
-    const created = await dashboardApi.createBoard('לוח בקרה חדש')
-    await refreshBoards(created.data.data.id)
+    try {
+      const created = await dashboardApi.createBoard('לוח בקרה חדש')
+      await refreshBoards(created.data.data.id)
+    } catch {
+      toast.error('שגיאה ביצירת הלוח')
+    }
   }
 
   async function renameBoard(id, name) {
-    await dashboardApi.updateBoard(id, name)
-    await refreshBoards(activeBoardId)
+    try {
+      await dashboardApi.updateBoard(id, name)
+      await refreshBoards(activeBoardId)
+    } catch {
+      toast.error('שגיאה בשינוי שם הלוח')
+    }
   }
 
   async function deleteBoard(id) {
@@ -234,41 +244,61 @@ export default function DashboardsPage() {
     if (!board) return
     if (boards.length <= 1) { toast.error('חייב להישאר לפחות לוח אחד'); return }
     if (!confirm(`למחוק את הלוח "${board.name}"? הפעולה אינה הפיכה.`)) return
-    await dashboardApi.deleteBoard(id)
-    await refreshBoards()
+    try {
+      await dashboardApi.deleteBoard(id)
+      await refreshBoards()
+    } catch {
+      toast.error('שגיאה במחיקת הלוח')
+    }
   }
 
   async function duplicateBoard(id) {
     const board = boards.find(b => b.id === id)
     if (!board) return
-    const created = await dashboardApi.createBoard(`${board.name} (עותק)`)
-    const boardId = created.data.data.id
-    for (const widget of board.widgets) {
-      const { id: _oldId, ...config } = widget
-      await dashboardApi.createWidget(boardId, config)
+    try {
+      const created = await dashboardApi.createBoard(`${board.name} (עותק)`)
+      const boardId = created.data.data.id
+      for (const widget of board.widgets) {
+        const { id: _oldId, ...config } = widget
+        await dashboardApi.createWidget(boardId, config)
+      }
+      await refreshBoards(boardId)
+    } catch {
+      toast.error('שגיאה בשכפול הלוח')
     }
-    await refreshBoards(boardId)
   }
 
   // ── Widget CRUD ─────────────────────────────────────────────────────────────
 
   async function handleAddWidget(widgetConfig) {
-    await dashboardApi.createWidget(activeBoardId, widgetConfig)
-    setShowAdd(false)
-    await refreshBoards(activeBoardId)
+    try {
+      await dashboardApi.createWidget(activeBoardId, widgetConfig)
+      setShowAdd(false)
+      await refreshBoards(activeBoardId)
+    } catch {
+      toast.error('שגיאה בשמירת ה-widget')
+    }
   }
 
   async function handleDeleteWidget(widgetId) {
-    await dashboardApi.deleteWidget(activeBoardId, widgetId)
-    await refreshBoards(activeBoardId)
+    try {
+      await dashboardApi.deleteWidget(activeBoardId, widgetId)
+      await refreshBoards(activeBoardId)
+    } catch {
+      toast.error('שגיאה בהסרת ה-widget')
+    }
   }
 
   async function handleUpdateWidget(widgetId, patch) {
     const widget = activeBoard.widgets.find(w => w.id === widgetId)
     if (!widget) return
-    const { id: _id, ...config } = { ...widget, ...patch }
-    await dashboardApi.updateWidget(activeBoardId, widgetId, config)
-    await refreshBoards(activeBoardId)
+    try {
+      const { id: _id, ...config } = { ...widget, ...patch }
+      await dashboardApi.updateWidget(activeBoardId, widgetId, config)
+      await refreshBoards(activeBoardId)
+    } catch {
+      toast.error('שגיאה בעדכון ה-widget')
+    }
   }
 
   // ── Export ──────────────────────────────────────────────────────────────────

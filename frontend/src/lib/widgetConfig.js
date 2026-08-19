@@ -65,6 +65,7 @@ export function drillDownParams(widget, segment, resolvedRange) {
   if (widget.orConditions?.length) params.orConditions = JSON.stringify(widget.orConditions)
   if (resolvedRange?.from) params.date_from = resolvedRange.from
   if (resolvedRange?.to) params.date_to = resolvedRange.to
+  if (widget.timePeriod?.field) params.date_field = widget.timePeriod.field
 
   return params
 }
