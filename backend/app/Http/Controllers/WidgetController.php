@@ -95,6 +95,7 @@ class WidgetController extends Controller
             'valueField'   => $request->input('valueField'),
             'aggregation'  => $request->input('aggregation', 'count'),
             'displayField' => $request->input('displayField'),
+            'displayGranularity' => $request->input('displayGranularity'),
             'timePeriod'   => $this->decodeJson($request->input('timePeriod')),
             'conditions'   => $this->decodeJson($request->input('conditions')) ?? [],
             'orConditions' => $this->decodeJson($request->input('orConditions')) ?? [],

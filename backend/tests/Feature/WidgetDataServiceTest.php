@@ -513,6 +513,63 @@ class WidgetDataServiceTest extends TestCase
         \Carbon\Carbon::setTestNow();
     }
 
+    public function test_display_field_by_date_buckets_by_granularity(): void
+    {
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-19'));
+
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'facebook'])
+            ->forceFill(['created_at' => \Carbon\Carbon::parse('2026-08-01')])->saveQuietly();
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'B', 'source' => 'facebook'])
+            ->forceFill(['created_at' => \Carbon\Carbon::parse('2026-08-15')])->saveQuietly();
+        Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'C', 'source' => 'facebook'])
+            ->forceFill(['created_at' => \Carbon\Carbon::parse('2026-07-01')])->saveQuietly();
+
+        $result = $this->service()->aggregate([
+            'entity'             => 'lead',
+            'displayField'       => 'created_at',
+            'displayGranularity' => 'month',
+        ], $this->admin);
+
+        $byKey = collect($result['rows'])->keyBy('key');
+        $this->assertSame(2.0, $byKey['2026-08']['total']);
+        $this->assertSame(1.0, $byKey['2026-07']['total']);
+        // Chronological order, not desc-by-total, for a date-bucketed primary group.
+        $this->assertSame(['2026-07', '2026-08'], collect($result['rows'])->pluck('key')->all());
+
+        \Carbon\Carbon::setTestNow();
+    }
+
+    public function test_record_type_can_be_grouped_by_created_at(): void
+    {
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-19'));
+
+        $recordType = \App\Models\RecordType::create([
+            'tenant_id' => $this->tenant->id, 'slug' => 'invoices', 'label' => 'חשבוניות',
+        ]);
+        \App\Models\CustomFieldDefinition::create([
+            'tenant_id' => $this->tenant->id, 'entity' => 'invoices',
+            'name' => 'amount', 'label' => 'סכום', 'field_type' => 'number',
+        ]);
+        \App\Models\Record::create(['tenant_id' => $this->tenant->id, 'record_type_id' => $recordType->id, 'data' => ['amount' => 100]])
+            ->forceFill(['created_at' => \Carbon\Carbon::parse('2026-08-01')])->saveQuietly();
+        \App\Models\Record::create(['tenant_id' => $this->tenant->id, 'record_type_id' => $recordType->id, 'data' => ['amount' => 50]])
+            ->forceFill(['created_at' => \Carbon\Carbon::parse('2026-07-01')])->saveQuietly();
+
+        $result = $this->service()->aggregate([
+            'entity'             => 'record:invoices',
+            'aggregation'        => 'sum',
+            'valueField'         => 'amount',
+            'displayField'       => 'created_at',
+            'displayGranularity' => 'month',
+        ], $this->admin);
+
+        $byKey = collect($result['rows'])->keyBy('key');
+        $this->assertSame(100.0, $byKey['2026-08']['total']);
+        $this->assertSame(50.0, $byKey['2026-07']['total']);
+
+        \Carbon\Carbon::setTestNow();
+    }
+
     public function test_group_by_unknown_field_is_ignored_falls_back_to_flat_shape(): void
     {
         Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'facebook']);

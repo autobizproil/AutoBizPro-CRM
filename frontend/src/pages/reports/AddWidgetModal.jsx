@@ -256,9 +256,21 @@ export default function AddWidgetModal({ onSave, onClose }) {
             {draft.type !== 'kpi' && (
               <div>
                 <label className={LABEL_CLASS}>שדה להצגה</label>
-                <select value={draft.displayField} onChange={e => patch({ displayField: e.target.value })} className={SELECT_CLASS}>
-                  {Object.entries(groupFields).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
-                </select>
+                <div className="flex gap-2">
+                  <select value={draft.displayField} onChange={e => patch({ displayField: e.target.value })} className={SELECT_CLASS}>
+                    {Object.entries(groupFields).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
+                  </select>
+                  {groupFields[draft.displayField]?.type === 'date' && (
+                    <select value={draft.displayGranularity ?? 'month'}
+                      onChange={e => patch({ displayGranularity: e.target.value })}
+                      className={SELECT_CLASS}>
+                      <option value="day">יום</option>
+                      <option value="week">שבוע</option>
+                      <option value="month">חודש</option>
+                      <option value="year">שנה</option>
+                    </select>
+                  )}
+                </div>
               </div>
             )}
 

@@ -13,6 +13,7 @@ export function widgetDataParams(widget) {
   const params = { entity: widget.entity, aggregation }
 
   if (widget.displayField) params.displayField = widget.displayField
+  if (widget.displayGranularity) params.displayGranularity = widget.displayGranularity
   if (aggregation !== COUNT_ONLY && widget.valueField) params.valueField = widget.valueField
 
   if (widget.timePeriod?.field && widget.timePeriod?.operator) {
@@ -68,6 +69,33 @@ export function drillDownParams(widget, segment, resolvedRange) {
   if (widget.timePeriod?.field) params.date_field = widget.timePeriod.field
 
   return params
+}
+
+// Fireberry-style widget caption: "<field> - <aggregation>" plus, when a time
+// period is set, "<date field>: <period>" — e.g. "סכום כולל - סכום" /
+// "נוצר בתאריך: חודש נוכחי". `meta` is the /dashboard/widget-fields payload
+// (entities/fields/aggregations/dateOperators), already fetched by whichever
+// widget-fields query is live on the page.
+export function widgetCaption(widget, meta) {
+  if (!meta || isLegacyWidget(widget) || !widget.entity) return null
+  const entityFields = meta.fields?.[widget.entity]
+  if (!entityFields) return null
+
+  const aggregation = widget.aggregation || 'count'
+  const aggLabel     = meta.aggregations?.find(a => a.id === aggregation)?.label ?? null
+  const valueLabel   = aggregation !== 'count' && widget.valueField
+    ? entityFields.valueFields?.[widget.valueField]?.label
+    : null
+  const aggLine = valueLabel && aggLabel ? `${valueLabel} - ${aggLabel}` : aggLabel
+
+  let periodLine = null
+  if (widget.timePeriod?.field && widget.timePeriod?.operator) {
+    const fieldLabel = entityFields.dateFields?.[widget.timePeriod.field]
+    const opLabel     = meta.dateOperators?.find(o => o.id === widget.timePeriod.operator)?.label
+    if (fieldLabel && opLabel) periodLine = `${fieldLabel}: ${opLabel}`
+  }
+
+  return { aggLine, periodLine }
 }
 
 export function pivotSeriesRows(rows, seriesKeys) {

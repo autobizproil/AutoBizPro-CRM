@@ -118,12 +118,26 @@ class WidgetDataService
         $groupByMeta  = $groupByField !== null ? ($descriptor['groupFields'][$groupByField] ?? null) : null;
 
         $displayExpr = $this->columnExpr($table, $displayField, $descriptor);
+        $displayIsDate = ($groupMeta['type'] ?? null) === 'date';
+        if ($displayIsDate) {
+            // Primary grouping by a date field (e.g. "revenue by month") — bucket by
+            // the same granularity the second-dimension date grouping already uses
+            // below, so a raw-timestamp column doesn't produce one group per row.
+            $displayGranularity = $config['displayGranularity'] ?? 'month';
+            $pattern = match ($displayGranularity) {
+                'week'  => '%x-W%v',
+                'month' => '%Y-%m',
+                'year'  => '%Y',
+                default => '%Y-%m-%d',
+            };
+            $displayExpr = "DATE_FORMAT({$displayExpr}, '{$pattern}')";
+        }
 
         if ($groupByMeta === null) {
             $rows = $query
                 ->select(DB::raw("{$displayExpr} as group_key"), DB::raw("{$aggregateSql} as total"))
                 ->groupBy(DB::raw($displayExpr))
-                ->orderByDesc('total')
+                ->when($displayIsDate, fn ($q) => $q->orderBy('group_key'), fn ($q) => $q->orderByDesc('total'))
                 ->limit(50)
                 ->get();
 
@@ -250,6 +264,10 @@ class WidgetDataService
 
         $groupFields = $filterFields = $valueFields = [];
         $dateFields  = ['created_at' => 'נוצר בתאריך'];
+        // created_at is a real column on every jsonOnly record too (see columnExpr's
+        // exemption below) — expose it as a groupable date field like every built-in
+        // entity already does, so month/year charts work for custom record types too.
+        $groupFields['created_at'] = ['label' => 'נוצר בתאריך', 'type' => 'date'];
 
         foreach ($defs as $def) {
             $type = self::RECORD_FIELD_TYPE_MAP[$def->field_type] ?? 'text';

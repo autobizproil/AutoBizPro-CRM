@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { dashboardApi } from '../../api/dashboard'
-import { isLegacyWidget, widgetDataParams, pivotSeriesRows } from '../../lib/widgetConfig'
+import { isLegacyWidget, widgetDataParams, pivotSeriesRows, widgetCaption } from '../../lib/widgetConfig'
 import DrillDownModal from './DrillDownModal'
 import MetricsTableWidget from './MetricsTableWidget'
 
@@ -375,12 +375,13 @@ function formatCreatedAt(createdAt) {
   return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function KpiCard({ widget, onDelete, data, isLoading }) {
+function KpiCard({ widget, onDelete, data, isLoading, meta }) {
   const [hovered, setHovered] = useState(false)
   const value  = typeof data === 'number' ? data : (data?.[0]?.total ?? '—')
   const target = widget.target
   const pct    = (typeof value === 'number' && target > 0) ? Math.min(100, (value / target) * 100) : null
   const createdLabel = formatCreatedAt(widget.createdAt)
+  const caption = widgetCaption(widget, meta)
 
   return (
     <div
@@ -413,8 +414,14 @@ function KpiCard({ widget, onDelete, data, isLoading }) {
               </div>
             </>
           )}
+          {caption?.aggLine && (
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-2">{caption.aggLine}</p>
+          )}
+          {caption?.periodLine && (
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">{caption.periodLine}</p>
+          )}
           {createdLabel && (
-            <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-2">נוצר בתאריך: {createdLabel}</p>
+            <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">נוסף בתאריך: {createdLabel}</p>
           )}
         </>
       )}
@@ -424,9 +431,10 @@ function KpiCard({ widget, onDelete, data, isLoading }) {
 
 // ── Chart widget card ─────────────────────────────────────────────────────────
 
-function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading, resolvedRange, seriesLabels }) {
+function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading, resolvedRange, seriesLabels, meta }) {
   const [hovered, setHovered]   = useState(false)
   const [drillDown, setDrillDown] = useState(null)
+  const caption = widgetCaption(widget, meta)
 
   return (
     <div
@@ -436,8 +444,15 @@ function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading, resolved
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{widget.title}</h3>
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{widget.title}</h3>
+          {caption?.aggLine && (
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+              {caption.aggLine}{caption.periodLine ? ` · ${caption.periodLine}` : ''}
+            </p>
+          )}
+        </div>
         {hovered && (
           <div className="flex items-center gap-2">
             <DateOverridePopover widget={widget} onUpdate={onUpdate} />
@@ -506,6 +521,13 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
   const isMetricsTable = widget.type === 'metrics_table'
   const legacy = isLegacyWidget(widget)
 
+  const { data: meta } = useQuery({
+    queryKey: ['widget-fields'],
+    queryFn:  () => dashboardApi.widgetFields().then(r => r.data.data),
+    staleTime: 5 * 60_000,
+    enabled: !legacy,
+  })
+
   // A widget with its own filter (period/date/conditions) ignores the board's global range.
   // Legacy preset widgets keep their per-report fetchers; new entity widgets
   // go through the generic aggregation endpoint.
@@ -571,6 +593,7 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
         onDelete={onDelete}
         data={data}
         isLoading={isLoading}
+        meta={meta}
       />
     )
   }
@@ -588,6 +611,7 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
       isLoading={isLoading}
       resolvedRange={resolvedRange}
       seriesLabels={seriesLabels}
+      meta={meta}
     />
   )
 }
