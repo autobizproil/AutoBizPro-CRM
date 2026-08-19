@@ -180,6 +180,7 @@ export default function DashboardsPage() {
   const [boards, setBoards]         = useState([])
   const [activeBoardId, setActive]  = useState(null)
   const [showAddWidget, setShowAdd] = useState(false)
+  const [editingWidget, setEditingWidget] = useState(null)
   const [loaded, setLoaded]         = useState(false)
 
   const activeBoard = boards.find(b => b.id === activeBoardId) ?? boards[0]
@@ -301,6 +302,11 @@ export default function DashboardsPage() {
     }
   }
 
+  async function handleEditWidgetSave(widgetConfig) {
+    await handleUpdateWidget(editingWidget.id, widgetConfig)
+    setEditingWidget(null)
+  }
+
   // ── Export ──────────────────────────────────────────────────────────────────
 
   function handleExport() {
@@ -365,6 +371,7 @@ export default function DashboardsPage() {
                 key={widget.id}
                 widget={widget}
                 onDelete={() => handleDeleteWidget(widget.id)}
+                onEdit={() => setEditingWidget(widget)}
                 dateParams={dateParams}
               />
             ))}
@@ -379,6 +386,7 @@ export default function DashboardsPage() {
                 key={widget.id}
                 widget={widget}
                 onDelete={() => handleDeleteWidget(widget.id)}
+                onEdit={() => setEditingWidget(widget)}
                 onUpdate={handleUpdateWidget}
                 dateParams={dateParams}
               />
@@ -400,7 +408,7 @@ export default function DashboardsPage() {
           לוחות בקרה
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-2">
+        <nav className="flex-1 overflow-y-auto py-2 scrollbar-right">
           {boards.map(board => (
             <BoardItem
               key={board.id}
@@ -425,11 +433,12 @@ export default function DashboardsPage() {
         </div>
       </aside>
 
-      {/* ── Add Widget Modal ── */}
-      {showAddWidget && (
+      {/* ── Add/Edit Widget Modal ── */}
+      {(showAddWidget || editingWidget) && (
         <AddWidgetModal
-          onSave={handleAddWidget}
-          onClose={() => setShowAdd(false)}
+          initial={editingWidget}
+          onSave={editingWidget ? handleEditWidgetSave : handleAddWidget}
+          onClose={() => { setShowAdd(false); setEditingWidget(null) }}
         />
       )}
     </div>

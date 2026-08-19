@@ -186,7 +186,7 @@ export default function Layout() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto dark:bg-gray-900">
+      <main className="flex-1 overflow-y-auto dark:bg-gray-900 scrollbar-right">
         <div className="p-6">
           <Outlet />
         </div>

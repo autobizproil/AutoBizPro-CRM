@@ -386,7 +386,7 @@ function kpiValueSizeClass(formatted) {
   return 'text-3xl'
 }
 
-function KpiCard({ widget, onDelete, data, isLoading, meta }) {
+function KpiCard({ widget, onDelete, onEdit, data, isLoading, meta }) {
   const [hovered, setHovered] = useState(false)
   const value  = typeof data === 'number' ? data : (data?.[0]?.total ?? '—')
   const target = widget.target
@@ -400,14 +400,15 @@ function KpiCard({ widget, onDelete, data, isLoading, meta }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {hovered && onDelete && (
-        <button
-          onClick={onDelete}
-          className="absolute top-2 left-2 text-gray-300 hover:text-red-400 text-sm leading-none"
-          title="הסר widget"
-        >
-          ×
-        </button>
+      {hovered && (onEdit || onDelete) && (
+        <div className="absolute top-2 left-2 flex items-center gap-2">
+          {onEdit && (
+            <button onClick={onEdit} className="text-gray-300 hover:text-[#2398c2] text-sm leading-none" title="ערוך widget">⚙</button>
+          )}
+          {onDelete && (
+            <button onClick={onDelete} className="text-gray-300 hover:text-red-400 text-sm leading-none" title="הסר widget">×</button>
+          )}
+        </div>
       )}
       {isLoading ? (
         <Skeleton />
@@ -447,7 +448,7 @@ function KpiCard({ widget, onDelete, data, isLoading, meta }) {
 
 // ── Chart widget card ─────────────────────────────────────────────────────────
 
-function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading, resolvedRange, seriesLabels, meta }) {
+function ChartWidgetCard({ widget, onDelete, onEdit, onUpdate, data, isLoading, resolvedRange, seriesLabels, meta }) {
   const [hovered, setHovered]   = useState(false)
   const [drillDown, setDrillDown] = useState(null)
   const caption = widgetCaption(widget, meta)
@@ -472,6 +473,9 @@ function ChartWidgetCard({ widget, onDelete, onUpdate, data, isLoading, resolved
         {hovered && (
           <div className="flex items-center gap-2">
             <DateOverridePopover widget={widget} onUpdate={onUpdate} />
+            {onEdit && (
+              <button onClick={onEdit} className="text-gray-300 hover:text-[#2398c2] text-lg leading-none" title="ערוך widget">⚙</button>
+            )}
             {onDelete && (
               <button
                 onClick={onDelete}
@@ -533,9 +537,10 @@ function renderPreviewChart(widget, data, isLoading) {
 
 // ── Main WidgetCard export ────────────────────────────────────────────────────
 
-export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, preview = false }) {
+export default function WidgetCard({ widget, onDelete, onEdit, onUpdate, dateParams, preview = false }) {
   const isMetricsTable = widget.type === 'metrics_table'
   const legacy = isLegacyWidget(widget)
+  const [metricsTableHovered, setMetricsTableHovered] = useState(false)
 
   const { data: meta } = useQuery({
     queryKey: ['widget-fields'],
@@ -586,8 +591,26 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
 
   if (isMetricsTable) {
     return (
-      <div className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4 ${preview ? '' : 'lg:col-span-2'}`}>
-        {!preview && <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">{widget.title}</h3>}
+      <div
+        className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4 relative ${preview ? '' : 'lg:col-span-2'}`}
+        onMouseEnter={() => setMetricsTableHovered(true)}
+        onMouseLeave={() => setMetricsTableHovered(false)}
+      >
+        {!preview && (
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">{widget.title}</h3>
+            {metricsTableHovered && (onEdit || onDelete) && (
+              <div className="flex items-center gap-2">
+                {onEdit && (
+                  <button onClick={onEdit} className="text-gray-300 hover:text-[#2398c2] text-lg leading-none" title="ערוך widget">⚙</button>
+                )}
+                {onDelete && (
+                  <button onClick={onDelete} className="text-gray-300 hover:text-red-400 text-lg leading-none" title="הסר widget">×</button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <MetricsTableWidget tiles={widget.tiles} createdAt={widget.createdAt} />
       </div>
     )

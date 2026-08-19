@@ -101,9 +101,9 @@ function MetricsTileEditor({ tiles, onChange, entities, fieldsByEntity, lookups 
   )
 }
 
-export default function AddWidgetModal({ onSave, onClose }) {
+export default function AddWidgetModal({ onSave, onClose, initial }) {
   const toast = useToast()
-  const [draft, setDraft] = useState(emptyWidgetDraft)
+  const [draft, setDraft] = useState(() => initial ? { ...emptyWidgetDraft(), ...initial } : emptyWidgetDraft())
 
   const { data: meta } = useQuery({
     queryKey: ['widget-fields'],
@@ -189,7 +189,7 @@ export default function AddWidgetModal({ onSave, onClose }) {
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
-          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">הוסף Widget</h2>
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">{initial ? 'עריכת Widget' : 'הוסף Widget'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">&times;</button>
         </div>
 

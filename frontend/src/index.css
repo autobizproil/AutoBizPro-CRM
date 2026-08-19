@@ -28,10 +28,27 @@ html.dark body {
   box-sizing: border-box;
 }
 
+html, body, #root {
+  height: 100%;
+}
+
 body {
+  margin: 0; /* browser default (~8px) made body taller than the app's h-screen
+                shell, causing a second, spurious document-level scrollbar on
+                every page in addition to the shell's own scroll regions */
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Chrome puts a scrollable RTL element's scrollbar on its left by default.
+   Flipping direction on the scroll owner (and back to rtl on its content)
+   moves the scrollbar to the right without affecting text/layout direction. */
+.scrollbar-right {
+  direction: ltr;
+}
+.scrollbar-right > * {
+  direction: rtl;
 }
 
 h1, h2, h3, h4, h5, h6 {
