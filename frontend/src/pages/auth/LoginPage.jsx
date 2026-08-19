@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 export default function LoginPage() {
@@ -62,6 +62,9 @@ export default function LoginPage() {
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#2398c2]/30 focus:border-[#2398c2]"
               required
             />
+            <div className="text-left mt-1">
+              <Link to="/forgot-password" className="text-xs text-[#2398c2] hover:underline">שכחתי סיסמה</Link>
+            </div>
           </div>
           <button
             type="submit"

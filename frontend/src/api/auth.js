@@ -7,4 +7,7 @@ export const authApi = {
   },
   logout: () => client.post('/auth/logout'),
   me:     () => client.get('/auth/me'),
+  forgotPassword: (email) => client.post('/auth/forgot-password', { email }),
+  resetPassword: ({ email, token, password, password_confirmation }) =>
+    client.post('/auth/reset-password', { email, token, password, password_confirmation }),
 }

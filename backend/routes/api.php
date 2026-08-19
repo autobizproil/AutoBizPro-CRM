@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\Route;
 
 // ── Public routes (no auth) ────────────────────────────────────────────────
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
 
 // Landing page builder — public render & form submission
 Route::get('/lp/{tenant}/{slug}',         [LandingPageController::class, 'render']);

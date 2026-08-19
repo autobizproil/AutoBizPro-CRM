@@ -2,9 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -64,6 +69,88 @@ class AuthController extends Controller
                 'permissions' => $this->getPermissions($user),
             ],
         ]);
+    }
+
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ], [
+            'email.required' => 'כתובת אימייל היא שדה חובה',
+            'email.email'    => 'כתובת אימייל לא תקינה',
+        ]);
+
+        $genericResponse = response()->json([
+            'success' => true,
+            'message' => 'אם קיים חשבון עם כתובת אימייל זו, נשלח אליו קישור לאיפוס סיסמה',
+        ]);
+
+        $user = User::where('email', $request->email)->where('is_service', false)->first();
+        if (! $user) {
+            return $genericResponse;
+        }
+
+        $token = Str::random(64);
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $user->email],
+            ['token' => Hash::make($token), 'created_at' => now()]
+        );
+
+        $resetUrl = $request->getSchemeAndHttpHost() . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
+
+        Mail::raw("לחצו על הקישור הבא לאיפוס הסיסמה שלכם: {$resetUrl}\n\nהקישור בתוקף ל-60 דקות.", function ($msg) use ($user) {
+            $msg->to($user->email)->subject('איפוס סיסמה - AutoBizPro CRM');
+        });
+
+        return $genericResponse;
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email'    => 'required|email',
+            'token'    => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ], [
+            'email.required'    => 'כתובת אימייל היא שדה חובה',
+            'token.required'    => 'קישור לא תקין',
+            'password.required' => 'סיסמה היא שדה חובה',
+            'password.min'      => 'הסיסמה חייבת להכיל לפחות 8 תווים',
+            'password.confirmed' => 'הסיסמאות אינן תואמות',
+        ]);
+
+        $row = DB::table('password_reset_tokens')->where('email', $request->email)->first();
+
+        if (! $row || ! Hash::check($request->token, $row->token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'קישור איפוס לא תקין או שפג תוקפו',
+                'code'    => 422,
+            ], 422);
+        }
+
+        if (now()->diffInMinutes($row->created_at) > 60) {
+            DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'קישור איפוס לא תקין או שפג תוקפו',
+                'code'    => 422,
+            ], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'קישור איפוס לא תקין או שפג תוקפו',
+                'code'    => 422,
+            ], 422);
+        }
+
+        $user->update(['password' => $request->password]);
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
+        return response()->json(['success' => true, 'data' => null]);
     }
 
     public function logout(Request $request): JsonResponse

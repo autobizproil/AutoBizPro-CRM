@@ -4,6 +4,8 @@ import { PreferencesProvider } from './context/PreferencesContext'
 import { ToastProvider } from './context/ToastContext'
 import { LabelsProvider } from './context/LabelsContext'
 import LoginPage from './pages/auth/LoginPage'
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import Layout from './components/ui/Layout'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import LeadsPage from './pages/leads/LeadsPage'
@@ -32,6 +34,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       {/* Public landing page — no auth required */}
       <Route path="/lp/:tenant/:slug" element={<LandingPagePublicPage />} />
       <Route path="/" element={
