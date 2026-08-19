@@ -1,4 +1,251 @@
-# HANDOFF — CRM (AutoBizPro) — 2026-08-14 (latest session, on top of everything below)
+# HANDOFF — CRM (AutoBizPro) — 2026-08-19 (latest session, on top of everything below)
+
+## 0. Latest session summary (2026-08-17 → 2026-08-19)
+
+Two big pieces of work: (1) three more wire-format/onboarding fixes for the Make.com Facebook
+bridge from the prior session, plus a demo tenant built for a sales call; (2) a full **Fireberry-
+parity dashboard widget builder**, built in two phases (P1, then combined P2+P3) via
+brainstorming → spec → plan → subagent-driven-development, fully deployed and live-verified.
+
+### Make.com bridge — 3 more onboarding fixes, `make:activate-facebook-bridge` added
+
+The prior session's `make:onboard-facebook-bridge` command needed 4 wire-format correction rounds
+to work at all (see §0 below, unchanged). This session found 3 more gaps, live, while onboarding
+`autobiz-crm`:
+
+1. **`http:ActionSendData` v3's mapper was still incomplete** — Make's UI accepted the scenario via
+   API but threw `BundleValidationError` on open, missing 7 boolean/auth fields (`serializeUrl`,
+   `shareCookies`, `rejectUnauthorized`, `followRedirect`, `useQuerystring`, `gzip`, `useMtls`, plus
+   `authUser`/`authPass`/`timeout`/`ca`). Fixed by matching the exact field set from sonia-crm's
+   real hand-built blueprint.
+2. **`metadata.instant` was missing** from the blueprint — without it a scenario is polling-based,
+   not webhook-driven, so an activated scenario wouldn't actually fire automatically on new leads.
+3. **Trigger module was wrong**: the command used `facebook-lead-ads:WatchLeads` (confirmed "the
+   right module" earlier by trial and error), but a direct side-by-side comparison against sonia-
+   crm's real, live-verified blueprint showed the actual correct trigger is
+   `facebook-lead-ads:NewLeadMultiple` — same-looking `__IMTHOOK__` webhook parameter shape, but
+   `WatchLeads` apparently doesn't fire instantly in practice. Fixed, including the module's
+   required `v`/`fields` parameters copied verbatim from the real export.
+
+All 3 fixes are in `backend/app/Console/Commands/OnboardFacebookBridge.php` and
+`backend/app/Services/Integrations/MakeApiService.php`, commits `747d8017`→`6c788971`.
+
+**New:** `make:activate-facebook-bridge {scenario_id}` (`MakeApiService::activateScenario()`) —
+activates a scenario via Make's REST API after the operator manually connects the customer's
+Facebook Page (the one click that can never be automated — Meta's own OAuth consent). Saves the
+last remaining manual "Activate" button click. Commit `fa560fec`.
+
+Also fixed two **infrastructure** bugs found while onboarding `autobiz-crm` live:
+- Production `APP_URL` was `http://` while nginx force-redirects to `https://` — Make's HTTP module
+  doesn't follow a 301 correctly on POST (redirect degrades it to GET), so the webhook silently
+  broke. Fixed by correcting `APP_URL` in the server's `.env` to `https://`.
+- **`route:cache` needs clearing on every deploy that touches `routes/api.php`, not just
+  `config:cache`** — hit again this session (new widget-builder routes 404'd after a deploy that
+  only ran `config:clear`/`config:cache`). This is documented in the prior session's handoff below
+  but bears repeating: **every backend deploy from now on should run both**
+  `php artisan config:clear && config:cache` **and** `php artisan route:clear && route:cache`,
+  then restart php-fpm.
+
+### Demo tenant built for a sales call — `demo-autobiz.duckdns.org`
+
+New tenant (id 3, subdomain `demo-autobiz`), full nginx vhost + Let's Encrypt SSL, added to
+`SANCTUM_STATEFUL_DOMAINS` (missing this caused an immediate post-login 401 — same class of bug as
+the `route:cache` one, a new domain needs 3 separate registration points: DNS, nginx+SSL, and
+Sanctum's stateful-domains list). Login `demo@demo.com` / `demo1234`. Seeded with realistic demo
+data (leads across all pipeline stages, clients, contacts, tasks) so the demo doesn't look empty.
+
+### Meta App Review — root cause of the "permissions absent from catalog" mystery found
+
+Not resolved, but the mechanism is now understood: Meta's Marketing API gates **Advanced Access**
+behind a **test-call quota** per permission (visible under App Dashboard → Products → Marketing
+API — "0 of 1 API call(s) required" style counters for `business_management`/`ads_read`/
+`ads_management`, plus an overall "0 of 500" tier counter), separate from Business Verification.
+Walked through satisfying the three "0 of 1" counters via Graph API Explorer (`GET /me/businesses`,
+`GET /me/adaccounts`, `GET /act_{id}/campaigns`) — as of session end the dashboard hadn't visibly
+updated yet (known to lag, same as Business Verification's own 24-48h delay). **Next step when
+resuming:** check whether those three counters now show 1/1; if the Marketing API tier itself needs
+500 calls before `leads_retrieval`/`pages_manage_metadata` become requestable, that's a much bigger
+volume of legitimate API usage to generate, not yet planned for.
+
+---
+
+## 0.1 Fireberry-parity dashboard widget builder — P1 + P2/3, DEPLOYED, LIVE-VERIFIED
+
+Full rebuild of the "לוחות בקרה" (Dashboards) widget system to match a competitor CRM (Fireberry)
+the user is migrating customers away from, built directly from live Fireberry screenshots the user
+captured mid-session. Two plans, executed via `superpowers:subagent-driven-development`
+(implementer + reviewer per task, fix loops, final whole-branch review), all on `master` directly
+(this project's established pattern — no long-lived feature branches, deploy straight from master
+after each plan completes).
+
+**Design docs:**
+`docs/superpowers/specs/2026-08-17-fireberry-widget-builder-design.md` (P1 spec + a P2/3 addendum
+added mid-session once the user confirmed AND/OR filter groups from a screenshot).
+`docs/superpowers/plans/2026-08-17-fireberry-widget-builder-p1.md` (8 tasks) and
+`docs/superpowers/plans/2026-08-18-fireberry-widget-builder-p2p3.md` (11 tasks).
+
+### P1 — foundation (commits `fb713ea0`→`03ccb842`)
+
+- **`EntityDescriptor`** (`backend/app/Services/Reporting/EntityDescriptor.php`) — static registry
+  of which columns each of 5 entities (lead/client/contact/task/activity) exposes to the widget
+  builder: `valueFields`/`groupFields`/`filterFields`/`dateFields`, each field typed
+  (`enum`/`lookup`/`text`/`date`/`number`) with Hebrew labels. **This is the security boundary** —
+  every column name that reaches SQL anywhere downstream is looked up here first; an unlisted field
+  name is silently dropped, never interpolated.
+- **`RelativeDateRange`** — all ~42 of Fireberry's relative date operators (היום, חודש קודם, רבעון
+  נוכחי, 90 ימים אחרונים, etc.), captured from a live screenshot of the actual dropdown, resolved to
+  concrete `[from, to]` Carbon ranges.
+- **`WidgetDataService::aggregate()`** — the generic aggregation engine. Builds a query from
+  `EntityDescriptor`, applies owner-role scoping (agents see only their own rows; activities scoped
+  through leads they own since activities have no owner column of their own), time-period filtering,
+  and conditions, then either returns a single total or a grouped breakdown.
+- **`WidgetController`** — `GET /dashboard/widget-fields` (metadata for the UI: entities, their
+  fields, date operators, aggregations, user/stage lookups) and `GET /dashboard/widget-data` (runs
+  one widget's aggregation; `timePeriod`/`conditions` arrive JSON-encoded).
+- **Frontend**: `AddWidgetModal.jsx` rebuilt in Fireberry's exact field order (סוג נתונים → כותרת →
+  ערכים → שדה להצגה → צבע → תקופת זמן → סינון רשומות), `FilterValueInput.jsx`/`LookupSelect.jsx` for
+  smart filter values (enum dropdowns, searchable user/stage lookups instead of free text).
+
+**Final review caught two real bugs, both fixed and re-verified before deploy:**
+1. `custom_fields` JSON column was hardcoded for every entity in `ConditionFilter` calls — `task`/
+   `activity` have no such column, so a `cf_*` condition against them threw an uncaught 500. Fixed
+   by adding a `jsonColumn` key (nullable) to each descriptor.
+2. Grouped queries had no `LIMIT`, then after adding one, the returned `total` was computed by
+   summing only the (now-capped) visible rows — silently undercounting whenever a group had more
+   than 50 distinct values. Fixed by computing `total` from a separate unlimited query.
+
+### P2+P3 — combined, built together per user request (commits `b0dd8c95`→`f2e7937c`)
+
+- **Drill-down** — clicking a bar/pie segment opens a modal with the underlying records, reusing
+  each entity's existing list endpoint (already supports `conditions`) plus a new equals-condition
+  on the clicked segment. `activity` has no generic list endpoint, so it shows a "no list view
+  available" message instead of crashing.
+- **Second grouping dimension** — `groupBy: {field, granularity}` produces a `seriesKeys`/`rows[].series`
+  shape instead of flat `rows[].total`, rendered as grouped or stacked multi-series bar charts.
+  Date-field granularity (day/week/month/year) via `DATE_FORMAT` with a whitelisted pattern
+  (`%x-W%v` for ISO week — verified against real production MySQL: `2026-08-19` → `2026-W34`,
+  `2026-01-01` → `2026-W01`, correct year-boundary rollover).
+- **KPI target** — optional `target` number, renders a "יעד: X" line + progress bar.
+- **AND/OR condition groups** — `conditions` (AND, unchanged from P1) + new `orConditions` array,
+  composed as `AND-group AND (or1 OR or2 ...)`. `ConditionFilter::apply()` gained a 6th optional
+  `$boolean = 'and'` parameter (default preserves all 6 existing callers' behavior unchanged).
+- **טבלת מדדים (metrics table)** widget type — a grid of independent mini-KPI tiles, each its own
+  `entity`/`aggregation`/`conditions`, N parallel calls to the existing `widget-data` endpoint.
+- **Server-side board persistence** — new `dashboard_boards`/`dashboard_widgets` tables (tenant +
+  user scoped, `config` as an opaque JSON blob so the widget shape can keep evolving without a
+  migration every time), replacing `localStorage['crm_boards_v2']`. One-time migration on first
+  load uploads any existing local boards to the server.
+
+**Final review found 2 Critical + 6 Important; all fixed and re-verified:**
+- Missing HTTP plumbing: `orConditions`/`groupBy` weren't actually being decoded in
+  `WidgetController::data()` — only tested, never wired to the real request.
+- React hooks-order violation: the `metrics_table` early-return sat before a `useQuery` call,
+  conditionally skipping a hook.
+- (6 Important, not itemized here — see git log around commit `5b018515` if needed.)
+
+**Task-level review also caught, separately:**
+- KPI widgets showed `'—'` instead of a live value in the Add Widget modal's own preview pane
+  (preview branch wasn't distinguishing KPI's bare-number payload from chart widgets' `.rows`
+  payload) — fixed, re-verified.
+- **Critical data-loss bug in the localStorage migration**: the original logic used
+  `listBoards().length > 0` as a signal to skip-and-clear localStorage — but that can't distinguish
+  "genuinely already migrated" from "a previous migration attempt partially failed." A retry after
+  partial failure would **actively delete** the still-un-migrated boards from localStorage,
+  permanently, silently. Fixed by migrating one board at a time, shrinking and re-persisting the
+  pending list after each individual success, only fully clearing localStorage once the pending
+  list is empty. Traced and re-verified control-flow by control-flow before merge — this was the
+  single highest-risk piece of the whole plan and got the most scrutiny.
+
+**Neither plan's frontend tasks (P2/3 tasks 6, 8, 10, 11) ever ran against a live dev server during
+implementation** — no safe dev environment was available to implementer subagents, and project
+convention discourages unrequested browser automation. All manual/live verification for this
+feature happened afterward, directly by the controlling session, against the real deployed
+`demo-autobiz` tenant (see below) — not during task execution itself. Worth knowing if this pattern
+repeats: budget explicit time for a post-deploy live pass, don't assume task-level "tests pass" is
+equivalent to "someone clicked it."
+
+### Post-deploy fixes (found live, by the user actually using it)
+
+Several real bugs only surfaced once the user started clicking around on the deployed feature —
+each was found, fixed, tested, and redeployed the same session:
+
+1. **`ChartTable` had zero dark-mode classes** (P1-era code, predates dark mode support elsewhere)
+   — text was near-invisible in dark mode. Also the raw `key` field (added in P2/3's row mapping)
+   was leaking into the table as an untranslated column. Both fixed.
+2. **Widget title field was completely hidden for טבלת מדדים widgets** — `AddWidgetModal`'s form
+   panel wrapped the whole "כותרת הגרף" input inside the `type !== 'metrics_table'` branch of its
+   ternary, so a metrics-table widget had no way to set its own title. Moved above the branch.
+3. **No real numeric field existed on any entity** — the "ערכים" (values) dropdown for
+   sum/avg/max/min aggregation was permanently locked to "מספר רשומות" (count-only) because
+   `valueFields` was empty everywhere in P1's `EntityDescriptor`. Added `leads.deal_value` (nullable
+   decimal, migration `2026_08_19_000001_add_deal_value_to_leads.php`) and wired it into the
+   descriptor — this is the first real numeric field, unlocking the aggregation dropdown end to end.
+4. **Custom record types (RecordType/Record — tenant-defined types like "חשבוniot") had zero
+   representation in the widget builder.** Added dynamic resolution: entity keys of the form
+   `record:<slug>` build an `EntityDescriptor`-shaped array on the fly from that tenant's
+   `CustomFieldDefinition` rows (every field lives in `records.data` JSON, no fixed columns — a new
+   `columnExpr()` helper resolves group/value/filter/date fields to either a plain column or a
+   `JSON_EXTRACT` expression depending on the descriptor, replacing every direct
+   `"{table}.{field}"` interpolation in `aggregate()`). `ConditionFilter`'s existing
+   `allFieldsAreJson` mode (already built for `RecordController`, just never wired here) handles
+   condition filtering. **Frontend needed zero changes** — `AddWidgetModal` already renders whatever
+   `WidgetController::fields()` returns as entity options.
+5. **Totals and group labels showed raw SQL precision** (e.g. "4500.0000") — `JSON_EXTRACT` on
+   custom-record numeric fields and the `CAST(...AS DECIMAL(18,4))` used for their aggregation both
+   surface far more precision than makes sense to display. Every total (ungrouped, per-group,
+   per-series) is now rounded to 2 decimals server-side, and numeric-looking group labels are
+   formatted the same way via a shared `formatKey()` helper.
+6. **Drill-down had no way to open the actual record**, and no tile showed when a widget was
+   created. Added: every KPI/metrics tile now shows "נוצר בתאריך: DD/MM/YYYY" (the widget's real DB
+   row `created_at`, threaded through `fromServerBoard`). Drill-down's first column is now a
+   clickable link — for leads it navigates to `/leads?open=<id>` (new deep-link support added to
+   `LeadsPage.jsx`, reading the query param once on mount to auto-open that lead's existing detail
+   panel). Clients/tasks/contacts have no dedicated single-record view in this app at all (only
+   inline row editing) — clicking their drill-down rows lands on the right list page, not the exact
+   record. **If a real detail view is ever wanted for those 3 entities, that's new scope.**
+7. **`RecordsPage.jsx` had 5 missing i18n keys** (`created_at`, `no_records_yet`,
+   `add_first_record`, `records_loading`, `records`) — none existed in `translations.js`, so the
+   `tr()` fallback (return the key itself) rendered literally: a column header reading
+   `created_at`, an empty-state reading `no_records_yet`. This was the dominant cause of the page
+   "not looking elegant" — fixed, both Hebrew and English.
+
+### Deploy pattern used throughout this session (worth codifying)
+
+nginx's docroot is `backend/public/`, but `npm run build` outputs to `frontend/dist/` — this exact
+gotcha is already documented in the prior session's handoff below, and was hit/handled correctly
+every single deploy this session using this sequence:
+```bash
+git pull origin master
+cd backend && sudo -u www-data php artisan config:clear && sudo -u www-data php artisan route:clear
+sudo -u www-data php artisan config:cache && sudo -u www-data php artisan route:cache
+sudo systemctl restart php8.3-fpm
+# only if a migration was added this deploy:
+sudo -u www-data php artisan migrate --force
+# only if frontend files changed:
+cd ../frontend && npm run build
+cd .. && sudo rm -rf backend/public/assets && sudo cp -r frontend/dist/assets backend/public/assets
+sudo cp frontend/dist/index.html backend/public/index.html
+sudo chown -R www-data:www-data backend/public
+```
+Consider actually writing this into `deploy/README.md` or a small script — it's been reconstructed
+from memory correctly every time so far, but that's luck, not process.
+
+### Next steps when resuming
+
+1. Check the Meta Marketing API test-call counters (see §Meta App Review above) — did the 3 "0 of 1"
+   counters clear? Does the 500-call tier counter block `leads_retrieval` regardless?
+2. The two remaining open items from the widget-builder design spec, deliberately parked: a "מתקדם"
+   nested-group filter UI beyond simple AND/OR (if Fireberry's is actually more complex than the two
+   flat groups already built — never confirmed beyond one screenshot), and giving clients/tasks/
+   contacts a real single-record detail view so drill-down can deep-link into them the way leads
+   already can.
+3. `docs/superpowers/plans/*.md` and the SDD ledgers under `.superpowers/sdd/` for both plans were
+   cleaned up (workspace deleted) after each plan's final review passed clean — the plans themselves
+   are committed to git and are the durable record if this work needs revisiting.
+
+---
+
+# Prior HANDOFF — 2026-08-14 (kept below for continuity)
 
 ## 0. Latest session summary (2026-08-12 → 2026-08-14)
 
