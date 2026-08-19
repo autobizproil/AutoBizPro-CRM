@@ -2,7 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { dashboardApi } from '../../api/dashboard'
 import { widgetDataParams } from '../../lib/widgetConfig'
 
-function MetricTile({ tile }) {
+function formatCreatedAt(createdAt) {
+  if (!createdAt) return null
+  const d = new Date(createdAt)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function MetricTile({ tile, createdLabel }) {
   const { data, isLoading } = useQuery({
     queryKey: ['metrics-tile', tile],
     queryFn:  () => dashboardApi.widgetData(widgetDataParams(tile)).then(r => r.data.data.total),
@@ -15,18 +22,25 @@ function MetricTile({ tile }) {
       <p className="text-xl font-bold tabular-nums text-gray-800 dark:text-gray-100">
         {isLoading ? '…' : (typeof data === 'number' ? data.toLocaleString() : '—')}
       </p>
+      {createdLabel && (
+        <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-1">נוצר בתאריך: {createdLabel}</p>
+      )}
     </div>
   )
 }
 
-export default function MetricsTableWidget({ tiles }) {
+// Individual tiles are entries in one widget's config, not their own DB rows —
+// they all share the widget's own creation timestamp.
+export default function MetricsTableWidget({ tiles, createdAt }) {
   if (!tiles?.length) {
     return <p className="text-sm text-gray-400 text-center py-8">אין מדדים בטבלה זו — ערוך את ה-widget כדי להוסיף</p>
   }
 
+  const createdLabel = formatCreatedAt(createdAt)
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-      {tiles.map((tile, i) => <MetricTile key={i} tile={tile} />)}
+      {tiles.map((tile, i) => <MetricTile key={i} tile={tile} createdLabel={createdLabel} />)}
     </div>
   )
 }

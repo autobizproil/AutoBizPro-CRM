@@ -368,11 +368,19 @@ function DateOverridePopover({ widget, onUpdate }) {
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 
+function formatCreatedAt(createdAt) {
+  if (!createdAt) return null
+  const d = new Date(createdAt)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 function KpiCard({ widget, onDelete, data, isLoading }) {
   const [hovered, setHovered] = useState(false)
   const value  = typeof data === 'number' ? data : (data?.[0]?.total ?? '—')
   const target = widget.target
   const pct    = (typeof value === 'number' && target > 0) ? Math.min(100, (value / target) * 100) : null
+  const createdLabel = formatCreatedAt(widget.createdAt)
 
   return (
     <div
@@ -404,6 +412,9 @@ function KpiCard({ widget, onDelete, data, isLoading }) {
                 <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: widget.color ?? '#2398c2' }} />
               </div>
             </>
+          )}
+          {createdLabel && (
+            <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-2">נוצר בתאריך: {createdLabel}</p>
           )}
         </>
       )}
@@ -539,7 +550,7 @@ export default function WidgetCard({ widget, onDelete, onUpdate, dateParams, pre
     return (
       <div className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4 ${preview ? '' : 'lg:col-span-2'}`}>
         {!preview && <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">{widget.title}</h3>}
-        <MetricsTableWidget tiles={widget.tiles} />
+        <MetricsTableWidget tiles={widget.tiles} createdAt={widget.createdAt} />
       </div>
     )
   }

@@ -43,7 +43,7 @@ function fromServerBoard(board) {
   return {
     id:   board.id,
     name: board.name,
-    widgets: (board.widgets ?? []).map(w => ({ ...w.config, id: w.id })),
+    widgets: (board.widgets ?? []).map(w => ({ ...w.config, id: w.id, createdAt: w.created_at })),
   }
 }
 
@@ -293,7 +293,7 @@ export default function DashboardsPage() {
     const widget = activeBoard.widgets.find(w => w.id === widgetId)
     if (!widget) return
     try {
-      const { id: _id, ...config } = { ...widget, ...patch }
+      const { id: _id, createdAt: _createdAt, ...config } = { ...widget, ...patch }
       await dashboardApi.updateWidget(activeBoardId, widgetId, config)
       await refreshBoards(activeBoardId)
     } catch {

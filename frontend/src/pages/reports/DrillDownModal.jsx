@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { dashboardApi } from '../../api/dashboard'
 import { drillDownEntityRoute, drillDownParams } from '../../lib/widgetConfig'
 
@@ -9,7 +10,13 @@ const ENTITY_TABLE_COLUMNS = {
   task:    [['title', 'כותרת'], ['status', 'סטטוס'], ['priority', 'עדיפות']],
 }
 
+// Leads have a real detail panel that supports deep-linking (?open=<id>);
+// clients/tasks/contacts only support inline row editing today, so the best
+// we can do for them is land on the right list — not open the exact row.
+const RECORD_LINK_ROUTE = { lead: id => `/leads?open=${id}` }
+
 export default function DrillDownModal({ widget, segment, resolvedRange, onClose }) {
+  const navigate = useNavigate()
   const route = drillDownEntityRoute(widget.entity)
 
   const { data, isLoading } = useQuery({
@@ -53,8 +60,24 @@ export default function DrillDownModal({ widget, segment, resolvedRange, onClose
               <tbody>
                 {data.map(row => (
                   <tr key={row.id} className="border-b border-gray-50 dark:border-gray-800 last:border-0">
-                    {columns.map(([key]) => (
-                      <td key={key} className="py-2 px-2 text-gray-700 dark:text-gray-200">{row[key] ?? '—'}</td>
+                    {columns.map(([key], i) => (
+                      i === 0 ? (
+                        <td key={key} className="py-2 px-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const link = RECORD_LINK_ROUTE[widget.entity]
+                              navigate(link ? link(row.id) : route)
+                              onClose()
+                            }}
+                            className="text-[#2398c2] hover:underline text-right"
+                          >
+                            {row[key] ?? '—'}
+                          </button>
+                        </td>
+                      ) : (
+                        <td key={key} className="py-2 px-2 text-gray-700 dark:text-gray-200">{row[key] ?? '—'}</td>
+                      )
                     ))}
                   </tr>
                 ))}

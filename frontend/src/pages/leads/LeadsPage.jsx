@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLeads, useCreateLead, useChangeLeadStage, useUpdateLead, useBulkLeadAction } from '../../hooks/useLeads'
 import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
 import DeleteAllModal from '../../components/ui/DeleteAllModal'
@@ -120,7 +120,23 @@ export default function LeadsPage() {
   const [error, setError]         = useState('')
   const [saving, setSaving]       = useState(false)
   const [selected, setSelected]   = useState(new Set())
-  const [panelId, setPanelId]     = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [panelId, setPanelId]     = useState(() => {
+    const openId = searchParams.get('open')
+    return openId ? Number(openId) : null
+  })
+
+  // Deep-link support: a drill-down or external link can navigate to /leads?open=<id>
+  // to open that lead's panel directly. Clear the param once consumed so closing
+  // the panel and navigating elsewhere doesn't re-open it.
+  useEffect(() => {
+    const openId = searchParams.get('open')
+    if (openId) {
+      setPanelId(Number(openId))
+      setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('open'); return next }, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [viewMode, setViewMode]   = useState('list') // 'list' | 'kanban'
   const [showCols, setShowCols]   = useState(false)
   const [visibleCols, setVisCols] = useState(loadCols)
