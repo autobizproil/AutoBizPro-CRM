@@ -4,8 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Activity;
 use App\Models\Client;
+use App\Models\CustomFieldDefinition;
 use App\Models\Lead;
 use App\Models\PipelineStage;
+use App\Models\Record;
+use App\Models\RecordType;
 use App\Models\Task;
 use App\Models\Tenant;
 use App\Models\User;
@@ -566,5 +569,86 @@ class WidgetDataServiceTest extends TestCase
         // No displayField at all → ungrouped branch, groupBy never even consulted.
         $this->assertArrayNotHasKey('seriesKeys', $result);
         $this->assertSame(1.0, $result['rows'][0]['total']);
+    }
+
+    // ── Custom record types (entity: "record:<slug>") ───────────────────────────
+
+    private function makeInvoiceType(): RecordType
+    {
+        $rt = RecordType::create([
+            'tenant_id' => $this->tenant->id, 'slug' => 'invoices', 'label' => 'חשבוניות',
+        ]);
+        CustomFieldDefinition::create([
+            'tenant_id' => $this->tenant->id, 'entity' => 'invoices', 'name' => 'amount',
+            'label' => 'סכום', 'field_type' => 'number', 'sort_order' => 1,
+        ]);
+        CustomFieldDefinition::create([
+            'tenant_id' => $this->tenant->id, 'entity' => 'invoices', 'name' => 'status',
+            'label' => 'סטטוס', 'field_type' => 'select', 'options' => ['open', 'paid'], 'sort_order' => 2,
+        ]);
+
+        return $rt;
+    }
+
+    public function test_unknown_record_type_slug_throws(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service()->aggregate(['entity' => 'record:nonexistent'], $this->admin);
+    }
+
+    public function test_record_type_sum_grouped_by_json_field(): void
+    {
+        $rt = $this->makeInvoiceType();
+        Record::create(['tenant_id' => $this->tenant->id, 'record_type_id' => $rt->id, 'data' => ['amount' => 100, 'status' => 'open']]);
+        Record::create(['tenant_id' => $this->tenant->id, 'record_type_id' => $rt->id, 'data' => ['amount' => 250, 'status' => 'open']]);
+        Record::create(['tenant_id' => $this->tenant->id, 'record_type_id' => $rt->id, 'data' => ['amount' => 50, 'status' => 'paid']]);
+
+        $result = $this->service()->aggregate([
+            'entity' => 'record:invoices', 'displayField' => 'status',
+            'valueField' => 'amount', 'aggregation' => 'sum',
+        ], $this->admin);
+
+        $byStatus = collect($result['rows'])->keyBy('key');
+        $this->assertSame(350.0, $byStatus['open']['total']);
+        $this->assertSame(50.0, $byStatus['paid']['total']);
+        $this->assertSame(400.0, $result['total']);
+    }
+
+    public function test_record_type_only_counts_its_own_records(): void
+    {
+        $invoices = $this->makeInvoiceType();
+        $quotes   = RecordType::create(['tenant_id' => $this->tenant->id, 'slug' => 'quotes', 'label' => 'הצעות מחיר']);
+
+        Record::create(['tenant_id' => $this->tenant->id, 'record_type_id' => $invoices->id, 'data' => ['amount' => 100]]);
+        Record::create(['tenant_id' => $this->tenant->id, 'record_type_id' => $quotes->id, 'data' => ['amount' => 999]]);
+
+        $result = $this->service()->aggregate(['entity' => 'record:invoices'], $this->admin);
+
+        $this->assertSame(1.0, $result['total']);
+    }
+
+    public function test_record_type_condition_filters_on_json_field(): void
+    {
+        $rt = $this->makeInvoiceType();
+        Record::create(['tenant_id' => $this->tenant->id, 'record_type_id' => $rt->id, 'data' => ['amount' => 100, 'status' => 'open']]);
+        Record::create(['tenant_id' => $this->tenant->id, 'record_type_id' => $rt->id, 'data' => ['amount' => 200, 'status' => 'paid']]);
+
+        $result = $this->service()->aggregate([
+            'entity' => 'record:invoices',
+            'conditions' => [['field' => 'status', 'operator' => 'equals', 'value' => 'paid']],
+        ], $this->admin);
+
+        $this->assertSame(1.0, $result['total']);
+    }
+
+    public function test_record_type_from_a_different_tenant_is_not_visible(): void
+    {
+        $otherTenant = Tenant::create(['name' => 'Other', 'subdomain' => 'other-widget', 'status' => 'active']);
+        RecordType::create(['tenant_id' => $otherTenant->id, 'slug' => 'invoices', 'label' => 'Other Invoices']);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service()->aggregate(['entity' => 'record:invoices'], $this->admin);
     }
 }

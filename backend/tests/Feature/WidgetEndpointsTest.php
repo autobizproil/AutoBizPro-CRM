@@ -75,6 +75,24 @@ class WidgetEndpointsTest extends TestCase
         $this->assertSame('ליד חדש', $resp->json('data.lookups.stages.0.name'));
     }
 
+    public function test_widget_fields_includes_tenant_record_types(): void
+    {
+        \App\Models\RecordType::create(['tenant_id' => $this->tenant->id, 'slug' => 'invoices', 'label' => 'חשבוניות']);
+        \App\Models\CustomFieldDefinition::create([
+            'tenant_id' => $this->tenant->id, 'entity' => 'invoices', 'name' => 'amount',
+            'label' => 'סכום', 'field_type' => 'number',
+        ]);
+
+        $resp = $this->asAdmin()->getJson('/api/dashboard/widget-fields');
+
+        $resp->assertOk();
+        $entities = collect($resp->json('data.entities'));
+        $recordEntity = $entities->firstWhere('key', 'record:invoices');
+        $this->assertNotNull($recordEntity);
+        $this->assertSame('חשבוניות', $recordEntity['label']);
+        $this->assertSame('number', $resp->json('data.fields.record:invoices.valueFields.amount.type'));
+    }
+
     public function test_widget_data_groups_by_source(): void
     {
         Lead::create(['tenant_id' => $this->tenant->id, 'name' => 'A', 'source' => 'facebook']);

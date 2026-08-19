@@ -2,19 +2,33 @@
 
 namespace App\Services\Reporting;
 
+use App\Models\CustomFieldDefinition;
 use App\Models\PipelineStage;
+use App\Models\Record;
+use App\Models\RecordType;
 use App\Models\User;
 use App\Services\ConditionFilter;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Builds the aggregation query behind a dashboard widget. Every column that
- * reaches SQL is looked up in EntityDescriptor first — a field name the
- * descriptor doesn't list is dropped, never interpolated.
+ * reaches SQL is looked up in a descriptor first — a field name the
+ * descriptor doesn't list is dropped, never interpolated. Descriptors come
+ * from two places: EntityDescriptor's static registry for the 5 built-in
+ * entities, or buildRecordDescriptor() for a tenant's custom record types
+ * (entity key "record:<slug>"), built fresh per request from that tenant's
+ * CustomFieldDefinition rows since every tenant's custom records differ.
  */
 class WidgetDataService
 {
     private const AGGREGATIONS = ['count', 'sum', 'avg', 'max', 'min'];
+
+    /** field_type (custom_field_definitions) => widget builder field type */
+    private const RECORD_FIELD_TYPE_MAP = [
+        'text' => 'text', 'textarea' => 'text', 'url' => 'text', 'phone' => 'text', 'email' => 'text',
+        'number' => 'number', 'select' => 'enum', 'checkbox' => 'enum',
+        'date' => 'date', 'datetime' => 'date',
+    ];
 
     /**
      * @param  array<string, mixed>  $config
@@ -23,7 +37,7 @@ class WidgetDataService
     public function aggregate(array $config, User $user): array
     {
         $entity     = (string) ($config['entity'] ?? '');
-        $descriptor = EntityDescriptor::for($entity);
+        $descriptor = $this->resolveDescriptor($entity);
 
         if ($descriptor === null) {
             throw new \InvalidArgumentException("Unknown entity '{$entity}'");
@@ -32,6 +46,10 @@ class WidgetDataService
         $table = $descriptor['table'];
         $query = $descriptor['model']::query();
 
+        if (isset($descriptor['recordTypeId'])) {
+            $query->where('record_type_id', $descriptor['recordTypeId']);
+        }
+
         $this->applyOwnerScope($query, $descriptor, $entity, $user);
         $resolvedRange = $this->applyTimePeriod($query, $descriptor, $table, $config['timePeriod'] ?? null);
         $resolvedRangeOut = $resolvedRange === null ? null : [
@@ -39,12 +57,17 @@ class WidgetDataService
             'to'   => $resolvedRange[1]->format('Y-m-d'),
         ];
 
+        // Custom record types have no fixed columns at all — every field (not just
+        // cf_*-prefixed ones) lives inside the jsonColumn, unlike lead/client/contact.
+        $allFieldsAreJson = !empty($descriptor['jsonOnly']);
+
         if (! empty($config['conditions']) && is_array($config['conditions'])) {
             ConditionFilter::apply(
                 $query,
                 $config['conditions'],
                 array_keys($descriptor['filterFields']),
-                $descriptor['jsonColumn']
+                $descriptor['jsonColumn'],
+                $allFieldsAreJson
             );
         }
 
@@ -52,8 +75,8 @@ class WidgetDataService
             $orConditions = $config['orConditions'];
             $filterFields = array_keys($descriptor['filterFields']);
             $jsonColumn   = $descriptor['jsonColumn'];
-            $query->where(function ($q) use ($orConditions, $filterFields, $jsonColumn) {
-                ConditionFilter::apply($q, $orConditions, $filterFields, $jsonColumn, false, 'or');
+            $query->where(function ($q) use ($orConditions, $filterFields, $jsonColumn, $allFieldsAreJson) {
+                ConditionFilter::apply($q, $orConditions, $filterFields, $jsonColumn, $allFieldsAreJson, 'or');
             });
         }
 
@@ -67,7 +90,12 @@ class WidgetDataService
         if ($aggregation === 'count' || ! isset($descriptor['valueFields'][$valueField])) {
             $aggregateSql = 'count(*)';
         } else {
-            $aggregateSql = "{$aggregation}(`{$table}`.`{$valueField}`)";
+            $valueExpr = $this->columnExpr($table, $valueField, $descriptor);
+            // JSON_EXTRACT yields a JSON-typed string; cast so sum/avg/max/min see a number.
+            if (!empty($descriptor['jsonOnly'])) {
+                $valueExpr = "CAST({$valueExpr} AS DECIMAL(18,4))";
+            }
+            $aggregateSql = "{$aggregation}({$valueExpr})";
         }
 
         $displayField = $config['displayField'] ?? null;
@@ -89,10 +117,12 @@ class WidgetDataService
         $groupByField = $config['groupBy']['field'] ?? null;
         $groupByMeta  = $groupByField !== null ? ($descriptor['groupFields'][$groupByField] ?? null) : null;
 
+        $displayExpr = $this->columnExpr($table, $displayField, $descriptor);
+
         if ($groupByMeta === null) {
             $rows = $query
-                ->select("{$table}.{$displayField} as group_key", DB::raw("{$aggregateSql} as total"))
-                ->groupBy("{$table}.{$displayField}")
+                ->select(DB::raw("{$displayExpr} as group_key"), DB::raw("{$aggregateSql} as total"))
+                ->groupBy(DB::raw($displayExpr))
                 ->orderByDesc('total')
                 ->limit(50)
                 ->get();
@@ -116,7 +146,7 @@ class WidgetDataService
 
         // Second dimension present — build a two-column GROUP BY and pivot into
         // {rows: [{key,label,color,series:{seriesKey: total}}], seriesKeys: [...]}.
-        $secondExpr = "{$table}.{$groupByField}";
+        $secondExpr = $this->columnExpr($table, $groupByField, $descriptor);
         if (($groupByMeta['type'] ?? null) === 'date') {
             $granularity = $config['groupBy']['granularity'] ?? 'day';
             $pattern = match ($granularity) {
@@ -125,7 +155,7 @@ class WidgetDataService
                 'year'  => '%Y',
                 default => '%Y-%m-%d',
             };
-            $secondExpr = "DATE_FORMAT({$table}.{$groupByField}, '{$pattern}')";
+            $secondExpr = "DATE_FORMAT({$secondExpr}, '{$pattern}')";
         }
 
         // Cap the number of GROUPS (not group×series rows) at 50 — same limit as the
@@ -133,8 +163,8 @@ class WidgetDataService
         // series coverage instead of an arbitrary cross-product row limit truncating
         // some groups' series mid-way.
         $topGroupKeys = $query->clone()
-            ->select("{$table}.{$displayField} as group_key", DB::raw("{$aggregateSql} as total"))
-            ->groupBy("{$table}.{$displayField}")
+            ->select(DB::raw("{$displayExpr} as group_key"), DB::raw("{$aggregateSql} as total"))
+            ->groupBy(DB::raw($displayExpr))
             ->orderByDesc('total')
             ->limit(50)
             ->pluck('group_key')
@@ -145,13 +175,13 @@ class WidgetDataService
         }
 
         $rows = $query
-            ->whereIn("{$table}.{$displayField}", $topGroupKeys)
+            ->whereIn(DB::raw($displayExpr), $topGroupKeys)
             ->select(
-                "{$table}.{$displayField} as group_key",
+                DB::raw("{$displayExpr} as group_key"),
                 DB::raw("{$secondExpr} as series_key"),
                 DB::raw("{$aggregateSql} as total")
             )
-            ->groupBy("{$table}.{$displayField}", DB::raw($secondExpr))
+            ->groupBy(DB::raw($displayExpr), DB::raw($secondExpr))
             ->orderByDesc('total')
             ->get();
 
@@ -185,6 +215,96 @@ class WidgetDataService
             'total'         => $total,
             'resolvedRange' => $resolvedRangeOut,
         ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function resolveDescriptor(string $entity): ?array
+    {
+        if (str_starts_with($entity, 'record:')) {
+            return $this->buildRecordDescriptor(substr($entity, 7));
+        }
+
+        return EntityDescriptor::for($entity);
+    }
+
+    /**
+     * Builds an EntityDescriptor-shaped array for one tenant's custom record
+     * type, from its CustomFieldDefinition rows. Every field lives in the
+     * `records.data` JSON column — jsonOnly marks that for columnExpr().
+     * Public: WidgetController::fields() also needs this shape to advertise
+     * record types as selectable entities in the widget builder UI.
+     *
+     * @return array<string, mixed>|null null when the slug doesn't resolve to
+     *                                    a record type owned by the current tenant
+     */
+    public function buildRecordDescriptor(string $slug): ?array
+    {
+        $tenantId = app('current_tenant_id');
+
+        $recordType = RecordType::where('tenant_id', $tenantId)->where('slug', $slug)->first();
+        if ($recordType === null) {
+            return null;
+        }
+
+        $defs = CustomFieldDefinition::where('tenant_id', $tenantId)->where('entity', $slug)->get();
+
+        $groupFields = $filterFields = $valueFields = [];
+        $dateFields  = ['created_at' => 'נוצר בתאריך'];
+
+        foreach ($defs as $def) {
+            $type = self::RECORD_FIELD_TYPE_MAP[$def->field_type] ?? 'text';
+            $meta = ['label' => $def->label, 'type' => $type];
+
+            if ($type === 'enum') {
+                $meta['options'] = $def->field_type === 'checkbox'
+                    ? ['1' => 'כן', '0' => 'לא']
+                    : array_combine($def->options ?? [], $def->options ?? []);
+            }
+
+            $groupFields[$def->name]  = $meta;
+            $filterFields[$def->name] = $meta;
+
+            if ($type === 'number') {
+                $valueFields[$def->name] = ['label' => $def->label, 'type' => 'number'];
+            }
+            if ($type === 'date') {
+                $dateFields[$def->name] = $def->label;
+            }
+        }
+
+        return [
+            'label'        => $recordType->label,
+            'model'        => Record::class,
+            'table'        => 'records',
+            'ownerColumn'  => null,
+            'jsonColumn'   => 'data',
+            'jsonOnly'     => true,
+            'recordTypeId' => $recordType->id,
+            'valueFields'  => $valueFields,
+            'groupFields'  => $groupFields,
+            'filterFields' => $filterFields,
+            'dateFields'   => $dateFields,
+        ];
+    }
+
+    /**
+     * Resolves a field name to the SQL expression that reads it — a plain
+     * column for normal entities, or a JSON_EXTRACT against the descriptor's
+     * jsonColumn for a jsonOnly (custom record type) descriptor. created_at/
+     * updated_at stay real columns even on jsonOnly entities since those two
+     * are physical columns on every table, never stored inside the JSON blob.
+     *
+     * @param  array<string, mixed>  $descriptor
+     */
+    private function columnExpr(string $table, string $field, array $descriptor): string
+    {
+        if (!empty($descriptor['jsonOnly']) && !in_array($field, ['created_at', 'updated_at'], true)) {
+            $jsonCol = $descriptor['jsonColumn'];
+
+            return "JSON_UNQUOTE(JSON_EXTRACT(`{$table}`.`{$jsonCol}`, '$.\"{$field}\"'))";
+        }
+
+        return "{$table}.{$field}";
     }
 
     /**
@@ -230,7 +350,7 @@ class WidgetDataService
             return null;
         }
 
-        $column = "{$table}.{$field}";
+        $column = DB::raw($this->columnExpr($table, $field, $descriptor));
 
         if ($operator === 'not_equals') {
             $range = RelativeDateRange::resolve('equals', $timePeriod['value'] ?? null);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PipelineStage;
+use App\Models\RecordType;
 use App\Models\User;
 use App\Services\Reporting\EntityDescriptor;
 use App\Services\Reporting\RelativeDateRange;
@@ -25,12 +26,31 @@ class WidgetController extends Controller
      * Metadata the widget builder needs to render its inputs: entities, their
      * fields, the relative-date operator list, aggregations, and lookup options.
      */
-    public function fields(): JsonResponse
+    public function fields(WidgetDataService $service): JsonResponse
     {
         $entities = [];
         $fields   = [];
 
         foreach (EntityDescriptor::all() as $key => $d) {
+            $entities[]   = ['key' => $key, 'label' => $d['label']];
+            $fields[$key] = [
+                'valueFields'  => $d['valueFields'],
+                'groupFields'  => $d['groupFields'],
+                'filterFields' => $d['filterFields'],
+                'dateFields'   => $d['dateFields'],
+            ];
+        }
+
+        // Tenant's own custom record types (e.g. "חשבוניות") are widget-buildable
+        // entities too, keyed "record:<slug>" so they never collide with the
+        // fixed built-in entity keys above.
+        $recordTypes = RecordType::where('tenant_id', app('current_tenant_id'))->orderBy('position')->get();
+        foreach ($recordTypes as $rt) {
+            $d = $service->buildRecordDescriptor($rt->slug);
+            if ($d === null) {
+                continue;
+            }
+            $key = "record:{$rt->slug}";
             $entities[]   = ['key' => $key, 'label' => $d['label']];
             $fields[$key] = [
                 'valueFields'  => $d['valueFields'],
