@@ -16,6 +16,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\RecordTypeController;
 use App\Http\Controllers\RecordController;
+use App\Http\Controllers\PaymentLineController;
 use App\Http\Controllers\BulkDeleteController;
 use App\Http\Controllers\SavedViewController;
 use App\Http\Controllers\TaskController;
@@ -304,6 +305,20 @@ Route::middleware(['auth:sanctum', 'tenant', 'agent.ability'])->group(function (
         ->middleware('permission:leads,can_update');
     Route::delete('/record-types/{recordType}/records/{record}', [RecordController::class, 'destroy'])
         ->middleware('permission:leads,can_delete');
+
+    // Payment lines — split-payment sub-rows on an invoice-like record
+    Route::get('/record-types/{recordType}/records/{record}/payment-lines',
+        [PaymentLineController::class, 'index'])
+        ->middleware('permission:leads,can_read');
+    Route::post('/record-types/{recordType}/records/{record}/payment-lines',
+        [PaymentLineController::class, 'store'])
+        ->middleware('permission:leads,can_update');
+    Route::put('/record-types/{recordType}/records/{record}/payment-lines/{paymentLine}',
+        [PaymentLineController::class, 'update'])
+        ->middleware('permission:leads,can_update');
+    Route::delete('/record-types/{recordType}/records/{record}/payment-lines/{paymentLine}',
+        [PaymentLineController::class, 'destroy'])
+        ->middleware('permission:leads,can_update');
 
     // Generic Delete-All — leads/contacts/clients/tasks, or any custom record-type
     // slug. Permission check happens inside the controller since the module/action
