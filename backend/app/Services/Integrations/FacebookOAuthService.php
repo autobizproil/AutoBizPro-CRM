@@ -236,6 +236,12 @@ class FacebookOAuthService
 
         $subscribed = $this->subscribePage($page['id'], $page['access_token']);
 
+        if (isset($page['user_access_token'])) {
+            $this->delegatePage($page['id'], $page['access_token'], $page['user_access_token'], $page['business_id'] ?? null);
+        }
+
+        $this->backfillLeads($page['id'], $page['access_token'], $tenantId);
+
         return ['page_name' => $page['name'], 'subscribed' => $subscribed];
     }
 }

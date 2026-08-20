@@ -182,6 +182,54 @@ class FacebookOAuthServiceTest extends TestCase
         $this->assertSame('111', $this->settings()->get('facebook_page_id'));
     }
 
+    public function test_connect_page_delegates_and_backfills_when_business_id_present(): void
+    {
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+        app()->instance('current_tenant_id', $tenant->id);
+        config(['services.facebook.business_id' => 'our-biz-123']);
+
+        Http::fake([
+            'graph.facebook.com/*/subscribed_apps*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/managed_businesses*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/agencies*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/leadgen_forms*' => Http::response(['data' => [
+                ['id' => 'form-1', 'name' => 'Contact Form', 'status' => 'ACTIVE'],
+            ]], 200),
+            'graph.facebook.com/*/form-1/leads*' => Http::response(['data' => [
+                ['id' => 'lg_connect_bf', 'created_time' => '2026-08-01T10:00:00+0000', 'field_data' => [
+                    ['name' => 'phone_number', 'values' => ['0527778888']],
+                ]],
+            ]], 200),
+        ]);
+
+        $result = $this->service()->connectPage([
+            'id' => '111', 'name' => 'AutoBizPro IL', 'access_token' => 'page-token-111',
+            'business_id' => 'client-biz-999', 'user_access_token' => 'user-token-abc',
+        ], $tenant->id);
+
+        $this->assertSame(['page_name' => 'AutoBizPro IL', 'subscribed' => true], $result);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'our-biz-123/managed_businesses'));
+        Http::assertSent(fn ($request) => str_contains($request->url(), '111/agencies'));
+        $this->assertNotNull(\App\Models\Lead::where('fb_leadgen_id', 'lg_connect_bf')->first());
+    }
+
+    public function test_connect_page_skips_delegation_when_page_has_no_business_id(): void
+    {
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+        app()->instance('current_tenant_id', $tenant->id);
+        config(['services.facebook.business_id' => 'our-biz-123']);
+
+        Http::fake([
+            'graph.facebook.com/*/subscribed_apps*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/leadgen_forms*' => Http::response(['data' => []], 200),
+        ]);
+
+        $this->service()->connectPage(['id' => '111', 'name' => 'Personal Page', 'access_token' => 'page-token-111'], $tenant->id);
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'managed_businesses'));
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'agencies'));
+    }
+
     private function settings(): SettingsService
     {
         return app(SettingsService::class);
