@@ -50,6 +50,23 @@ class FacebookOAuthControllerTest extends TestCase
         $this->assertStringContainsString('facebook.com', $response->headers->get('Location'));
     }
 
+    public function test_redirect_requests_classic_scopes_not_config_id(): void
+    {
+        [, $user] = $this->tenantAdmin();
+
+        $response = $this->withHeader('X-Tenant', 'acme')
+            ->actingAs($user)
+            ->get('/api/integrations/facebook/oauth/redirect');
+
+        $response->assertRedirect();
+        $location = $response->headers->get('Location');
+        $this->assertStringContainsString('scope=', $location);
+        foreach (['ads_read', 'pages_show_list', 'leads_retrieval', 'pages_manage_ads', 'business_management', 'pages_read_user_content', 'pages_manage_metadata'] as $scope) {
+            $this->assertStringContainsString($scope, urldecode($location));
+        }
+        $this->assertStringNotContainsString('config_id=', $location);
+    }
+
     public function test_callback_with_single_page_redirects_to_settings_connected(): void
     {
         [$tenant] = $this->tenantAdmin();

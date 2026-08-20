@@ -34,15 +34,24 @@ class FacebookOAuthController extends Controller
             'expires_at' => now()->addSeconds(self::TOKEN_TTL_SECONDS)->timestamp,
         ]));
 
-        // This app's permissions (pages_manage_metadata, leads_retrieval) are gated behind
-        // Facebook Login for Business's Configuration system, not classic OAuth scopes —
-        // passing ->scopes() directly triggers "Invalid Scopes" instead of a permission
-        // prompt. config_id carries the permission set instead; see the design doc's
-        // "OAuth callback identity" section for the Task 6 redesign context this builds on.
+        // Delegation-based connect (see docs/superpowers/specs/2026-08-20-facebook-delegation-lead-ads-design.md)
+        // requests these permissions as classic OAuth scopes on AutoBizPro's own app, rather than
+        // via the Facebook Login for Business config_id/Configuration picker that never surfaced
+        // leads_retrieval/pages_manage_metadata as choosable (see that spec's "Open assumption"
+        // section — this switch is the working hypothesis for what actually unblocks Meta, not a
+        // confirmed fix).
         return Socialite::driver('facebook')
             ->stateless()
-            ->setScopes([])
-            ->with(['state' => $state, 'config_id' => config('services.facebook.config_id')])
+            ->setScopes([
+                'ads_read',
+                'pages_show_list',
+                'leads_retrieval',
+                'pages_manage_ads',
+                'business_management',
+                'pages_read_user_content',
+                'pages_manage_metadata',
+            ])
+            ->with(['state' => $state])
             ->redirect();
     }
 
