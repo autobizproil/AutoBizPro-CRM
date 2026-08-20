@@ -83,9 +83,10 @@ class FacebookOAuthController extends Controller
 
         if (count($pages) > 1) {
             $pagesToken = Crypt::encryptString(json_encode([
-                'tenant_id'  => $tenantId,
-                'pages'      => $pages,
-                'expires_at' => now()->addSeconds(self::TOKEN_TTL_SECONDS)->timestamp,
+                'tenant_id'          => $tenantId,
+                'pages'              => $pages,
+                'user_access_token'  => $longLivedToken,
+                'expires_at'         => now()->addSeconds(self::TOKEN_TTL_SECONDS)->timestamp,
             ]));
             return $this->toSettings([
                 'fb_status'      => 'choose_page',
@@ -94,7 +95,7 @@ class FacebookOAuthController extends Controller
             ]);
         }
 
-        $result = $svc->connectPage($pages[0], $tenantId);
+        $result = $svc->connectPage($pages[0] + ['user_access_token' => $longLivedToken], $tenantId);
         return $this->toSettings([
             'fb_status'     => 'connected',
             'fb_page'       => $result['page_name'],
@@ -119,7 +120,7 @@ class FacebookOAuthController extends Controller
             return response()->json(['success' => false, 'message' => 'העמוד שנבחר לא נמצא, נסה להתחבר שוב'], 404);
         }
 
-        $result = $svc->connectPage($page, $payload['tenant_id']);
+        $result = $svc->connectPage($page + ['user_access_token' => $payload['user_access_token'] ?? null], $payload['tenant_id']);
         return response()->json(['success' => true, 'status' => 'connected'] + $result);
     }
 
