@@ -92,6 +92,30 @@ class FacebookOAuthServiceTest extends TestCase
         $this->assertSame([], $this->service()->fetchPages('user-token-abc'));
     }
 
+    public function test_fetch_pages_includes_business_id_when_present(): void
+    {
+        Http::fake([
+            'graph.facebook.com/*/me/accounts*' => Http::response(['data' => [
+                ['id' => '111', 'name' => 'Page With Business', 'access_token' => 'page-token-111', 'business' => ['id' => 'biz-999']],
+                ['id' => '222', 'name' => 'Personal Page', 'access_token' => 'page-token-222'],
+            ]], 200),
+        ]);
+
+        $pages = $this->service()->fetchPages('user-token-abc');
+
+        $this->assertSame('biz-999', $pages[0]['business_id']);
+        $this->assertArrayNotHasKey('business_id', $pages[1]);
+    }
+
+    public function test_fetch_pages_requests_business_field(): void
+    {
+        Http::fake(['graph.facebook.com/*/me/accounts*' => Http::response(['data' => []], 200)]);
+
+        $this->service()->fetchPages('user-token-abc');
+
+        Http::assertSent(fn ($request) => str_contains($request['fields'] ?? '', 'business'));
+    }
+
     public function test_subscribe_page_posts_leadgen_field_and_returns_true_on_success(): void
     {
         Http::fake(['graph.facebook.com/*/subscribed_apps*' => Http::response(['success' => true], 200)]);

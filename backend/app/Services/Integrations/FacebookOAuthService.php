@@ -51,7 +51,7 @@ class FacebookOAuthService
     {
         $response = Http::get('https://graph.facebook.com/v21.0/me/accounts', [
             'access_token' => $userAccessToken,
-            'fields'       => 'id,name,access_token',
+            'fields'       => 'id,name,access_token,business',
         ]);
 
         if (!$response->ok()) {
@@ -64,10 +64,13 @@ class FacebookOAuthService
             fn (array $p) => isset($p['id'], $p['name'], $p['access_token'])
         );
 
-        return array_values(array_map(
-            fn (array $p) => ['id' => $p['id'], 'name' => $p['name'], 'access_token' => $p['access_token']],
-            $pages
-        ));
+        return array_values(array_map(function (array $p) {
+            $page = ['id' => $p['id'], 'name' => $p['name'], 'access_token' => $p['access_token']];
+            if (isset($p['business']['id'])) {
+                $page['business_id'] = $p['business']['id'];
+            }
+            return $page;
+        }, $pages));
     }
 
     /**
