@@ -15,6 +15,7 @@ export const dashboardApi = {
   listBoards:   ()             => client.get('/dashboards'),
   createBoard:  (name)         => client.post('/dashboards', { name }),
   updateBoard:  (id, name)     => client.put(`/dashboards/${id}`, { name }),
+  updateBoardPosition: (id, position) => client.put(`/dashboards/${id}`, { position }),
   deleteBoard:  (id)           => client.delete(`/dashboards/${id}`),
   createWidget: (boardId, config) => client.post(`/dashboards/${boardId}/widgets`, { config }),
   updateWidget: (boardId, widgetId, config) => client.put(`/dashboards/${boardId}/widgets/${widgetId}`, { config }),

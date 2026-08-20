@@ -6,6 +6,8 @@ import { useToast } from '../../context/ToastContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const LAST_ACTIVE_BOARD_KEY = 'crm_last_active_board_id'
+
 function makeId() {
   return (typeof crypto !== 'undefined' && crypto.randomUUID)
     ? crypto.randomUUID()
@@ -103,7 +105,7 @@ export async function migrateLocalStorageIfNeeded() {
 
 // ── Inline-rename board button ────────────────────────────────────────────────
 
-function BoardItem({ board, isActive, onClick, onRename, onDelete, onDuplicate, canDelete }) {
+function BoardItem({ board, isActive, onClick, onRename, onDelete, onDuplicate, onMoveUp, onMoveDown, canMoveUp, canMoveDown, canDelete }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft]     = useState(board.name)
   const inputRef              = useRef(null)
@@ -158,6 +160,18 @@ function BoardItem({ board, isActive, onClick, onRename, onDelete, onDuplicate, 
         {board.name}
       </button>
       <button
+        onClick={(e) => { e.stopPropagation(); if (canMoveUp) onMoveUp(board.id) }}
+        disabled={!canMoveUp}
+        title="הזז למעלה"
+        className="opacity-0 group-hover:opacity-100 disabled:!opacity-0 text-gray-300 hover:text-[#2398c2] text-xs flex-shrink-0 transition-opacity"
+      >▲</button>
+      <button
+        onClick={(e) => { e.stopPropagation(); if (canMoveDown) onMoveDown(board.id) }}
+        disabled={!canMoveDown}
+        title="הזז למטה"
+        className="opacity-0 group-hover:opacity-100 disabled:!opacity-0 text-gray-300 hover:text-[#2398c2] text-xs flex-shrink-0 transition-opacity"
+      >▼</button>
+      <button
         onClick={(e) => { e.stopPropagation(); onDuplicate(board.id) }}
         title="שכפל לוח"
         className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-[#2398c2] text-xs flex-shrink-0 transition-opacity"
@@ -207,15 +221,23 @@ export default function DashboardsPage() {
     }
 
     setBoards(serverBoards)
-    setActive(preferredActiveId && serverBoards.some(b => b.id === preferredActiveId)
+    const resolvedActiveId = preferredActiveId && serverBoards.some(b => b.id === preferredActiveId)
       ? preferredActiveId
-      : serverBoards[0]?.id ?? null)
+      : serverBoards[0]?.id ?? null
+    setActive(resolvedActiveId)
+    if (resolvedActiveId) localStorage.setItem(LAST_ACTIVE_BOARD_KEY, String(resolvedActiveId))
+  }
+
+  function selectBoard(id) {
+    setActive(id)
+    localStorage.setItem(LAST_ACTIVE_BOARD_KEY, String(id))
   }
 
   useEffect(() => {
+    const lastActiveId = Number(localStorage.getItem(LAST_ACTIVE_BOARD_KEY)) || undefined
     migrateLocalStorageIfNeeded()
       .catch(() => { /* migration is best-effort; a failed upload just leaves the old localStorage data in place for a retry next load */ })
-      .finally(() => refreshBoards()
+      .finally(() => refreshBoards(lastActiveId)
         .catch(() => toast.error('שגיאה בטעינת לוחות הבקרה'))
         .finally(() => setLoaded(true)))
   }, [])
@@ -237,6 +259,24 @@ export default function DashboardsPage() {
       await refreshBoards(activeBoardId)
     } catch {
       toast.error('שגיאה בשינוי שם הלוח')
+    }
+  }
+
+  async function moveBoard(id, direction) {
+    const index = boards.findIndex(b => b.id === id)
+    const swapIndex = index + direction
+    if (index === -1 || swapIndex < 0 || swapIndex >= boards.length) return
+    try {
+      // The list is already server-ordered by position, so each entry's array
+      // index doubles as its position — swapping two adjacent entries' index
+      // values is enough, no need to know the real underlying position numbers.
+      await Promise.all([
+        dashboardApi.updateBoardPosition(boards[index].id, swapIndex),
+        dashboardApi.updateBoardPosition(boards[swapIndex].id, index),
+      ])
+      await refreshBoards(activeBoardId)
+    } catch {
+      toast.error('שגיאה בשינוי סדר הלוחות')
     }
   }
 
@@ -336,6 +376,41 @@ export default function DashboardsPage() {
   return (
     <div dir="rtl" className="flex" style={{ height: 'calc(100vh - 0px)', minHeight: 0 }}>
 
+      {/* ── Board list sidebar — first in DOM so it renders on the right in RTL ── */}
+      <aside className="w-52 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col flex-shrink-0">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200">
+          לוחות בקרה
+        </div>
+
+        <nav className="flex-1 overflow-y-auto py-2 scrollbar-right">
+          {boards.map((board, i) => (
+            <BoardItem
+              key={board.id}
+              board={board}
+              isActive={board.id === activeBoardId}
+              onClick={() => selectBoard(board.id)}
+              onRename={renameBoard}
+              onDelete={deleteBoard}
+              onDuplicate={duplicateBoard}
+              onMoveUp={id => moveBoard(id, -1)}
+              onMoveDown={id => moveBoard(id, 1)}
+              canMoveUp={i > 0}
+              canMoveDown={i < boards.length - 1}
+              canDelete={boards.length > 1}
+            />
+          ))}
+        </nav>
+
+        <div className="p-3 border-t border-gray-100 dark:border-gray-700">
+          <button
+            onClick={addBoard}
+            className="w-full text-sm text-[#2398c2] hover:text-[#1d7fa3] text-right py-1 transition-colors"
+          >
+            + הוסף לוח בקרה
+          </button>
+        </div>
+      </aside>
+
       {/* ── Main board area ── */}
       <div className="flex-1 overflow-y-auto p-6">
 
@@ -401,37 +476,6 @@ export default function DashboardsPage() {
           )
         )}
       </div>
-
-      {/* ── Right sidebar ── */}
-      <aside className="w-52 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-col flex-shrink-0">
-        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200">
-          לוחות בקרה
-        </div>
-
-        <nav className="flex-1 overflow-y-auto py-2 scrollbar-right">
-          {boards.map(board => (
-            <BoardItem
-              key={board.id}
-              board={board}
-              isActive={board.id === activeBoardId}
-              onClick={() => setActive(board.id)}
-              onRename={renameBoard}
-              onDelete={deleteBoard}
-              onDuplicate={duplicateBoard}
-              canDelete={boards.length > 1}
-            />
-          ))}
-        </nav>
-
-        <div className="p-3 border-t border-gray-100 dark:border-gray-700">
-          <button
-            onClick={addBoard}
-            className="w-full text-sm text-[#2398c2] hover:text-[#1d7fa3] text-right py-1 transition-colors"
-          >
-            + הוסף לוח בקרה
-          </button>
-        </div>
-      </aside>
 
       {/* ── Add/Edit Widget Modal ── */}
       {(showAddWidget || editingWidget) && (

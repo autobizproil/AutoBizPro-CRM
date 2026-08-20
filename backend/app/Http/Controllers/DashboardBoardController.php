@@ -46,7 +46,10 @@ class DashboardBoardController extends Controller
     public function update(Request $request, int $board): JsonResponse
     {
         $model = $this->ownedBoard($board, $request->user()->id);
-        $data  = $request->validate(['name' => 'sometimes|string|max:120']);
+        $data  = $request->validate([
+            'name'     => 'sometimes|string|max:120',
+            'position' => 'sometimes|integer|min:0',
+        ]);
 
         $model->update($data);
 

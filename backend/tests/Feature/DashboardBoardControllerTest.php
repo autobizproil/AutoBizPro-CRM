@@ -63,6 +63,16 @@ class DashboardBoardControllerTest extends TestCase
             ->assertStatus(403);
     }
 
+    public function test_update_reorders_board_position(): void
+    {
+        $board = DashboardBoard::create(['tenant_id' => $this->tenant->id, 'user_id' => $this->userA->id, 'name' => 'שם', 'position' => 0]);
+
+        $this->asUser($this->userA)->putJson("/api/dashboards/{$board->id}", ['position' => 3])
+            ->assertOk();
+
+        $this->assertDatabaseHas('dashboard_boards', ['id' => $board->id, 'position' => 3]);
+    }
+
     public function test_destroy_cascades_widgets(): void
     {
         $board  = DashboardBoard::create(['tenant_id' => $this->tenant->id, 'user_id' => $this->userA->id, 'name' => 'שם', 'position' => 0]);
