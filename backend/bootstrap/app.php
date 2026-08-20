@@ -15,6 +15,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->statefulApi(); // Sanctum SPA mode
 
+        // This is an API-only app — there's no named 'login' route to redirect
+        // guests to. Left at Laravel's default, Authenticate::redirectTo() calls
+        // route('login') for any unauthenticated non-XHR request (e.g. someone
+        // opening a protected URL directly in a browser tab) and throws
+        // RouteNotFoundException *before* AuthenticationException is even
+        // constructed — bypassing the JSON handler registered below entirely and
+        // surfacing as an unhandled 500. Hit repeatedly in production logs.
+        $middleware->redirectGuestsTo(fn () => null);
+
         $middleware->alias([
             'tenant'        => TenantMiddleware::class,
             'permission'    => CheckPermission::class,
