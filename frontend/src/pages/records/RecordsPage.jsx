@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { recordTypesApi, recordsApi } from '../../api/recordTypes'
 import { customFieldsApi } from '../../api/customFields'
+import { paymentLinesApi } from '../../api/paymentLines'
+import { PAYMENT_TYPES } from '../../constants/paymentTypes'
 import { useAuth } from '../../context/AuthContext'
 import FilterPanel from '../leads/FilterPanel'
 import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
@@ -89,12 +91,33 @@ export default function RecordsPage() {
     onSuccess:  invalidate,
   })
 
+  const { data: paymentLines = [] } = useQuery({
+    queryKey: ['payment-lines', slug, editing?.id],
+    queryFn:  () => paymentLinesApi.list(type.id, editing.id).then(r => r.data.data),
+    enabled: !!type && !!editing && !!type.has_payment_lines,
+  })
+  const [lineWarning, setLineWarning] = useState('')
+  const invalidateLines = () => qc.invalidateQueries({ queryKey: ['payment-lines', slug, editing?.id] })
+
+  const createLine = useMutation({
+    mutationFn: (d) => paymentLinesApi.create(type.id, editing.id, d),
+    onSuccess:  (res) => { invalidateLines(); setLineWarning(res.data.warning ?? '') },
+  })
+  const updateLine = useMutation({
+    mutationFn: ({ id, d }) => paymentLinesApi.update(type.id, editing.id, id, d),
+    onSuccess:  (res) => { invalidateLines(); setLineWarning(res.data.warning ?? '') },
+  })
+  const deleteLine = useMutation({
+    mutationFn: (id) => paymentLinesApi.destroy(type.id, editing.id, id),
+    onSuccess:  (res) => { invalidateLines(); setLineWarning(res.data.warning ?? '') },
+  })
+
   const deleteAll = useDeleteAllEntity(slug, ['records', slug])
   const [deleteAllOpen, setDeleteAllOpen] = useState(false)
 
   const openCreate = () => { setEditing(null); setForm({}); setError(''); setModal(true) }
-  const openEdit = (r) => { setEditing(r); setForm(r.data ?? {}); setError(''); setModal(true) }
-  const closeModal = () => { setModal(false); setEditing(null); setForm({}); setError('') }
+  const openEdit = (r) => { setEditing(r); setForm(r.data ?? {}); setError(''); setLineWarning(''); setModal(true) }
+  const closeModal = () => { setModal(false); setEditing(null); setForm({}); setError(''); setLineWarning('') }
 
   const setField = (name) => (e) => {
     const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value
@@ -276,6 +299,43 @@ export default function RecordsPage() {
                   </div>
                 ))}
               </div>
+              {editing && type?.has_payment_lines && (
+                <div className="border-t border-gray-100 dark:border-gray-700 pt-3 mt-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">שורות תשלום</h3>
+                    <button type="button"
+                      onClick={() => createLine.mutate({ payment_type: PAYMENT_TYPES[0].id, amount: 0 })}
+                      className="text-xs text-[#2398c2] hover:underline">+ הוסף שורה</button>
+                  </div>
+                  {lineWarning && (
+                    <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-300 text-xs px-3 py-2 rounded-lg mb-2">
+                      {lineWarning}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {paymentLines.map(line => (
+                      <div key={line.id} className="flex items-center gap-2">
+                        <select value={line.payment_type}
+                          onChange={e => updateLine.mutate({ id: line.id, d: { payment_type: e.target.value } })}
+                          className={INPUT + ' flex-1'}>
+                          {PAYMENT_TYPES.map(pt => <option key={pt.id} value={pt.id}>{pt.label}</option>)}
+                        </select>
+                        <input type="number" step="0.01" value={line.amount}
+                          onChange={e => updateLine.mutate({ id: line.id, d: { amount: e.target.value } })}
+                          className={INPUT + ' w-28'} dir="ltr" />
+                        <input type="date" value={line.paid_at ?? ''}
+                          onChange={e => updateLine.mutate({ id: line.id, d: { paid_at: e.target.value || null } })}
+                          className={INPUT + ' w-40'} dir="ltr" />
+                        <button type="button" onClick={() => deleteLine.mutate(line.id)}
+                          className="text-gray-300 dark:text-gray-600 hover:text-red-500 text-lg leading-none">×</button>
+                      </div>
+                    ))}
+                    {paymentLines.length === 0 && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500">אין שורות תשלום עדיין</p>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={createRecord.isPending || updateRecord.isPending}
                   className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
