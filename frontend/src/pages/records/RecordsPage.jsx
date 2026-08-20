@@ -98,6 +98,7 @@ export default function RecordsPage() {
   })
   const [lineWarning, setLineWarning] = useState('')
   const [lineError, setLineError]     = useState('')
+  const [lineDrafts, setLineDrafts]   = useState({})
   const invalidateLines = () => qc.invalidateQueries({ queryKey: ['payment-lines', slug, editing?.id] })
 
   const createLine = useMutation({
@@ -308,7 +309,7 @@ export default function RecordsPage() {
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">שורות תשלום</h3>
                     <button type="button"
-                      onClick={() => createLine.mutate({ payment_type: PAYMENT_TYPES[0].id, amount: 0 })}
+                      onClick={() => createLine.mutate({ payment_type: PAYMENT_TYPES[0].id, amount: 0.01 })}
                       className="text-xs text-[#2398c2] hover:underline">+ הוסף שורה</button>
                   </div>
                   {lineError && (
@@ -329,11 +330,21 @@ export default function RecordsPage() {
                           className={INPUT + ' flex-1'}>
                           {PAYMENT_TYPES.map(pt => <option key={pt.id} value={pt.id}>{pt.label}</option>)}
                         </select>
-                        <input type="number" step="0.01" value={line.amount}
-                          onChange={e => updateLine.mutate({ id: line.id, d: { amount: e.target.value } })}
+                        <input type="number" step="0.01"
+                          value={lineDrafts[line.id]?.amount ?? line.amount}
+                          onChange={e => setLineDrafts(d => ({ ...d, [line.id]: { ...d[line.id], amount: e.target.value } }))}
+                          onBlur={e => {
+                            updateLine.mutate({ id: line.id, d: { amount: e.target.value } })
+                            setLineDrafts(d => { const { [line.id]: _drop, ...rest } = d; return rest })
+                          }}
                           className={INPUT + ' w-28'} dir="ltr" />
-                        <input type="date" value={line.paid_at ?? ''}
-                          onChange={e => updateLine.mutate({ id: line.id, d: { paid_at: e.target.value || null } })}
+                        <input type="date"
+                          value={lineDrafts[line.id]?.paid_at ?? (line.paid_at ?? '')}
+                          onChange={e => setLineDrafts(d => ({ ...d, [line.id]: { ...d[line.id], paid_at: e.target.value } }))}
+                          onBlur={e => {
+                            updateLine.mutate({ id: line.id, d: { paid_at: e.target.value || null } })
+                            setLineDrafts(d => { const { [line.id]: _drop, ...rest } = d; return rest })
+                          }}
                           className={INPUT + ' w-40'} dir="ltr" />
                         <button type="button" onClick={() => deleteLine.mutate(line.id)}
                           className="text-gray-300 dark:text-gray-600 hover:text-red-500 text-lg leading-none">×</button>

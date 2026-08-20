@@ -52,7 +52,8 @@ class WidgetDataService
         }
         if (isset($descriptor['recordTypeIdsIn'])) {
             $query->join('records', 'records.id', '=', "{$table}.record_id")
-                ->whereIn('records.record_type_id', $descriptor['recordTypeIdsIn']);
+                ->whereIn('records.record_type_id', $descriptor['recordTypeIdsIn'])
+                ->whereNull('records.deleted_at');
         }
 
         $this->applyOwnerScope($query, $descriptor, $entity, $user);

@@ -83,6 +83,26 @@ class PaymentLineWidgetTest extends TestCase
         $this->assertEquals(100.0, $resp->json('data.total'));
     }
 
+    public function test_soft_deleted_records_payment_lines_excluded_from_totals(): void
+    {
+        [$tenant, $admin] = $this->admin('pl-widget-softdel');
+        app()->instance('current_tenant_id', $tenant->id);
+        $type = RecordType::create(['tenant_id' => $tenant->id, 'slug' => 'invoices', 'label' => 'חשבוניות', 'position' => 0, 'has_payment_lines' => true]);
+        $kept = Record::create(['tenant_id' => $tenant->id, 'record_type_id' => $type->id, 'data' => []]);
+        $deleted = Record::create(['tenant_id' => $tenant->id, 'record_type_id' => $type->id, 'data' => []]);
+        RecordPaymentLine::create(['tenant_id' => $tenant->id, 'record_id' => $kept->id, 'payment_type' => 'cash', 'amount' => 100, 'position' => 0]);
+        RecordPaymentLine::create(['tenant_id' => $tenant->id, 'record_id' => $deleted->id, 'payment_type' => 'cash', 'amount' => 999, 'position' => 0]);
+        $deleted->delete();
+
+        $resp = $this->actingAs($admin)->withHeaders(['X-Tenant' => 'pl-widget-softdel'])
+            ->getJson('/api/dashboard/widget-data?' . http_build_query([
+                'entity' => 'payments:all', 'valueField' => 'amount', 'aggregation' => 'sum',
+            ]));
+
+        $resp->assertOk();
+        $this->assertEquals(100.0, $resp->json('data.total'));
+    }
+
     public function test_payments_slug_without_has_payment_lines_is_unknown_entity(): void
     {
         [$tenant, $admin] = $this->admin('pl-widget-noflag');
