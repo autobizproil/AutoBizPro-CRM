@@ -128,9 +128,9 @@ class LeadService
             $query->where('assigned_to', $userId);
         }
 
-        // change_stage needs per-lead automation firing, which a mass query-builder
-        // update skips entirely (Eloquent model events don't fire on it) — so this
-        // branch can't be a one-line match() arm like the others.
+        // change_stage/assign need per-lead event firing, which a mass query-builder
+        // update skips entirely (Eloquent model events don't fire on it) — so these
+        // branches can't be one-line match() arms like the others.
         if ($action === 'change_stage') {
             $stageId = (int) $value;
             $changedIds = (clone $query)->where('pipeline_stage_id', '!=', $stageId)->pluck('id');
@@ -146,8 +146,22 @@ class LeadService
             return $count;
         }
 
+        if ($action === 'assign') {
+            $assignee   = (int) $value;
+            $changedIds = (clone $query)->where('assigned_to', '!=', $assignee)->pluck('id');
+            $count      = $query->update(['assigned_to' => $assignee]);
+
+            if ($changedIds->isNotEmpty()) {
+                $observer = app(\App\Observers\LeadObserver::class);
+                Lead::whereIn('id', $changedIds)->get()->each(
+                    fn (Lead $lead) => $observer->dispatch($lead, 'lead_updated')
+                );
+            }
+
+            return $count;
+        }
+
         return match ($action) {
-            'assign' => $query->update(['assigned_to' => (int) $value]),
             'delete' => $query->delete(), // soft delete
             default  => 0,
         };

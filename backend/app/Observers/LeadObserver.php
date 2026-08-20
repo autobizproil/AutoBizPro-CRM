@@ -45,7 +45,11 @@ class LeadObserver
         }
     }
 
-    private function dispatch(Lead $lead, string $event): void
+    // Public so bulk-update paths (e.g. LeadService::bulk's 'assign' action) that
+    // must use a mass query-builder update for efficiency — and so skip Eloquent
+    // events entirely — can still fire the same outgoing-webhook notification a
+    // normal per-lead update would have triggered via updated() above.
+    public function dispatch(Lead $lead, string $event): void
     {
         $settings   = app(SettingsService::class);
         $hasSetting = ! empty($settings->get('outgoing_webhook_url'));
