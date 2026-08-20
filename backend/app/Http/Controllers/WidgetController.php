@@ -60,6 +60,35 @@ class WidgetController extends Controller
             ];
         }
 
+        // Payment-lines pseudo-entities — "all invoice types combined" plus one
+        // per record type flagged has_payment_lines, so "by payment type"
+        // breakdowns are buildable the same generic way as any other entity.
+        $allPayments = $service->buildPaymentDescriptor(null);
+        if ($allPayments !== null) {
+            $entities[]            = ['key' => 'payments:all', 'label' => $allPayments['label']];
+            $fields['payments:all'] = [
+                'valueFields'  => $allPayments['valueFields'],
+                'groupFields'  => $allPayments['groupFields'],
+                'filterFields' => $allPayments['filterFields'],
+                'dateFields'   => $allPayments['dateFields'],
+            ];
+
+            foreach ($recordTypes->where('has_payment_lines', true) as $rt) {
+                $d = $service->buildPaymentDescriptor($rt->slug);
+                if ($d === null) {
+                    continue;
+                }
+                $key = "payments:{$rt->slug}";
+                $entities[]   = ['key' => $key, 'label' => $d['label']];
+                $fields[$key] = [
+                    'valueFields'  => $d['valueFields'],
+                    'groupFields'  => $d['groupFields'],
+                    'filterFields' => $d['filterFields'],
+                    'dateFields'   => $d['dateFields'],
+                ];
+            }
+        }
+
         $dateOperators = [];
         foreach (RelativeDateRange::OPERATORS as $id => $label) {
             $dateOperators[] = [
