@@ -82,4 +82,19 @@ class PaymentLineWidgetTest extends TestCase
         $resp->assertOk();
         $this->assertEquals(100.0, $resp->json('data.total'));
     }
+
+    public function test_payments_slug_without_has_payment_lines_is_unknown_entity(): void
+    {
+        [$tenant, $admin] = $this->admin('pl-widget-noflag');
+        app()->instance('current_tenant_id', $tenant->id);
+        RecordType::create(['tenant_id' => $tenant->id, 'slug' => 'notes', 'label' => 'הערות', 'position' => 0, 'has_payment_lines' => false]);
+
+        $resp = $this->actingAs($admin)->withHeaders(['X-Tenant' => 'pl-widget-noflag'])
+            ->getJson('/api/dashboard/widget-data?' . http_build_query([
+                'entity' => 'payments:notes', 'valueField' => 'amount', 'aggregation' => 'sum',
+            ]));
+
+        $resp->assertStatus(422);
+        $this->assertStringContainsString('Unknown entity', $resp->json('message'));
+    }
 }

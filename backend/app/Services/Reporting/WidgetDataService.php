@@ -51,9 +51,8 @@ class WidgetDataService
             $query->where('record_type_id', $descriptor['recordTypeId']);
         }
         if (isset($descriptor['recordTypeIdsIn'])) {
-            $query->join('records', 'records.id', '=', 'record_payment_lines.record_id')
-                ->whereIn('records.record_type_id', $descriptor['recordTypeIdsIn'])
-                ->select('record_payment_lines.*');
+            $query->join('records', 'records.id', '=', "{$table}.record_id")
+                ->whereIn('records.record_type_id', $descriptor['recordTypeIdsIn']);
         }
 
         $this->applyOwnerScope($query, $descriptor, $entity, $user);
