@@ -87,7 +87,9 @@ export default function LoginPage() {
       </div>
 
       {/* Marketing panel — desktop only */}
-      <div className="hidden lg:flex flex-1 relative items-center justify-center overflow-hidden text-white p-16"
+      {/* md (768px) not lg (1024px) — Chrome's "Request desktop site" on mobile
+          renders at ~980px, which is under the lg breakpoint and would hide this */}
+      <div className="hidden md:flex flex-1 relative items-center justify-center overflow-hidden text-white p-16"
         style={{ background: 'linear-gradient(135deg, #1d7fa3 0%, #2398c2 55%, #6fb84f 100%)' }}>
         {/* Decorative blobs */}
         <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-white/10 blur-3xl" />
