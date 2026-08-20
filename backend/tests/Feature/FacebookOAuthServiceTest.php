@@ -179,4 +179,72 @@ class FacebookOAuthServiceTest extends TestCase
     {
         return app(SettingsService::class);
     }
+
+    private function callDelegatePage(FacebookOAuthService $svc, string $pageId, string $pageAccessToken, string $userAccessToken, ?string $clientBusinessId): void
+    {
+        $method = new \ReflectionMethod($svc, 'delegatePage');
+        $method->setAccessible(true);
+        $method->invoke($svc, $pageId, $pageAccessToken, $userAccessToken, $clientBusinessId);
+    }
+
+    public function test_delegate_page_calls_managed_businesses_and_agencies_when_client_business_id_present(): void
+    {
+        config(['services.facebook.business_id' => 'our-biz-123']);
+        Http::fake([
+            'graph.facebook.com/*/managed_businesses*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/agencies*' => Http::response(['success' => true], 200),
+        ]);
+
+        $this->callDelegatePage($this->service(), '111', 'page-token-111', 'user-token-abc', 'client-biz-999');
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'our-biz-123/managed_businesses')
+                && $request->method() === 'POST'
+                && $request['existing_client_business_id'] === 'client-biz-999'
+                && $request['access_token'] === 'user-token-abc';
+        });
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '111/agencies')
+                && $request->method() === 'POST'
+                && $request['business'] === 'our-biz-123'
+                && $request['permitted_tasks'] === ['ADVERTISE', 'MANAGE_LEADS']
+                && $request['access_token'] === 'page-token-111';
+        });
+    }
+
+    public function test_delegate_page_skips_both_calls_when_no_client_business_id(): void
+    {
+        config(['services.facebook.business_id' => 'our-biz-123']);
+        Http::fake();
+
+        $this->callDelegatePage($this->service(), '111', 'page-token-111', 'user-token-abc', null);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_delegate_page_does_not_throw_on_duplicated_asset_error(): void
+    {
+        config(['services.facebook.business_id' => 'our-biz-123']);
+        Http::fake([
+            'graph.facebook.com/*/managed_businesses*' => Http::response(['error' => ['message' => 'duplicated asset detected']], 400),
+            'graph.facebook.com/*/agencies*' => Http::response(['error' => ['message' => 'duplicated asset detected']], 400),
+        ]);
+
+        $this->callDelegatePage($this->service(), '111', 'page-token-111', 'user-token-abc', 'client-biz-999');
+
+        $this->assertTrue(true); // reaching here without an exception is the assertion
+    }
+
+    public function test_delegate_page_does_not_throw_on_unexpected_error(): void
+    {
+        config(['services.facebook.business_id' => 'our-biz-123']);
+        Http::fake([
+            'graph.facebook.com/*/managed_businesses*' => Http::response(['error' => ['message' => 'permission denied']], 403),
+            'graph.facebook.com/*/agencies*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('timeout'),
+        ]);
+
+        $this->callDelegatePage($this->service(), '111', 'page-token-111', 'user-token-abc', 'client-biz-999');
+
+        $this->assertTrue(true);
+    }
 }

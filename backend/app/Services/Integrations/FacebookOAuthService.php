@@ -100,6 +100,61 @@ class FacebookOAuthService
     }
 
     /**
+     * Claim a delegated management relationship on the page's owning Business (if any),
+     * granting this app's own pre-configured Business Manager (FACEBOOK_BUSINESS_ID)
+     * lead-management access without a per-customer App Review relationship — see
+     * docs/superpowers/specs/2026-08-20-facebook-delegation-lead-ads-design.md.
+     * Never throws: a failed delegation must not undo an otherwise-saved connection, and
+     * a page with no owning Business (personal page) simply has nothing to delegate.
+     */
+    private function delegatePage(string $pageId, string $pageAccessToken, string $userAccessToken, ?string $clientBusinessId): void
+    {
+        if (!$clientBusinessId) {
+            return;
+        }
+
+        $ourBusinessId = config('services.facebook.business_id');
+        if (!$ourBusinessId) {
+            Log::warning('Facebook OAuth: skipping delegation, FACEBOOK_BUSINESS_ID not configured', ['page_id' => $pageId]);
+            return;
+        }
+
+        $this->graphPostBestEffort(
+            "https://graph.facebook.com/v21.0/{$ourBusinessId}/managed_businesses",
+            ['existing_client_business_id' => $clientBusinessId, 'access_token' => $userAccessToken],
+            'managed_businesses',
+            $pageId
+        );
+
+        $this->graphPostBestEffort(
+            "https://graph.facebook.com/v21.0/{$pageId}/agencies",
+            ['business' => $ourBusinessId, 'permitted_tasks' => ['ADVERTISE', 'MANAGE_LEADS'], 'access_token' => $pageAccessToken],
+            'agencies',
+            $pageId
+        );
+    }
+
+    /**
+     * POST a delegation call, logging any non-2xx response except the expected
+     * "duplicated asset" case (page already delegated — not a real failure), and
+     * never letting a connection exception escape. Mirrors subscribePage()'s
+     * response->ok() check so delegation failures are as debuggable as subscription
+     * failures already are, while still honoring the "never throws" contract.
+     */
+    private function graphPostBestEffort(string $url, array $params, string $label, string $pageId): void
+    {
+        try {
+            $response = Http::asForm()->post($url, $params);
+            $message  = $response->json('error.message', '');
+            if (!$response->ok() && !str_contains($message, 'duplicated asset')) {
+                Log::warning("Facebook OAuth: {$label} call failed", ['page_id' => $pageId, 'status' => $response->status(), 'body' => $response->body()]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Facebook OAuth: {$label} call failed", ['page_id' => $pageId, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
      * Persist the chosen Page's connection details for the current tenant and
      * attempt the webhook subscription. Always saves the connection, even if the
      * subscription call fails — the caller surfaces $result['subscribed'] === false
