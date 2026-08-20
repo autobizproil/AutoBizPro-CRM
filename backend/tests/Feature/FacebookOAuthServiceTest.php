@@ -6,6 +6,7 @@ use App\Services\Integrations\FacebookOAuthService;
 use App\Services\SettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class FacebookOAuthServiceTest extends TestCase
@@ -262,9 +263,28 @@ class FacebookOAuthServiceTest extends TestCase
             return str_contains($request->url(), '111/agencies')
                 && $request->method() === 'POST'
                 && $request['business'] === 'our-biz-123'
-                && $request['permitted_tasks'] === ['ADVERTISE', 'MANAGE_LEADS']
+                && $request['permitted_tasks'] === '["ADVERTISE","MANAGE_LEADS"]'
                 && $request['access_token'] === 'page-token-111';
         });
+    }
+
+    public function test_graph_post_best_effort_logs_failure_when_response_ok_but_success_false(): void
+    {
+        // Graph's agencies/managed_businesses endpoints return HTTP 200 with a
+        // {"success": false} body on some failures — response->ok() alone would
+        // miss this, silently treating it as success.
+        config(['services.facebook.business_id' => 'our-biz-123']);
+        Log::spy();
+        Http::fake([
+            'graph.facebook.com/*/managed_businesses*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/agencies*' => Http::response(['success' => false], 200),
+        ]);
+
+        $this->callDelegatePage($this->service(), '111', 'page-token-111', 'user-token-abc', 'client-biz-999');
+
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn ($message) => str_contains($message, 'agencies call failed'))
+            ->once();
     }
 
     public function test_delegate_page_skips_both_calls_when_no_client_business_id(): void
@@ -387,5 +407,50 @@ class FacebookOAuthServiceTest extends TestCase
         $this->callBackfillLeads($this->service(), '111', 'page-token-111', $tenant->id);
 
         $this->assertTrue(true);
+    }
+
+    public function test_backfill_form_leads_stops_when_data_empty_even_though_cursor_present(): void
+    {
+        // Meta's Graph API can keep handing back paging.cursors.after on a page whose
+        // data is already empty — cursor presence alone is not a reliable "more pages"
+        // signal. Empty data must terminate the loop regardless of the cursor.
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+
+        Http::fake([
+            'graph.facebook.com/*/leadgen_forms*' => Http::response(['data' => [
+                ['id' => 'form-1', 'name' => 'Contact Form', 'status' => 'ACTIVE'],
+            ]], 200),
+            'graph.facebook.com/*/form-1/leads*' => Http::response([
+                'data'   => [],
+                'paging' => ['cursors' => ['after' => 'some-cursor']],
+            ], 200),
+        ]);
+
+        $this->callBackfillLeads($this->service(), '111', 'page-token-111', $tenant->id);
+
+        Http::assertSentCount(2); // 1 leadgen_forms + 1 leads request, not infinite
+    }
+
+    public function test_backfill_form_leads_hard_cap_stops_pathological_infinite_pagination(): void
+    {
+        // Insurance on top of the empty-data check: even if every page keeps returning
+        // non-empty data with a cursor forever, the loop must still stop.
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+
+        Http::fake([
+            'graph.facebook.com/*/leadgen_forms*' => Http::response(['data' => [
+                ['id' => 'form-1', 'name' => 'Contact Form', 'status' => 'ACTIVE'],
+            ]], 200),
+            'graph.facebook.com/*/form-1/leads*' => Http::response([
+                'data' => [
+                    ['id' => 'lg_cap', 'created_time' => '2026-08-01T10:00:00+0000', 'field_data' => []],
+                ],
+                'paging' => ['cursors' => ['after' => 'always-cursor']],
+            ], 200),
+        ]);
+
+        $this->callBackfillLeads($this->service(), '111', 'page-token-111', $tenant->id);
+
+        Http::assertSentCount(201); // 1 leadgen_forms + capped at 200 leads requests
     }
 }

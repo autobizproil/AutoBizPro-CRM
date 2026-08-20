@@ -130,16 +130,17 @@ class FacebookOAuthService
 
         $this->graphPostBestEffort(
             "https://graph.facebook.com/v21.0/{$pageId}/agencies",
-            ['business' => $ourBusinessId, 'permitted_tasks' => ['ADVERTISE', 'MANAGE_LEADS'], 'access_token' => $pageAccessToken],
+            ['business' => $ourBusinessId, 'permitted_tasks' => json_encode(['ADVERTISE', 'MANAGE_LEADS']), 'access_token' => $pageAccessToken],
             'agencies',
             $pageId
         );
     }
 
     /**
-     * One-time sync of a page's existing lead forms and their historical leads on first
-     * connect — Facebook's webhook only delivers leads generated after subscription, so
-     * without this, everything captured before "Connect with Facebook" was clicked is lost.
+     * Sync of a page's lead forms and their leads, run on every connect/reconnect — safe
+     * to repeat because upsertLead()'s dedup makes it a no-op for leads already captured.
+     * Facebook's webhook only delivers leads generated after subscription, so without this,
+     * everything captured before "Connect with Facebook" was clicked would otherwise be lost.
      * Never throws: a failed or partial backfill must not undo an otherwise-saved connection.
      * Per-form failures don't abort the remaining forms.
      */
@@ -173,6 +174,8 @@ class FacebookOAuthService
         }
 
         $params = ['access_token' => $pageAccessToken, 'fields' => 'id,created_time,field_data', 'limit' => 50];
+        $pageCount = 0;
+        $maxPages = 200;
 
         do {
             try {
@@ -187,16 +190,24 @@ class FacebookOAuthService
                 return;
             }
 
-            foreach ($response->json('data') ?? [] as $lead) {
+            $rows = $response->json('data') ?? [];
+            foreach ($rows as $lead) {
                 if (!isset($lead['id'])) {
                     continue;
                 }
-                $this->leadAdsService->upsertLead($lead, $formId, $lead['id'], $tenantId);
+                $this->leadAdsService->upsertLead($lead, $formId, $lead['id'], $tenantId, silent: true);
             }
 
-            $after = $response->json('paging.cursors.after');
+            // Graph can keep handing back a cursor even on the final page when data is
+            // empty — empty data, not cursor absence, is the real "no more results" signal.
+            $after = $rows === [] ? null : $response->json('paging.cursors.after');
             $params['after'] = $after;
-        } while ($after);
+            $pageCount++;
+        } while ($after && $pageCount < $maxPages);
+
+        if ($pageCount >= $maxPages) {
+            Log::warning('Facebook OAuth: leads backfill hit page cap, stopping', ['form_id' => $formId, 'max_pages' => $maxPages]);
+        }
     }
 
     /**
@@ -211,7 +222,7 @@ class FacebookOAuthService
         try {
             $response = Http::asForm()->post($url, $params);
             $message  = $response->json('error.message', '');
-            if (!$response->ok() && !str_contains($message, 'duplicated asset')) {
+            if ((!$response->ok() || !$response->json('success')) && !str_contains($message, 'duplicated asset')) {
                 Log::warning("Facebook OAuth: {$label} call failed", ['page_id' => $pageId, 'status' => $response->status(), 'body' => $response->body()]);
             }
         } catch (\Throwable $e) {
