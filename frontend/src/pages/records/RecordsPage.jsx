@@ -97,27 +97,31 @@ export default function RecordsPage() {
     enabled: !!type && !!editing && !!type.has_payment_lines,
   })
   const [lineWarning, setLineWarning] = useState('')
+  const [lineError, setLineError]     = useState('')
   const invalidateLines = () => qc.invalidateQueries({ queryKey: ['payment-lines', slug, editing?.id] })
 
   const createLine = useMutation({
     mutationFn: (d) => paymentLinesApi.create(type.id, editing.id, d),
     onSuccess:  (res) => { invalidateLines(); setLineWarning(res.data.warning ?? '') },
+    onError:    (err) => setLineError(err.response?.data?.message ?? 'שגיאה בשמירה'),
   })
   const updateLine = useMutation({
     mutationFn: ({ id, d }) => paymentLinesApi.update(type.id, editing.id, id, d),
     onSuccess:  (res) => { invalidateLines(); setLineWarning(res.data.warning ?? '') },
+    onError:    (err) => setLineError(err.response?.data?.message ?? 'שגיאה בשמירה'),
   })
   const deleteLine = useMutation({
     mutationFn: (id) => paymentLinesApi.destroy(type.id, editing.id, id),
     onSuccess:  (res) => { invalidateLines(); setLineWarning(res.data.warning ?? '') },
+    onError:    (err) => setLineError(err.response?.data?.message ?? 'שגיאה בשמירה'),
   })
 
   const deleteAll = useDeleteAllEntity(slug, ['records', slug])
   const [deleteAllOpen, setDeleteAllOpen] = useState(false)
 
   const openCreate = () => { setEditing(null); setForm({}); setError(''); setModal(true) }
-  const openEdit = (r) => { setEditing(r); setForm(r.data ?? {}); setError(''); setLineWarning(''); setModal(true) }
-  const closeModal = () => { setModal(false); setEditing(null); setForm({}); setError(''); setLineWarning('') }
+  const openEdit = (r) => { setEditing(r); setForm(r.data ?? {}); setError(''); setLineWarning(''); setLineError(''); setModal(true) }
+  const closeModal = () => { setModal(false); setEditing(null); setForm({}); setError(''); setLineWarning(''); setLineError('') }
 
   const setField = (name) => (e) => {
     const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value
@@ -307,6 +311,11 @@ export default function RecordsPage() {
                       onClick={() => createLine.mutate({ payment_type: PAYMENT_TYPES[0].id, amount: 0 })}
                       className="text-xs text-[#2398c2] hover:underline">+ הוסף שורה</button>
                   </div>
+                  {lineError && (
+                    <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded-lg mb-2">
+                      {lineError}
+                    </div>
+                  )}
                   {lineWarning && (
                     <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-300 text-xs px-3 py-2 rounded-lg mb-2">
                       {lineWarning}
