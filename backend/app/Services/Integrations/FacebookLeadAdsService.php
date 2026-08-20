@@ -182,6 +182,11 @@ class FacebookLeadAdsService
         }
 
         if ($silent) {
+            // saveQuietly() installs a NullDispatcher for the whole save, which
+            // suppresses not just LeadObserver::created() but also Lead::booted()'s
+            // static::saving() hook — so phone_normalized must be set explicitly
+            // here, mirroring what that hook would otherwise have done.
+            $attributes['phone_normalized'] = \App\Services\PhoneNormalizer::normalize($phone);
             $lead = new Lead($attributes);
             if ($createdAt) {
                 $lead->created_at = $createdAt;

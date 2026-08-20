@@ -347,6 +347,39 @@ class FacebookOAuthServiceTest extends TestCase
         $this->assertSame($tenant->id, $lead->tenant_id);
     }
 
+    public function test_backfill_leads_sets_phone_normalized_despite_save_quietly(): void
+    {
+        // Regression: upsertLead()'s silent branch uses saveQuietly(), which installs
+        // a NullDispatcher for the whole save and therefore also suppresses Lead::
+        // booted()'s static::saving() hook that normally sets phone_normalized — not
+        // just LeadObserver::created(). Backfilled leads must still get a correct
+        // phone_normalized so phone-dedup lookups (this method's own check, plus
+        // PaycallService/VoicenterService/IntegrationsController) keep working.
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+
+        Http::fake([
+            'graph.facebook.com/*/leadgen_forms*' => Http::response(['data' => [
+                ['id' => 'form-1', 'name' => 'Contact Form', 'status' => 'ACTIVE'],
+            ]], 200),
+            'graph.facebook.com/*/form-1/leads*' => Http::response(['data' => [
+                ['id' => 'lg_bf_phone', 'created_time' => '2026-08-01T10:00:00+0000', 'field_data' => [
+                    ['name' => 'full_name', 'values' => ['Backfilled Lead']],
+                    ['name' => 'phone_number', 'values' => ['+972521112222']],
+                ]],
+            ]], 200),
+        ]);
+
+        $this->callBackfillLeads($this->service(), '111', 'page-token-111', $tenant->id);
+
+        $lead = \App\Models\Lead::where('fb_leadgen_id', 'lg_bf_phone')->first();
+        $this->assertNotNull($lead);
+        $this->assertSame(
+            \App\Services\PhoneNormalizer::normalize('+972521112222'),
+            $lead->phone_normalized
+        );
+        $this->assertNotNull($lead->phone_normalized);
+    }
+
     public function test_backfill_leads_follows_pagination_cursor(): void
     {
         $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
