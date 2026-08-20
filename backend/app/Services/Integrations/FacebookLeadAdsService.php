@@ -111,7 +111,13 @@ class FacebookLeadAdsService
         }
     }
 
-    private function upsertLead(array $leadData, ?string $formId, string $leadgenId, int $tenantId): void
+    /**
+     * Public so both the real-time webhook path (processWebhook above) and
+     * FacebookOAuthService::backfillLeads() call the same dedup/mapping logic —
+     * Graph's /{leadgenId} response and /{formId}/leads list items share the same
+     * field_data/created_time shape, so one method safely serves both callers.
+     */
+    public function upsertLead(array $leadData, ?string $formId, string $leadgenId, int $tenantId): void
     {
         // Facebook retries webhook delivery on non-200 responses, so leadgen_id
         // is the reliable dedupe key — check it before falling back to phone.

@@ -117,4 +117,23 @@ class FacebookLeadAdsTest extends TestCase
         $this->assertSame(0, Lead::count());
         $this->assertSame('needs_renewal', app(\App\Services\SettingsService::class)->get('facebook_connection_status'));
     }
+
+    public function test_upsert_lead_is_callable_directly_and_creates_a_lead(): void
+    {
+        $tenant = Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+        app()->instance('current_tenant_id', $tenant->id);
+
+        $svc = app(\App\Services\Integrations\FacebookLeadAdsService::class);
+        $svc->upsertLead([
+            'field_data' => [
+                ['name' => 'full_name', 'values' => ['Direct Call Test']],
+                ['name' => 'phone_number', 'values' => ['0509998888']],
+            ],
+        ], 'form-direct-1', 'lg_direct_1', $tenant->id);
+
+        $lead = Lead::where('fb_leadgen_id', 'lg_direct_1')->first();
+        $this->assertNotNull($lead);
+        $this->assertSame('Direct Call Test', $lead->name);
+        $this->assertSame($tenant->id, $lead->tenant_id);
+    }
 }
