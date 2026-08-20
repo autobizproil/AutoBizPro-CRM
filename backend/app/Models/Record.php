@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Record extends Model
@@ -23,5 +24,10 @@ class Record extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function paymentLines(): HasMany
+    {
+        return $this->hasMany(RecordPaymentLine::class)->orderBy('position');
     }
 }
