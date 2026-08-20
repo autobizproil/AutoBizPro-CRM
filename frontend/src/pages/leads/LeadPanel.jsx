@@ -207,7 +207,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-800 shadow-2xl z-50 flex flex-col" dir="rtl">
+      <div className="fixed top-0 right-0 h-full w-full max-w-5xl bg-white dark:bg-gray-800 shadow-2xl z-50 flex flex-col" dir="rtl">
         {isLoading || !lead ? (
           <div className="flex items-center justify-center h-full text-gray-400">טוען...</div>
         ) : (
@@ -302,10 +302,10 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
               )}
             </div>
 
-            {/* Scrollable body */}
-            <div className="flex-1 overflow-y-auto">
+            {/* Scrollable body — details sidebar (right) + activity/timeline (left), like a full record page */}
+            <div className="flex-1 min-h-0 flex flex-col md:flex-row-reverse overflow-y-auto md:overflow-hidden">
               {/* Details */}
-              <div className="px-5 py-4 space-y-3 border-b border-gray-100 dark:border-gray-700">
+              <div className="md:w-80 md:flex-shrink-0 md:overflow-y-auto px-5 py-4 space-y-3 border-b md:border-b-0 md:border-l border-gray-100 dark:border-gray-700">
                 <Detail label="סטטוס">
                   <select value={lead.pipeline_stage_id ?? ''} onChange={changeStage} disabled={!canEdit}
                     className="border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 disabled:opacity-60">
@@ -347,6 +347,8 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 ))}
               </div>
 
+              {/* Activity + timeline */}
+              <div className="flex-1 md:overflow-y-auto">
               {/* Activity composer */}
               {canEdit && (
                 <form onSubmit={submitActivity} className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
@@ -392,6 +394,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     })}
                   </div>
                 )}
+              </div>
               </div>
             </div>
           </>
