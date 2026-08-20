@@ -207,7 +207,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed top-0 left-0 h-full w-full max-w-md bg-white dark:bg-gray-800 shadow-2xl z-50 flex flex-col" dir="rtl">
+      <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-800 shadow-2xl z-50 flex flex-col" dir="rtl">
         {isLoading || !lead ? (
           <div className="flex items-center justify-center h-full text-gray-400">טוען...</div>
         ) : (
