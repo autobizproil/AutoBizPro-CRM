@@ -15,10 +15,12 @@ use Illuminate\Support\Facades\Log;
 class FacebookOAuthService
 {
     private SettingsService $settings;
+    private FacebookLeadAdsService $leadAdsService;
 
-    public function __construct(SettingsService $settings)
+    public function __construct(SettingsService $settings, FacebookLeadAdsService $leadAdsService)
     {
         $this->settings = $settings;
+        $this->leadAdsService = $leadAdsService;
     }
 
     /**
@@ -132,6 +134,69 @@ class FacebookOAuthService
             'agencies',
             $pageId
         );
+    }
+
+    /**
+     * One-time sync of a page's existing lead forms and their historical leads on first
+     * connect — Facebook's webhook only delivers leads generated after subscription, so
+     * without this, everything captured before "Connect with Facebook" was clicked is lost.
+     * Never throws: a failed or partial backfill must not undo an otherwise-saved connection.
+     * Per-form failures don't abort the remaining forms.
+     */
+    private function backfillLeads(string $pageId, string $pageAccessToken, int $tenantId): void
+    {
+        try {
+            $response = Http::get("https://graph.facebook.com/v21.0/{$pageId}/leadgen_forms", [
+                'access_token' => $pageAccessToken,
+                'fields'       => 'id,name,status',
+                'limit'        => 50,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Facebook OAuth: leadgen_forms fetch failed', ['page_id' => $pageId, 'error' => $e->getMessage()]);
+            return;
+        }
+
+        if (!$response->ok()) {
+            Log::warning('Facebook OAuth: leadgen_forms fetch failed', ['page_id' => $pageId, 'status' => $response->status(), 'body' => $response->body()]);
+            return;
+        }
+
+        foreach ($response->json('data') ?? [] as $form) {
+            $this->backfillFormLeads($form['id'] ?? null, $pageAccessToken, $tenantId);
+        }
+    }
+
+    private function backfillFormLeads(?string $formId, string $pageAccessToken, int $tenantId): void
+    {
+        if (!$formId) {
+            return;
+        }
+
+        $params = ['access_token' => $pageAccessToken, 'fields' => 'id,created_time,field_data', 'limit' => 50];
+
+        do {
+            try {
+                $response = Http::get("https://graph.facebook.com/v21.0/{$formId}/leads", $params);
+            } catch (\Throwable $e) {
+                Log::warning('Facebook OAuth: leads fetch failed', ['form_id' => $formId, 'error' => $e->getMessage()]);
+                return;
+            }
+
+            if (!$response->ok()) {
+                Log::warning('Facebook OAuth: leads fetch failed', ['form_id' => $formId, 'status' => $response->status(), 'body' => $response->body()]);
+                return;
+            }
+
+            foreach ($response->json('data') ?? [] as $lead) {
+                if (!isset($lead['id'])) {
+                    continue;
+                }
+                $this->leadAdsService->upsertLead($lead, $formId, $lead['id'], $tenantId);
+            }
+
+            $after = $response->json('paging.cursors.after');
+            $params['after'] = $after;
+        } while ($after);
     }
 
     /**

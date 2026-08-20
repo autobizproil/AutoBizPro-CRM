@@ -14,7 +14,14 @@ class FacebookOAuthServiceTest extends TestCase
 
     private function service(): FacebookOAuthService
     {
-        return new FacebookOAuthService(app(SettingsService::class));
+        return app(FacebookOAuthService::class);
+    }
+
+    private function callBackfillLeads(FacebookOAuthService $svc, string $pageId, string $pageAccessToken, int $tenantId): void
+    {
+        $method = new \ReflectionMethod($svc, 'backfillLeads');
+        $method->setAccessible(true);
+        $method->invoke($svc, $pageId, $pageAccessToken, $tenantId);
     }
 
     public function test_exchange_long_lived_token_calls_graph_with_fb_exchange_token_grant(): void
@@ -244,6 +251,92 @@ class FacebookOAuthServiceTest extends TestCase
         ]);
 
         $this->callDelegatePage($this->service(), '111', 'page-token-111', 'user-token-abc', 'client-biz-999');
+
+        $this->assertTrue(true);
+    }
+
+    public function test_backfill_leads_fetches_forms_and_creates_leads(): void
+    {
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+
+        Http::fake([
+            'graph.facebook.com/*/leadgen_forms*' => Http::response(['data' => [
+                ['id' => 'form-1', 'name' => 'Contact Form', 'status' => 'ACTIVE'],
+            ]], 200),
+            'graph.facebook.com/*/form-1/leads*' => Http::response(['data' => [
+                ['id' => 'lg_bf_1', 'created_time' => '2026-08-01T10:00:00+0000', 'field_data' => [
+                    ['name' => 'full_name', 'values' => ['Backfilled Lead']],
+                    ['name' => 'phone_number', 'values' => ['0521112222']],
+                ]],
+            ]], 200),
+        ]);
+
+        $this->callBackfillLeads($this->service(), '111', 'page-token-111', $tenant->id);
+
+        $lead = \App\Models\Lead::where('fb_leadgen_id', 'lg_bf_1')->first();
+        $this->assertNotNull($lead);
+        $this->assertSame('Backfilled Lead', $lead->name);
+        $this->assertSame($tenant->id, $lead->tenant_id);
+    }
+
+    public function test_backfill_leads_follows_pagination_cursor(): void
+    {
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+
+        Http::fake([
+            'graph.facebook.com/*/leadgen_forms*' => Http::response(['data' => [
+                ['id' => 'form-1', 'name' => 'Contact Form', 'status' => 'ACTIVE'],
+            ]], 200),
+            'graph.facebook.com/*/form-1/leads?*after=cursor-2*' => Http::response(['data' => [
+                ['id' => 'lg_page2', 'created_time' => '2026-08-02T10:00:00+0000', 'field_data' => [
+                    ['name' => 'phone_number', 'values' => ['0523334444']],
+                ]],
+            ]], 200),
+            'graph.facebook.com/*/form-1/leads*' => Http::response([
+                'data' => [
+                    ['id' => 'lg_page1', 'created_time' => '2026-08-01T10:00:00+0000', 'field_data' => [
+                        ['name' => 'phone_number', 'values' => ['0521112222']],
+                    ]],
+                ],
+                'paging' => ['cursors' => ['after' => 'cursor-2']],
+            ], 200),
+        ]);
+
+        $this->callBackfillLeads($this->service(), '111', 'page-token-111', $tenant->id);
+
+        $this->assertNotNull(\App\Models\Lead::where('fb_leadgen_id', 'lg_page1')->first());
+        $this->assertNotNull(\App\Models\Lead::where('fb_leadgen_id', 'lg_page2')->first());
+    }
+
+    public function test_backfill_leads_continues_to_next_form_when_one_form_fetch_fails(): void
+    {
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+
+        Http::fake([
+            'graph.facebook.com/*/leadgen_forms*' => Http::response(['data' => [
+                ['id' => 'form-bad', 'name' => 'Broken Form', 'status' => 'ACTIVE'],
+                ['id' => 'form-good', 'name' => 'Good Form', 'status' => 'ACTIVE'],
+            ]], 200),
+            'graph.facebook.com/*/form-bad/leads*' => Http::response(['error' => ['message' => 'nope']], 400),
+            'graph.facebook.com/*/form-good/leads*' => Http::response(['data' => [
+                ['id' => 'lg_good', 'created_time' => '2026-08-01T10:00:00+0000', 'field_data' => [
+                    ['name' => 'phone_number', 'values' => ['0529998888']],
+                ]],
+            ]], 200),
+        ]);
+
+        $this->callBackfillLeads($this->service(), '111', 'page-token-111', $tenant->id);
+
+        $this->assertNotNull(\App\Models\Lead::where('fb_leadgen_id', 'lg_good')->first());
+    }
+
+    public function test_backfill_leads_does_not_throw_when_forms_fetch_fails(): void
+    {
+        $tenant = \App\Models\Tenant::create(['name' => 'Acme', 'subdomain' => 'acme', 'status' => 'active']);
+
+        Http::fake(['graph.facebook.com/*/leadgen_forms*' => Http::response(['error' => ['message' => 'nope']], 400)]);
+
+        $this->callBackfillLeads($this->service(), '111', 'page-token-111', $tenant->id);
 
         $this->assertTrue(true);
     }
