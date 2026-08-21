@@ -76,6 +76,8 @@ class RecordTypeController extends Controller
             'label_singular' => 'nullable|string|max:120',
             'icon'           => 'nullable|string|max:16',
             'position'       => 'sometimes|integer|min:0',
+            'has_payment_lines' => 'sometimes|boolean',
+            'has_payment_lines_amount_field' => 'nullable|string|max:255',
         ]);
 
         $recordType->update($data);

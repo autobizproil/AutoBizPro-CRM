@@ -5,6 +5,7 @@ namespace App\Services\Reporting;
 use App\Models\CustomFieldDefinition;
 use App\Models\PipelineStage;
 use App\Models\Record;
+use App\Models\RecordPaymentLine;
 use App\Models\RecordType;
 use App\Models\User;
 use App\Services\ConditionFilter;
@@ -48,6 +49,11 @@ class WidgetDataService
 
         if (isset($descriptor['recordTypeId'])) {
             $query->where('record_type_id', $descriptor['recordTypeId']);
+        }
+        if (isset($descriptor['recordTypeIdsIn'])) {
+            $query->join('records', 'records.id', '=', "{$table}.record_id")
+                ->whereIn('records.record_type_id', $descriptor['recordTypeIdsIn'])
+                ->whereNull('records.deleted_at');
         }
 
         $this->applyOwnerScope($query, $descriptor, $entity, $user);
@@ -234,6 +240,12 @@ class WidgetDataService
     /** @return array<string, mixed>|null */
     private function resolveDescriptor(string $entity): ?array
     {
+        if (str_starts_with($entity, 'payments:')) {
+            $slug = substr($entity, 9);
+
+            return $this->buildPaymentDescriptor($slug === 'all' ? null : $slug);
+        }
+
         if (str_starts_with($entity, 'record:')) {
             return $this->buildRecordDescriptor(substr($entity, 7));
         }
@@ -302,6 +314,64 @@ class WidgetDataService
             'groupFields'  => $groupFields,
             'filterFields' => $filterFields,
             'dateFields'   => $dateFields,
+        ];
+    }
+
+    /**
+     * Builds an EntityDescriptor-shaped array over record_payment_lines,
+     * joined to record_types for the tenant filter. $slug === null aggregates
+     * across every record type flagged has_payment_lines for this tenant
+     * (entity key "payments:all"); a slug scopes to one type ("payments:<slug>").
+     * Unlike buildRecordDescriptor(), payment_type/amount are real columns —
+     * jsonOnly is false, so columnExpr() emits plain column references.
+     *
+     * @return array<string, mixed>|null null when a given slug doesn't resolve
+     *                                    to a has_payment_lines type for this tenant
+     */
+    public function buildPaymentDescriptor(?string $slug): ?array
+    {
+        $tenantId = app('current_tenant_id');
+
+        $typesQuery = RecordType::where('tenant_id', $tenantId)->where('has_payment_lines', true);
+        if ($slug !== null) {
+            $typesQuery->where('slug', $slug);
+        }
+        $recordTypeIds = $typesQuery->pluck('id');
+
+        if ($recordTypeIds->isEmpty()) {
+            return null;
+        }
+
+        $label = $slug === null
+            ? 'תשלומים — הכל'
+            : 'תשלומים — ' . (RecordType::where('tenant_id', $tenantId)->where('slug', $slug)->value('label') ?? $slug);
+
+        return [
+            'label'        => $label,
+            'model'        => RecordPaymentLine::class,
+            'table'        => 'record_payment_lines',
+            'ownerColumn'  => null,
+            'jsonColumn'   => null,
+            'jsonOnly'     => false,
+            'recordTypeIdsIn' => $recordTypeIds->all(),
+            'valueFields'  => ['amount' => ['label' => 'סכום', 'type' => 'number']],
+            'groupFields'  => [
+                'payment_type' => [
+                    'label'   => 'סוג תשלום',
+                    'type'    => 'enum',
+                    'options' => RecordPaymentLine::PAYMENT_TYPES,
+                ],
+                'paid_at' => ['label' => 'תאריך תשלום', 'type' => 'date'],
+                'created_at' => ['label' => 'נוצר בתאריך', 'type' => 'date'],
+            ],
+            'filterFields' => [
+                'payment_type' => [
+                    'label'   => 'סוג תשלום',
+                    'type'    => 'enum',
+                    'options' => RecordPaymentLine::PAYMENT_TYPES,
+                ],
+            ],
+            'dateFields'   => ['paid_at' => 'תאריך תשלום', 'created_at' => 'נוצר בתאריך'],
         ];
     }
 

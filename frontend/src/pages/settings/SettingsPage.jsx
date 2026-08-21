@@ -1167,7 +1167,8 @@ function LabelsTab() {
 
   // Custom record types — user-defined entities beyond the fixed 4
   const [showTypeModal, setShowTypeModal] = useState(false)
-  const [typeDraft, setTypeDraft]   = useState({ label: '', label_singular: '', icon: RECORD_TYPE_ICONS[0] })
+  const [editingType, setEditingType] = useState(null) // RecordType being edited, or null for create
+  const [typeDraft, setTypeDraft]   = useState({ label: '', label_singular: '', icon: RECORD_TYPE_ICONS[0], has_payment_lines: false, has_payment_lines_amount_field: '' })
   const [typeError, setTypeError]  = useState('')
 
   const { data: recordTypes = [] } = useQuery({
@@ -1175,22 +1176,43 @@ function LabelsTab() {
     queryFn:  () => recordTypesApi.list().then(r => r.data.data),
   })
 
+  const { data: editingTypeFields = [] } = useQuery({
+    queryKey: ['custom-fields', editingType?.slug],
+    queryFn:  () => customFieldsApi.list(editingType.slug).then(r => r.data.data),
+    enabled:  !!editingType,
+  })
+
   const allEntities = [
     ...ENTITIES,
     ...recordTypes.map(rt => ({ id: rt.slug, label: rt.label, custom: true, recordTypeId: rt.id, recordCount: rt.records_count })),
   ]
 
-  const createType = useMutation({
-    mutationFn: (d) => recordTypesApi.create(d),
+  const saveType = useMutation({
+    mutationFn: (d) => editingType ? recordTypesApi.update(editingType.id, d) : recordTypesApi.create(d),
     onSuccess:  (res) => {
       qc.invalidateQueries({ queryKey: ['record-types'] })
-      setShowTypeModal(false)
-      setTypeDraft({ label: '', label_singular: '', icon: RECORD_TYPE_ICONS[0] })
-      setTypeError('')
-      setEntity(res.data.data.slug)
+      closeTypeModal()
+      if (!editingType) setEntity(res.data.data.slug)
     },
-    onError: (err) => setTypeError(err.response?.data?.message ?? 'שגיאה ביצירת סוג הרשומה'),
+    onError: (err) => setTypeError(err.response?.data?.message ?? 'שגיאה בשמירת סוג הרשומה'),
   })
+
+  function closeTypeModal() {
+    setShowTypeModal(false)
+    setEditingType(null)
+    setTypeDraft({ label: '', label_singular: '', icon: RECORD_TYPE_ICONS[0], has_payment_lines: false, has_payment_lines_amount_field: '' })
+    setTypeError('')
+  }
+
+  function openEditType(rt) {
+    setEditingType(rt)
+    setTypeDraft({
+      label: rt.label, label_singular: rt.label_singular ?? '', icon: rt.icon ?? RECORD_TYPE_ICONS[0],
+      has_payment_lines: !!rt.has_payment_lines, has_payment_lines_amount_field: rt.has_payment_lines_amount_field ?? '',
+    })
+    setTypeError('')
+    setShowTypeModal(true)
+  }
 
   const deleteType = useMutation({
     mutationFn: (id) => recordTypesApi.destroy(id),
@@ -1200,14 +1222,16 @@ function LabelsTab() {
     },
   })
 
-  const handleCreateType = (e) => {
+  const handleSaveType = (e) => {
     e.preventDefault()
     setTypeError('')
     if (!typeDraft.label.trim()) return
-    createType.mutate({
+    saveType.mutate({
       label: typeDraft.label.trim(),
       label_singular: typeDraft.label_singular.trim() || undefined,
       icon: typeDraft.icon,
+      has_payment_lines: typeDraft.has_payment_lines,
+      has_payment_lines_amount_field: typeDraft.has_payment_lines ? (typeDraft.has_payment_lines_amount_field || null) : null,
     })
   }
 
@@ -1310,6 +1334,12 @@ function LabelsTab() {
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
               }`}>
               {en.label}
+              {en.custom && canManage && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); openEditType(recordTypes.find(rt => rt.id === en.recordTypeId)) }}
+                  className="mr-1.5 inline-flex opacity-0 group-hover/tab:opacity-100 text-gray-300 hover:text-[#2398c2] transition-opacity"
+                  title="ערוך סוג רשומה">✎</span>
+              )}
               {en.custom && canManage && (
                 <span
                   onClick={(e) => {
@@ -1520,15 +1550,15 @@ function LabelsTab() {
         </div>
       )}
 
-      {/* Create record type modal */}
+      {/* Create/edit record type modal */}
       {showTypeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowTypeModal(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={closeTypeModal}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">סוג רשומה חדש</h2>
-              <button onClick={() => setShowTypeModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{editingType ? 'עריכת סוג רשומה' : 'סוג רשומה חדש'}</h2>
+              <button onClick={closeTypeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
             </div>
-            <form onSubmit={handleCreateType} className="px-6 py-4 space-y-4">
+            <form onSubmit={handleSaveType} className="px-6 py-4 space-y-4">
               {typeError && (
                 <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-sm px-3 py-2 rounded-lg">
                   {typeError}
@@ -1561,15 +1591,38 @@ function LabelsTab() {
                   ))}
                 </div>
               </div>
+              {editingType && (
+                <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none mb-2">
+                    <input type="checkbox" checked={typeDraft.has_payment_lines}
+                      onChange={e => setTypeDraft(d => ({ ...d, has_payment_lines: e.target.checked }))}
+                      className="rounded border-gray-300 accent-[#2398c2]" />
+                    מכיל שורות תשלום (Bit / אשראי / מזומן וכו')
+                  </label>
+                  {typeDraft.has_payment_lines && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">שדה סכום החשבונית (לאזהרת התאמה)</label>
+                      <select value={typeDraft.has_payment_lines_amount_field}
+                        onChange={e => setTypeDraft(d => ({ ...d, has_payment_lines_amount_field: e.target.value }))}
+                        className={INPUT}>
+                        <option value="">בלי אזהרה</option>
+                        {editingTypeFields.filter(f => f.field_type === 'number').map(f => (
+                          <option key={f.name} value={f.name}>{f.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
               <p className="text-xs text-gray-400 dark:text-gray-500">
-                לאחר היצירה תוכל להוסיף שדות משלך (בדיוק כמו ברשומות אחרות) ותופיע קישור בסרגל הניווט העליון.
+                {editingType ? 'שינויים כאן חלים מיד על כל הרשומות מסוג זה.' : 'לאחר היצירה תוכל להוסיף שדות משלך (בדיוק כמו ברשומות אחרות) ותופיע קישור בסרגל הניווט העליון.'}
               </p>
               <div className="flex gap-2 pt-1">
-                <button type="submit" disabled={createType.isPending || !typeDraft.label.trim()}
+                <button type="submit" disabled={saveType.isPending || !typeDraft.label.trim()}
                   className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
-                  {createType.isPending ? 'יוצר...' : 'צור סוג רשומה'}
+                  {saveType.isPending ? 'שומר...' : editingType ? 'שמור שינויים' : 'צור סוג רשומה'}
                 </button>
-                <button type="button" onClick={() => setShowTypeModal(false)}
+                <button type="button" onClick={closeTypeModal}
                   className="px-4 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm">ביטול</button>
               </div>
             </form>

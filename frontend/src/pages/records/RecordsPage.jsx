@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { recordTypesApi, recordsApi } from '../../api/recordTypes'
 import { customFieldsApi } from '../../api/customFields'
+import { paymentLinesApi } from '../../api/paymentLines'
+import { PAYMENT_TYPES } from '../../constants/paymentTypes'
 import { useAuth } from '../../context/AuthContext'
 import FilterPanel from '../leads/FilterPanel'
 import { useDeleteAllEntity } from '../../hooks/useBulkDelete'
@@ -89,12 +91,38 @@ export default function RecordsPage() {
     onSuccess:  invalidate,
   })
 
+  const { data: paymentLines = [] } = useQuery({
+    queryKey: ['payment-lines', slug, editing?.id],
+    queryFn:  () => paymentLinesApi.list(type.id, editing.id).then(r => r.data.data),
+    enabled: !!type && !!editing && !!type.has_payment_lines,
+  })
+  const [lineWarning, setLineWarning] = useState('')
+  const [lineError, setLineError]     = useState('')
+  const [lineDrafts, setLineDrafts]   = useState({})
+  const invalidateLines = () => qc.invalidateQueries({ queryKey: ['payment-lines', slug, editing?.id] })
+
+  const createLine = useMutation({
+    mutationFn: (d) => paymentLinesApi.create(type.id, editing.id, d),
+    onSuccess:  (res) => { invalidateLines(); setLineWarning(res.data.warning ?? '') },
+    onError:    (err) => setLineError(err.response?.data?.message ?? 'שגיאה בשמירה'),
+  })
+  const updateLine = useMutation({
+    mutationFn: ({ id, d }) => paymentLinesApi.update(type.id, editing.id, id, d),
+    onSuccess:  (res) => { invalidateLines(); setLineWarning(res.data.warning ?? '') },
+    onError:    (err) => setLineError(err.response?.data?.message ?? 'שגיאה בשמירה'),
+  })
+  const deleteLine = useMutation({
+    mutationFn: (id) => paymentLinesApi.destroy(type.id, editing.id, id),
+    onSuccess:  (res) => { invalidateLines(); setLineWarning(res.data.warning ?? '') },
+    onError:    (err) => setLineError(err.response?.data?.message ?? 'שגיאה בשמירה'),
+  })
+
   const deleteAll = useDeleteAllEntity(slug, ['records', slug])
   const [deleteAllOpen, setDeleteAllOpen] = useState(false)
 
   const openCreate = () => { setEditing(null); setForm({}); setError(''); setModal(true) }
-  const openEdit = (r) => { setEditing(r); setForm(r.data ?? {}); setError(''); setModal(true) }
-  const closeModal = () => { setModal(false); setEditing(null); setForm({}); setError('') }
+  const openEdit = (r) => { setEditing(r); setForm(r.data ?? {}); setError(''); setLineWarning(''); setLineError(''); setModal(true) }
+  const closeModal = () => { setModal(false); setEditing(null); setForm({}); setError(''); setLineWarning(''); setLineError('') }
 
   const setField = (name) => (e) => {
     const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value
@@ -276,6 +304,58 @@ export default function RecordsPage() {
                   </div>
                 ))}
               </div>
+              {editing && type?.has_payment_lines && (
+                <div className="border-t border-gray-100 dark:border-gray-700 pt-3 mt-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">שורות תשלום</h3>
+                    <button type="button"
+                      onClick={() => createLine.mutate({ payment_type: PAYMENT_TYPES[0].id, amount: 0.01 })}
+                      className="text-xs text-[#2398c2] hover:underline">+ הוסף שורה</button>
+                  </div>
+                  {lineError && (
+                    <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded-lg mb-2">
+                      {lineError}
+                    </div>
+                  )}
+                  {lineWarning && (
+                    <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-300 text-xs px-3 py-2 rounded-lg mb-2">
+                      {lineWarning}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {paymentLines.map(line => (
+                      <div key={line.id} className="flex items-center gap-2">
+                        <select value={line.payment_type}
+                          onChange={e => updateLine.mutate({ id: line.id, d: { payment_type: e.target.value } })}
+                          className={INPUT + ' flex-1'}>
+                          {PAYMENT_TYPES.map(pt => <option key={pt.id} value={pt.id}>{pt.label}</option>)}
+                        </select>
+                        <input type="number" step="0.01"
+                          value={lineDrafts[line.id]?.amount ?? line.amount}
+                          onChange={e => setLineDrafts(d => ({ ...d, [line.id]: { ...d[line.id], amount: e.target.value } }))}
+                          onBlur={e => {
+                            updateLine.mutate({ id: line.id, d: { amount: e.target.value } })
+                            setLineDrafts(d => { const { [line.id]: _drop, ...rest } = d; return rest })
+                          }}
+                          className={INPUT + ' w-28'} dir="ltr" />
+                        <input type="date"
+                          value={lineDrafts[line.id]?.paid_at ?? (line.paid_at ?? '')}
+                          onChange={e => setLineDrafts(d => ({ ...d, [line.id]: { ...d[line.id], paid_at: e.target.value } }))}
+                          onBlur={e => {
+                            updateLine.mutate({ id: line.id, d: { paid_at: e.target.value || null } })
+                            setLineDrafts(d => { const { [line.id]: _drop, ...rest } = d; return rest })
+                          }}
+                          className={INPUT + ' w-40'} dir="ltr" />
+                        <button type="button" onClick={() => deleteLine.mutate(line.id)}
+                          className="text-gray-300 dark:text-gray-600 hover:text-red-500 text-lg leading-none">×</button>
+                      </div>
+                    ))}
+                    {paymentLines.length === 0 && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500">אין שורות תשלום עדיין</p>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={createRecord.isPending || updateRecord.isPending}
                   className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
