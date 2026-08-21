@@ -253,8 +253,10 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
 
             {/* Stage stepper — chevron/breadcrumb segments like Fireberry: each stage flows
                 into the next with a pointed edge via clip-path. Stages before the active one
-                are flat gray (already passed); stages after fade from the active color the
-                further they are, so the whole row reads as one gradient. */}
+                are flat gray (already passed); stages after keep a fixed light tint of their
+                own configured color — a distance-based fade was tried first but washed every
+                stage into the same pale blue-lavender once diluted, losing the per-stage hue
+                the tenant actually set. */}
             {stages.length > 0 && (() => {
               const activeIdx = stages.findIndex(s => s.id === lead.pipeline_stage_id)
               return (
@@ -276,8 +278,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     if (active) {
                       style.backgroundColor = color
                     } else if (!passed && activeIdx !== -1) {
-                      const dist = i - activeIdx
-                      style.backgroundColor = `color-mix(in srgb, ${color} ${Math.max(15, 40 - dist * 8)}%, white)`
+                      style.backgroundColor = `color-mix(in srgb, ${color} 30%, white)`
                     }
                     return (
                       <button
