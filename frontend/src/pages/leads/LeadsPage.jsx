@@ -392,7 +392,7 @@ export default function LeadsPage() {
         )
         case 'source': return (
           <select value={form.source} onChange={set('source')} className={MODAL_INPUT}>
-            {SOURCES.map(s => <option key={s} value={s}>{s || `בחר ${t('source')}`}</option>)}
+            {SOURCES.map(s => <option key={s} value={s} style={{ color: s ? (SOURCE_COLORS[s] ?? '#111827') : '#6b7280' }}>{s || `בחר ${t('source')}`}</option>)}
           </select>
         )
         case 'pipeline_stage_id': return (
@@ -508,13 +508,13 @@ export default function LeadsPage() {
               color: SOURCE_COLORS[lead.source] ?? '#6b7280',
               borderColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}60`,
             } : { backgroundColor: '#f3f4f6', color: '#9ca3af', borderColor: '#e5e7eb' }}>
-            <option value="" className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">ללא מקור הגעה</option>
+            <option value="" style={{ color: '#6b7280', backgroundColor: 'white' }}>ללא מקור הגעה</option>
             {/* Imported leads can carry a source value outside our fixed list —
                 keep it selectable instead of silently losing it when the dropdown opens. */}
             {lead.source && !SOURCES.includes(lead.source) && (
-              <option value={lead.source} className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">{lead.source}</option>
+              <option value={lead.source} style={{ color: SOURCE_COLORS[lead.source] ?? '#6b7280', backgroundColor: 'white' }}>{lead.source}</option>
             )}
-            {SOURCES.filter(Boolean).map(s => <option key={s} value={s} className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">{s}</option>)}
+            {SOURCES.filter(Boolean).map(s => <option key={s} value={s} style={{ color: SOURCE_COLORS[s] ?? '#111827', backgroundColor: 'white' }}>{s}</option>)}
           </select>
         </td>
       )

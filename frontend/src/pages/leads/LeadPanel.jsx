@@ -8,7 +8,7 @@ import { customFieldsApi } from '../../api/customFields'
 import { clientsApi } from '../../api/clients'
 import { tasksApi } from '../../api/tasks'
 import { useToast } from '../../context/ToastContext'
-import { SOURCES } from '../../lib/leadSources'
+import { SOURCES, SOURCE_COLORS } from '../../lib/leadSources'
 
 // Small stroke-icon set — replaces the old emoji icons everywhere in this panel
 // (activity types, modal titles), which read as childish next to Fireberry's flat colored icons.
@@ -388,9 +388,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     {/* Imported leads (e.g. from Fireberry) can carry a source value outside
                         our fixed list — show it as-is instead of silently blanking it out. */}
                     {!SOURCES.includes(field('source')) && field('source') && (
-                      <option value={field('source')}>{field('source')}</option>
+                      <option value={field('source')} style={{ color: SOURCE_COLORS[field('source')] ?? '#6b7280' }}>{field('source')}</option>
                     )}
-                    {SOURCES.map(s => <option key={s} value={s}>{s || 'ללא מקור הגעה'}</option>)}
+                    {SOURCES.map(s => <option key={s} value={s} style={{ color: s ? (SOURCE_COLORS[s] ?? '#111827') : '#6b7280' }}>{s || 'ללא מקור הגעה'}</option>)}
                   </select>
                 </Detail>
                 <div>
