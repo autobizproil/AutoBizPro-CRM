@@ -189,6 +189,50 @@ fixed (out of scope, different project). Spawned as background task
 mechanism into this CRM, replacing/extending the dead Track A scaffolding.
 Not started as of this handoff.
 
+### OPEN TASK — lead panel visual polish (reported, not yet built)
+
+User compared our lead panel against Fireberry's real record page side by
+side (screenshots) right after the full-page+stepper port above landed, and
+said ours "looks like a kid designed it, not professional." Specific,
+concrete gaps from that comparison (do this as a real design pass, not a
+copy-paste of colors):
+
+- **Stage stepper shape**: Fireberry's segments are chevron/arrow-shaped —
+  each stage flows into the next with a pointed edge (like a breadcrumb),
+  active stage in a solid saturated color, inactive stages in a light
+  gray-blue gradient. Ours (`LeadPanel.jsx`'s new stepper row, this session)
+  is plain flat rectangles with hard edges — no chevron shape at all.
+- **Quick action buttons**: Fireberry's are **pill-shaped** (`rounded-full`),
+  consistent pastel background per action (light blue "לקוח", light
+  pink/red "חתימה", light green "Yesh", light purple "תשלום", light
+  yellow "חשבונית", light green "וואטסאפ", light blue "התקשר"), evenly
+  sized and spaced. Ours uses `rounded-lg` (sharp-ish rectangles) with
+  `flex-1` causing uneven widths depending on how many buttons render for a
+  given lead (phone present/absent etc. changes the count).
+- **Header avatar**: Fireberry's is a clean, simple colored circle with the
+  first initial. Ours colors the circle from `lead.stage?.color` which can
+  land on a harsh/ugly color depending on what color the stage happens to
+  have — looked visibly worse in the side-by-side. Consider a fixed neutral
+  palette or a deliberately curated color instead of reusing the raw stage
+  color for the avatar background.
+- **Activity-type dropdown icons**: Fireberry's "תיעוד פעילות" dropdown shows
+  each activity type (שיחה/וואטסאפ/אימייל/פגישה/הערה/משימה) with its own
+  colored icon inline in the option list. Check whether ours currently does
+  this or falls back to plain text.
+- **Related-record count badges**: Fireberry shows small colored circular
+  icon badges near the top (תנועות/חשבוניות/הזמנות with counts) linking to
+  related records. Our lead model doesn't have equivalent relations to
+  invoices/orders today — lower priority, note but don't force it.
+- **General spacing**: Fireberry has more generous whitespace and clearer
+  visual separation between sections than our current tighter layout.
+
+Two reference screenshots (ours vs. Fireberry, same-shaped record: a
+converted client "אבי רצון"/"אורן") were shared in chat this session —
+if starting this task in a fresh session without that visual context, ask
+the user to re-share or re-open Fireberr/one of our own leads side by side
+before implementing, rather than guessing exact colors/shapes from this
+text description alone.
+
 ### Environment notes for next session
 
 - The in-session Browser-pane preview tooling (`Claude_Browser__*`) was
