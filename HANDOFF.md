@@ -1,4 +1,220 @@
-# HANDOFF — CRM (AutoBizPro) — 2026-08-19 (latest session, on top of everything below)
+# HANDOFF — CRM (AutoBizPro) — 2026-08-20/21 (latest session, on top of everything below)
+
+## 0. Latest session summary (2026-08-19 evening → 2026-08-21)
+
+Long session, mostly on `sonia-crm` production, deploying after nearly every
+commit (pattern: `git pull` → `config:clear`+`config:cache` →
+`route:clear`+`route:cache` → restart php-fpm → `npm run build` → copy
+`dist/` into `backend/public/`, per the deploy gotcha documented below).
+14 commits, `c0971de4`→`c3e0d3e2`.
+
+### Forgot-password flow (`c0971de4`)
+
+Login screen had no way to recover a forgotten password. Added: request-link
+page, reset-with-token page, backend endpoints (throttled 5/min, generic
+"if this email exists..." response to avoid enumeration), new
+`password_reset_tokens` table (migration in `SCHEMA_DB/`).
+
+### Fireberry-parity dashboards — Sonia's own "הכנסות" board built for real (`6095c787`, plus data-only board creation not in git)
+
+User asked to replicate everything Sonia had in Fireberry's dashboards.
+Two real widget-builder gaps found and fixed first:
+- Custom record types (e.g. her "חשבוniot") could filter by `created_at` but
+  never **group/chart** by it — only built-in entities had `created_at` in
+  `groupFields`, not `buildRecordDescriptor()`'s output. Fixed, plus added
+  month/week/year bucketing on the **primary** display field (previously only
+  the P2/3 *secondary* groupBy dimension supported date granularity) via a
+  new `displayGranularity` param, with matching UI in `AddWidgetModal`.
+- Added a Fireberry-style caption under every widget ("‎<field> - <aggregation>",
+  "‎<date field>: <period>") so a widget's filter is visible without opening
+  edit mode — this is what the user pointed at as "the thing that's different
+  from ours" after seeing her real Fireberry screenshots.
+
+Then **live-inspected Sonia's real Fireberry account** (app.fireberry.com,
+tenant "MAXIDOORS" — user logged in herself, gave explicit permission each
+time before any SSH/browser action touching her account or sonia-crm prod)
+and built two real boards on her CRM tenant (tenant_id=2, board ids 5 and 6,
+created directly via `DashboardBoard`/`DashboardWidget` Eloquent models over
+SSH tinker, dry-run validated against real data before writing anything):
+
+- **"הכנסות"** (revenue) — 4 custom record types for invoices already existed
+  on her tenant (`rt_rdhst4`=חשבוניות עסקה, `rt_8az626`=חשבוניות זיכוי,
+  `rt_5h0wrx`=חשבוניות מס, `rt_7vjqxv`=חשבוניות מס קבלה). Found via dry-run
+  that the "סכום כולל" field is empty/unused on 3 of the 4 types — real data
+  lives in "סה״כ (ש״ח)" instead (verified: לפני מע"מ + מע"מ = סה״כ). 12
+  widgets: monthly/prior-month/yearly/all-time revenue KPIs, per-type
+  all-time "unpaid" totals (free — these are just totals of the whole
+  document type, no special field needed, עסקה=quote/unpaid, מס=pre-receipt),
+  revenue-by-client×year bar, revenue-by-month bar, two client tables,
+  VAT-by-month, and a 4-tile metrics-table by document type.
+- **"ניתוח לקוחות"** — Fireberry had 4 literally-identical duplicate "new
+  customers this month" tiles (dead clutter from Sonia's own setup, not
+  reproduced) plus a status pie. Built one clean KPI (this month), one
+  (previous month), and a lead-status pie (`entity=lead`,
+  `displayField=pipeline_stage_id`).
+
+**Deliberately not built**: payment-type breakdown (Bit/אשראי/מזומן).
+Live-inspected where this data actually lives in Fireberry: a repeating
+"פרטי קבלה" sub-table per receipt (multiple payment lines possible per
+invoice — split payments). This CRM's `Record`/`RecordType` system has *no*
+line-item/child-row concept at all, only flat fields — spawned as a
+background task (`task_1561b701`, not yet started) to spec+build a real
+`record_payment_lines` table + UI + widget-builder support for it.
+
+### CSV import UX (`96e1d5ed`, `53702df2`)
+
+- Status-mapping step (leads import) went fully automatic — no more manual
+  per-value dropdown. Default was already correct (exact name match →
+  existing stage, else auto-create with the exact CSV value as the stage
+  name); removed the choice UI entirely per user's explicit call, step 3 is
+  now a read-only preview of what will happen.
+- Import summary lumped every skip into "(כפילויות)" regardless of cause —
+  now tracks and shows a real per-reason breakdown (`ImportJob.skip_reasons`,
+  new column). A real "178 duplicates" the user saw turned out to likely be
+  duplicate phone numbers *within the source CSV itself*, not stale DB data.
+- Real progress bar during processing — `ProcessImportJob` counts total rows
+  up front and persists running imported/skipped counts every 25 rows (not
+  per-row); frontend already polled every 1.5s, now renders an actual %.
+
+### Lead source dropdown (`96e1d5ed`)
+
+Free-text field → dropdown (same list as lead-creation), shared via new
+`frontend/src/lib/leadSources.js`. Preserves an imported value outside the
+list instead of blanking it.
+
+### Widget-card visual bugs found live by the user (`6443f37a`, `0bb69325`)
+
+- A 7-digit "all time" KPI total literally overflowed its own card's rounded
+  border into the neighboring tile — font size now scales down with the
+  formatted string's length, `overflow-hidden`+`truncate` as a backstop.
+- Double scrollbar on every page: `body` had no height/margin reset, so its
+  natural height (h-screen shell + default ~8px browser margin) exceeded the
+  viewport and added a spurious outer scrollbar next to the app's own
+  intentional ones. Also added a `.scrollbar-right` utility (Chrome puts an
+  RTL element's own scrollbar on its *left* by default) for the main content
+  area and the dashboards board list.
+- Widgets could only be deleted, never edited — added a gear (⚙) button next
+  to the delete "×", opens `AddWidgetModal` pre-filled via a new `initial`
+  prop. The `metrics_table` widget type had *no* hover controls at all before
+  this despite already receiving `onDelete` as a prop — nobody had wired it up.
+
+### Production bug found via a log audit, not a bug report (`daebd5ed`)
+
+Asked to "look at the whole system" — pulled `sonia-crm`'s Laravel log and
+found `Route [login] not defined` recurring since Aug 12. Root cause: this is
+an API-only app with no named `login` route; `Authenticate::redirectTo()`'s
+default behavior calls `route('login')` for any unauthenticated *non-XHR*
+request (someone opening a protected API URL directly in a browser tab, or a
+bot) — that throws `RouteNotFoundException` **before** `AuthenticationException`
+is even constructed, bypassing the JSON exception handler already registered
+in `bootstrap/app.php` and surfacing as a raw 500. Fixed via
+`$middleware->redirectGuestsTo(fn () => null)`. Verified by reproducing the
+exact crash locally (temporarily reverted the fix, watched the new test fail
+with the identical error, restored it) before deploying — see
+`AuthControllerTest.php`. Also cleared 5 stale `failed_jobs` rows from
+2026-07-24 (CSV import files that no longer existed on disk by the time the
+queue processed them — dead, not a live problem).
+
+### Background code audit → one more real bug (`bd5973ca`)
+
+Dispatched an Explore-agent audit for tenant-isolation gaps, SQL injection,
+bulk-update event bypasses, N+1s, and swallowed exceptions. Codebase came back
+clean on nearly everything (every `withoutGlobalScope` call site is either
+paired with an explicit tenant filter or derives tenant from a non-user-
+controlled lookup; every raw-SQL sink is field-whitelisted). One real bug:
+`LeadService::bulk()`'s `assign` action had the *same* mass-query-builder
+event-bypass bug that `change_stage` was already fixed for in an earlier
+session — bulk-reassigning leads never fired the outgoing webhook. Fixed
+with the identical pattern (mass update for the write, then fire the
+observer's `dispatch()` — made `LeadObserver::dispatch()` public for this —
+for just the leads whose `assigned_to` actually changed).
+
+### Dashboard boards sidebar (`0b9f5403`)
+
+Three real bugs found from the user actually using it after the above ship:
+sidebar's own code comment said "Right sidebar" but it was the *second*
+child of an RTL flex row, which puts it on the left — swapped DOM order.
+Every page load reset to the first board, discarding whatever board the user
+was on — now persisted to `localStorage` and restored. No way to reorder
+boards at all — added ▲▼ move buttons; `PUT /dashboards/{id}` now also
+accepts `position`.
+
+### Lead detail panel — full redesign to match Fireberry (`7db2e572`, `ec9eff4c`, `c3e0d3e2`)
+
+Three rounds, each driven by the user pointing at something concrete:
+1. Panel had `left-0` hardcoded regardless of RTL — every other panel in the
+   app opens from the right, this was the one exception. Fixed.
+2. User: "I want it to open like an additional page." Widened from a 448px
+   drawer to `max-w-5xl`, split the body into a right-hand fixed field
+   sidebar + independently-scrolling activity/timeline column (falls back to
+   stacked single-column on mobile).
+3. User: "really like Fireberry, more like a page." **Logged into the user's
+   own real Fireberry with explicit permission** and opened an actual
+   customer record to see precisely what "page" meant: no dim backdrop, a
+   real full-bleed surface, pipeline stage shown as a horizontal stepper bar
+   (all stages visible, current one highlighted) instead of a dropdown.
+   Ported both exactly: dropped the backdrop (`fixed inset-0 bg-white`, no
+   overlay div), added a back-arrow in the header, replaced the stage
+   `<select>` with a clickable stepper row.
+
+### Login page redesign (`b25d7cc7`, `abeb1d08`)
+
+Plain centered card → split-screen with a gradient marketing panel (headline,
+4 feature bullets, social-proof line), matching Fireberry's login layout the
+user photographed. One follow-up bug: panel used a `lg:` (1024px) breakpoint,
+but the user was viewing via Chrome's "Request desktop site" on mobile, which
+renders at ~980px — under the threshold, so the whole panel was hidden.
+Lowered to `md:` (768px).
+
+### Facebook Lead Ads — the real unblock found, spec spawned as a background task
+
+User asked to check `C:\xampp\htdocs\Taskey` (a separate, older sibling PHP
+CRM, same business owner) for how *its* Facebook integration works, since
+this CRM's own direct-OAuth Track A has been dead-blocked for weeks (Meta
+never surfaced `leads_retrieval`/`pages_manage_metadata` as requestable for
+this app — see the 2026-08-14 section below). Read
+`taskey_admin/facebook_app/facebook_app.php` +
+`facebook_app_functions.php` (~2000 lines, lots of dead commented-out code
+mixed with the live path). **The actual unblock**: Tasky's app is approved
+for exactly the blocked permissions, but it doesn't rely on per-tenant App
+Review at all — it delegates each client Facebook Page to Taskey's own
+pre-approved Business Manager via `POST /{business_id}/managed_businesses` +
+`POST /{page_id}/agencies` (`permitted_tasks: ['ADVERTISE','MANAGE_LEADS']`),
+then subscribes the page to the `leadgen` webhook and backfills historical
+leads/forms synchronously. **Security note for the *other* codebase, not
+this one**: Taskey's `app_secret` and a live customer's access token are
+hardcoded in plaintext PHP source, not `.env` — flagged to the user, not
+fixed (out of scope, different project). Spawned as background task
+`task_214d64a4`: spec+plan+build a tenant-scoped port of the delegation
+mechanism into this CRM, replacing/extending the dead Track A scaffolding.
+Not started as of this handoff.
+
+### Environment notes for next session
+
+- The in-session Browser-pane preview tooling (`Claude_Browser__*`) was
+  persistently unreliable this whole session — screenshots frequently timed
+  out ("pane is not displayed"), and login flows inside it randomly lost
+  session state across tool calls even right after a confirmed-successful
+  login POST. Not a code issue (confirmed: same login flow worked fine via
+  curl and via the user's own real browser). When it happens, fall back to
+  `read_page`/`get_page_text`/`javascript_tool` computed-style checks instead
+  of fighting for a screenshot, and say explicitly that live visual
+  verification wasn't possible rather than guessing.
+- Production deploys and any SSH/DB write against `sonia-crm` were confirmed
+  gated by the session's own auto-mode classifier on **every individual
+  invocation** — a standing "you may proceed automatically" instruction
+  inside a `/loop` prompt does not bypass this; each deploy needs a real
+  user turn. This makes unattended multi-hour autonomous work on this project
+  structurally impossible for anything touching production — plan sessions
+  around that rather than trying to schedule around it.
+- Sonia's Fireberry account is real production data for a live customer —
+  every SSH/browser touch against either it or `sonia-crm` prod this session
+  had a fresh explicit confirmation first; keep doing that, don't generalize
+  an earlier yes.
+
+---
+
+# Prior HANDOFF — 2026-08-19 (kept below for continuity)
 
 ## 0. Latest session summary (2026-08-17 → 2026-08-19)
 
