@@ -139,7 +139,6 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
     updateLead.mutate({ id: leadId, data: { [key]: edit[key] } })
   }
 
-  const changeStage = (e) => updateLead.mutate({ id: leadId, data: { pipeline_stage_id: Number(e.target.value) } })
 
   const submitActivity = (e) => {
     e.preventDefault()
@@ -203,11 +202,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-
-      {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-5xl bg-white dark:bg-gray-800 shadow-2xl z-50 flex flex-col" dir="rtl">
+      {/* Full-page takeover — no dim backdrop, this IS the page while open (matches
+          Fireberry's record view: a real page-like surface, not a floating drawer). */}
+      <div className="fixed inset-0 bg-white dark:bg-gray-800 z-50 flex flex-col" dir="rtl">
         {isLoading || !lead ? (
           <div className="flex items-center justify-center h-full text-gray-400">טוען...</div>
         ) : (
@@ -216,6 +213,9 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-start justify-between"
               style={{ borderTop: `4px solid ${lead.stage?.color ?? '#2398c2'}` }}>
               <div className="flex items-center gap-3 min-w-0">
+                <button onClick={onClose} title="חזרה" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M5 12l6-6M5 12l6 6"/></svg>
+                </button>
                 <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold flex-shrink-0"
                   style={{ backgroundColor: lead.stage?.color ?? '#2398c2' }}>
                   {lead.name?.trim()
@@ -230,6 +230,28 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
               </div>
               <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
             </div>
+
+            {/* Stage stepper */}
+            {stages.length > 0 && (
+              <div className="flex border-b border-gray-100 dark:border-gray-700 overflow-x-auto">
+                {stages.map(s => {
+                  const active = s.id === lead.pipeline_stage_id
+                  return (
+                    <button
+                      key={s.id}
+                      disabled={!canEdit}
+                      onClick={() => updateLead.mutate({ id: leadId, data: { pipeline_stage_id: s.id } })}
+                      className={`flex-1 min-w-[100px] text-center text-xs font-medium py-2.5 px-2 transition-colors whitespace-nowrap disabled:cursor-default ${
+                        active ? 'text-white' : 'bg-gray-50 dark:bg-gray-700/40 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                      style={active ? { backgroundColor: s.color ?? '#2398c2' } : undefined}
+                    >
+                      {s.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Quick actions */}
             <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-2 flex-wrap">
@@ -306,13 +328,6 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
             <div className="flex-1 min-h-0 flex flex-col md:flex-row-reverse overflow-y-auto md:overflow-hidden">
               {/* Details */}
               <div className="md:w-80 md:flex-shrink-0 md:overflow-y-auto px-5 py-4 space-y-3 border-b md:border-b-0 md:border-l border-gray-100 dark:border-gray-700">
-                <Detail label="סטטוס">
-                  <select value={lead.pipeline_stage_id ?? ''} onChange={changeStage} disabled={!canEdit}
-                    className="border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 disabled:opacity-60">
-                    <option value="">ללא שלב</option>
-                    {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </Detail>
                 <EditableDetail label="טלפון" value={field('phone')} onChange={setField('phone')} onBlur={() => commit('phone')} disabled={!canEdit} type="tel" />
                 <EditableDetail label="אימייל" value={field('email')} onChange={setField('email')} onBlur={() => commit('email')} disabled={!canEdit} type="email" />
                 <Detail label="מקור">
