@@ -513,7 +513,7 @@ from memory correctly every time so far, but that's luck, not process.
 deployed but blocked on Meta; Track B (Make.com bridge) is built, deployed, and verified live end-to-end
 for the first customer (sonia-crm) — a real test lead flowed from Facebook through Make into the CRM.**
 
-### Track A: Direct Facebook OAuth connect — DONE, DEPLOYED, BLOCKED ON META
+### Track A: Direct Facebook OAuth connect — DONE, DEPLOYED, **UNBLOCKED 2026-08-21** (see resolution below the original blocked writeup)
 
 Full one-click "Connect with Facebook" flow replacing the old manual app_id/secret/page_id form.
 Built via superpowers brainstorming → spec → plan → subagent-driven-development, 9 tasks +
@@ -553,6 +553,52 @@ resolved this session. `FACEBOOK_CONFIG_ID` is still empty in production `.env` 
 moment a real Configuration with both permissions can be created and its ID pasted in — no code
 changes needed at that point, just: `sudo nano ~/AutoBizPro-CRM/backend/.env`, add
 `FACEBOOK_CONFIG_ID=...`, then `sudo -u www-data php artisan config:clear && config:cache`.
+
+**RESOLVED 2026-08-21 — root cause was never config_id vs. classic OAuth scopes.** [PR #6](https://github.com/autobizproil/AutoBizPro-CRM/pull/6)
+(spec: `docs/superpowers/specs/2026-08-20-facebook-delegation-lead-ads-design.md`, plan:
+`docs/superpowers/plans/2026-08-20-facebook-delegation-lead-ads.md`) ported a Business-Manager
+delegation mechanism from a sister legacy app (Taskey CRM) and, as part of that work, switched the
+OAuth redirect from `config_id`/Configurations to classic `->scopes([...])` — that switch was
+initially thought to be the fix, but **live testing proved it wasn't**: hitting the classic-scopes
+OAuth dialog directly still returned `Invalid Scopes: leads_retrieval, pages_manage_ads,
+pages_read_user_content, pages_manage_metadata` (later narrowing to just the last two). Both
+flavors were blocked identically — this was never a flow-type issue.
+
+**The actual fix: App Dashboard → Use cases.** The app had a permission-catalog gap totally
+unrelated to config_id/scopes: **App Dashboard → Use cases** had zero lead/Page-related use cases
+attached, only "Create & manage ads with Marketing API". Meta's current App Review model gates the
+whole permission catalog behind Use Cases, not raw permission requests — a permission simply
+doesn't exist as requestable (App Review or OAuth) until its use case is attached, which is exactly
+the "listed nowhere, not even as needs-review" symptom this write-up originally described. Adding
+**"Capture & manage ad leads with Marketing API"** and **"Manage everything on your Page"**
+(App Dashboard → Use cases → Add use cases → filter "All") immediately did two things, live-verified
+same session:
+- `leads_retrieval` and `pages_manage_ads` became grantable via the classic OAuth dialog with zero
+  further review (worked instantly for an app-role user).
+- `pages_manage_metadata` and `pages_read_user_content` gained an **"Add to App Review"** button in
+  App Dashboard → App Review → Permissions and Features (previously absent from that list entirely —
+  this is the exact catalog gap the original blocked write-up above describes).
+
+**Live end-to-end verified 2026-08-21 against `sonia-crm` production**, real page ("אוטוביז פרו
+ישראל"): OAuth connect → page picker → `connectPage()` → delegation calls (`managed_businesses`/
+`agencies`, zero errors in `laravel.log`) → historical backfill pulled in Facebook's own Test Leads
+with correct `created_at` mapped from Facebook's `created_time` (not "now") → confirmed via
+`supervisorctl tail crm-worker` that `SendOutgoingWebhook` never fired for the backfilled leads (the
+whole point of PR #6's `silent`/`saveQuietly()` path — historical leads must not trigger "new lead"
+automations/WhatsApp messages).
+
+**Still open:** App Review submission (justification + screencast) for `pages_manage_metadata` +
+`pages_read_user_content` — the button exists now, nobody has clicked through the actual submission
+form yet. 5 of 7 scopes already work with zero further action. `FACEBOOK_BUSINESS_ID` is set in
+production `.env` on the shared VPS (one value for both `autobiz-crm`/`sonia-crm` hostnames, same
+as every other Facebook config value here).
+
+**Deploy note for this fix:** production `master` had **diverged** from `origin/master` (2 stray
+local merge commits vs. 15 unpulled origin commits) when this was deployed — `git pull` refused
+with "divergent branches" until `git pull --no-rebase` was used explicitly. Also had the
+already-documented harmless `.gitignore`/`package-lock.json` uncommitted noise (see below) that
+needed `git checkout --` before the pull would proceed cleanly. Worth checking `git status` on the
+server before assuming a plain `git pull` will just work.
 
 **Deploy gotcha worth knowing for next time:** `frontend/npm run build` outputs to `frontend/dist/`,
 but nginx's actual docroot for this app is `backend/public/` (see
