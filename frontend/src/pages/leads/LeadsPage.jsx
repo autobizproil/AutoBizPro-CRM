@@ -498,16 +498,24 @@ export default function LeadsPage() {
       )
       case 'source': return (
         <td key={c.key} className="px-4 py-2 text-xs whitespace-nowrap">
-          {lead.source ? (
-            <span className="inline-flex items-center rounded-full text-[11px] font-medium px-2.5 py-0.5 border"
-              style={{
-                backgroundColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}22`,
-                color: SOURCE_COLORS[lead.source] ?? '#6b7280',
-                borderColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}60`,
-              }}>
-              {lead.source}
-            </span>
-          ) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+          <select
+            value={lead.source ?? ''}
+            disabled={!canEdit}
+            onChange={e => updateLead.mutate({ id: lead.id, data: { source: e.target.value } })}
+            className="inline-flex items-center rounded-full text-[11px] font-medium px-2.5 py-0.5 border cursor-pointer appearance-none disabled:cursor-default"
+            style={lead.source ? {
+              backgroundColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}22`,
+              color: SOURCE_COLORS[lead.source] ?? '#6b7280',
+              borderColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}60`,
+            } : { backgroundColor: '#f3f4f6', color: '#9ca3af', borderColor: '#e5e7eb' }}>
+            <option value="" className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">ללא מקור הגעה</option>
+            {/* Imported leads can carry a source value outside our fixed list —
+                keep it selectable instead of silently losing it when the dropdown opens. */}
+            {lead.source && !SOURCES.includes(lead.source) && (
+              <option value={lead.source} className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">{lead.source}</option>
+            )}
+            {SOURCES.filter(Boolean).map(s => <option key={s} value={s} className="text-gray-800 bg-white dark:bg-gray-800 dark:text-gray-100">{s}</option>)}
+          </select>
         </td>
       )
       case 'assigned_to': return (

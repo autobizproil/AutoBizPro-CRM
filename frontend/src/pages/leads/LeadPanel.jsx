@@ -390,7 +390,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     {!SOURCES.includes(field('source')) && field('source') && (
                       <option value={field('source')}>{field('source')}</option>
                     )}
-                    {SOURCES.map(s => <option key={s} value={s}>{s || '—'}</option>)}
+                    {SOURCES.map(s => <option key={s} value={s}>{s || 'ללא מקור הגעה'}</option>)}
                   </select>
                 </Detail>
                 <div>
