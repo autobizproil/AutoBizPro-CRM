@@ -345,7 +345,7 @@ export default function ImportPage() {
                     />
                   </div>
                   <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">
-                    {job.imported + job.skipped} מתוך {job.total_rows} שורות
+                    {Math.min(100, Math.round((job.imported + job.skipped) / job.total_rows * 100))}%
                   </p>
                 </>
               ) : (
