@@ -10,14 +10,32 @@ import { tasksApi } from '../../api/tasks'
 import { useToast } from '../../context/ToastContext'
 import { SOURCES } from '../../lib/leadSources'
 
+// Small stroke-icon set — replaces the old emoji icons everywhere in this panel
+// (activity types, modal titles), which read as childish next to Fireberry's flat colored icons.
+function Icon({ type, className, style }) {
+  const common = { className, style, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' }
+  switch (type) {
+    case 'call': return <svg {...common}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    case 'whatsapp': return <svg {...common}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    case 'email': return <svg {...common}><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>
+    case 'meeting': return <svg {...common}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    case 'task': return <svg {...common}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    case 'stage_change': return <svg {...common}><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+    case 'payment': return <svg {...common}><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    case 'signature': return <svg {...common}><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+    case 'note':
+    default: return <svg {...common}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+  }
+}
+
 const ACTIVITY_TYPES = {
-  call:         { label: 'שיחה',  icon: '📞', color: '#3b82f6' },
-  whatsapp:     { label: 'וואטסאפ', icon: '💬', color: '#22c55e' },
-  email:        { label: 'אימייל', icon: '✉️', color: '#a855f7' },
-  meeting:      { label: 'פגישה', icon: '🤝', color: '#f59e0b' },
-  note:         { label: 'הערה',  icon: '📝', color: '#6b7280' },
-  task:         { label: 'משימה', icon: '✅', color: '#0ea5e9' },
-  stage_change: { label: 'שינוי שלב', icon: '🔀', color: '#2398c2' },
+  call:         { label: 'שיחה',  color: '#3b82f6' },
+  whatsapp:     { label: 'וואטסאפ', color: '#22c55e' },
+  email:        { label: 'אימייל', color: '#a855f7' },
+  meeting:      { label: 'פגישה', color: '#f59e0b' },
+  note:         { label: 'הערה',  color: '#6b7280' },
+  task:         { label: 'משימה', color: '#0ea5e9' },
+  stage_change: { label: 'שינוי שלב', color: '#2398c2' },
 }
 
 function timeAgo(iso) {
@@ -48,6 +66,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
   })
   const [activityType, setAT] = useState('call')
   const [activityBody, setAB] = useState('')
+  const [showTypeMenu, setShowTypeMenu] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [showInvoice, setShowInvoice] = useState(false)
   const [invType, setInvType] = useState(400)
@@ -115,7 +134,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
 
   // Reset local edit state when switching leads
   useEffect(() => {
-    setEdit({}); setAB(''); setShowTemplates(false)
+    setEdit({}); setAB(''); setShowTypeMenu(false); setShowTemplates(false)
     setShowInvoice(false); setInvItems([{ description: '', price: '', quantity: 1 }]); setInvTaxId('')
     setShowCardcom(false); setCardcomAmount(''); setCardcomDesc('')
     setShowYesh(false); setYeshItems([{ description: '', price: '', quantity: 1 }]); setYeshTaxId('')
@@ -210,14 +229,15 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
         ) : (
           <>
             {/* Header */}
-            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-start justify-between"
+            <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-700 flex items-start justify-between"
               style={{ borderTop: `4px solid ${lead.stage?.color ?? '#2398c2'}` }}>
               <div className="flex items-center gap-3 min-w-0">
                 <button onClick={onClose} title="חזרה" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M5 12l6-6M5 12l6 6"/></svg>
                 </button>
-                <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold flex-shrink-0"
-                  style={{ backgroundColor: lead.stage?.color ?? '#2398c2' }}>
+                {/* Fixed neutral avatar color (not the stage's raw color, which can land on
+                    a harsh hue depending on how the tenant configured that stage). */}
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-bold flex-shrink-0 bg-indigo-500">
                   {lead.name?.trim()
                     ? lead.name.trim()[0].toUpperCase()
                     : <svg className="w-5 h-5 opacity-80" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
@@ -231,41 +251,72 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
               <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
             </div>
 
-            {/* Stage stepper */}
-            {stages.length > 0 && (
-              <div className="flex border-b border-gray-100 dark:border-gray-700 overflow-x-auto">
-                {stages.map(s => {
-                  const active = s.id === lead.pipeline_stage_id
-                  return (
-                    <button
-                      key={s.id}
-                      disabled={!canEdit}
-                      onClick={() => updateLead.mutate({ id: leadId, data: { pipeline_stage_id: s.id } })}
-                      className={`flex-1 min-w-[100px] text-center text-xs font-medium py-2.5 px-2 transition-colors whitespace-nowrap disabled:cursor-default ${
-                        active ? 'text-white' : 'bg-gray-50 dark:bg-gray-700/40 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }`}
-                      style={active ? { backgroundColor: s.color ?? '#2398c2' } : undefined}
-                    >
-                      {s.name}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+            {/* Stage stepper — chevron/breadcrumb segments like Fireberry: each stage flows
+                into the next with a pointed edge via clip-path. Stages before the active one
+                are flat gray (already passed); stages after fade from the active color the
+                further they are, so the whole row reads as one gradient. */}
+            {stages.length > 0 && (() => {
+              const activeIdx = stages.findIndex(s => s.id === lead.pipeline_stage_id)
+              return (
+                <div className="flex border-b border-gray-100 dark:border-gray-700 overflow-x-auto">
+                  {stages.map((s, i) => {
+                    const active = i === activeIdx
+                    const passed = activeIdx !== -1 && i < activeIdx
+                    const isFirst = i === 0
+                    const isLast = i === stages.length - 1
+                    const clipPath = isFirst && isLast
+                      ? undefined
+                      : isFirst
+                        ? 'polygon(100% 0, 15% 0, 0 50%, 15% 100%, 100% 100%)'
+                        : isLast
+                          ? 'polygon(100% 0, 0 0, 0 100%, 100% 100%, 85% 50%)'
+                          : 'polygon(100% 0, 15% 0, 0 50%, 15% 100%, 100% 100%, 85% 50%)'
+                    const color = s.color ?? '#2398c2'
+                    const style = { clipPath, marginInlineStart: isFirst ? 0 : '-10px' }
+                    if (active) {
+                      style.backgroundColor = color
+                    } else if (!passed && activeIdx !== -1) {
+                      const dist = i - activeIdx
+                      style.backgroundColor = `color-mix(in srgb, ${color} ${Math.max(15, 40 - dist * 8)}%, white)`
+                    }
+                    return (
+                      <button
+                        key={s.id}
+                        disabled={!canEdit}
+                        onClick={() => updateLead.mutate({ id: leadId, data: { pipeline_stage_id: s.id } })}
+                        className={`flex-1 min-w-[110px] text-center text-xs font-medium py-3 px-4 transition-colors whitespace-nowrap disabled:cursor-default relative ${
+                          active
+                            ? 'text-white'
+                            : passed
+                              ? 'bg-gray-100 dark:bg-gray-700/40 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
+                              : 'text-gray-600 dark:text-gray-300 hover:brightness-95'
+                        }`}
+                        style={style}
+                      >
+                        {s.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })()}
 
-            {/* Quick actions */}
-            <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-2 flex-wrap">
+            {/* Quick actions — pill-shaped, one neutral tone; the icon alone carries the color
+                cue. User feedback on the first pass ("too many colors"): a colored pastel
+                per button read as noisy, so the row is now a single flat gray family and only
+                the icon glyphs stay tinted for at-a-glance recognition. */}
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex gap-2 flex-wrap">
               {lead.phone && (
                 <a href={`tel:${lead.phone}`} dir="ltr"
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> התקשר
+                  className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/40 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#3b82f6' }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> התקשר
                 </a>
               )}
               {lead.phone && (
-                <div className="flex-1 relative">
+                <div className="relative">
                   <button onClick={() => setShowTemplates(s => !s)}
-                    className="w-full flex items-center justify-center gap-1.5 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> וואטסאפ
+                    className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/40 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#22c55e' }}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> וואטסאפ
                   </button>
                   {showTemplates && (
                     <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 max-h-56 overflow-y-auto w-48">
@@ -285,41 +336,41 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
               )}
               {canEdit && (
                 <button onClick={() => setShowInvoice(true)}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> חשבונית
+                  className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/40 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#d97706' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> חשבונית
                 </button>
               )}
               {canEdit && lead?.name && (
                 <button onClick={() => { setShowCardcom(true); cardcomCreatePage.reset() }}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> תשלום
+                  className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/40 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#9333ea' }}><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> תשלום
                 </button>
               )}
               {canEdit && (
                 <button onClick={() => { setShowYesh(true); yeshCreateInvoice.reset() }}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Yesh
+                  className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/40 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#059669' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Yesh
                 </button>
               )}
               {canEdit && (
                 <button onClick={handlePdfSign}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 py-2 rounded-lg text-sm font-medium transition-colors">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg> חתימה
+                  className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/40 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#e11d48' }}><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg> חתימה
                 </button>
               )}
               {canEdit && (
                 <button
                   onClick={() => clientsApi.convertLead(lead.id).then(() => toast.success('הליד הומר ללקוח!')).catch(() => toast.error('שגיאה בהמרה'))}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-[#2398c2]/10 hover:bg-[#2398c2]/20 text-[#2398c2] py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/40 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors"
                   title="המר ללקוח">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg> לקוח
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#2398c2' }}><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg> לקוח
                 </button>
               )}
               {canEdit && (
                 <button onClick={() => setShowTask(true)}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/30 dark:hover:bg-sky-900/50 text-sky-700 dark:text-sky-300 py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/40 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-full text-sm font-medium transition-colors"
                   title="צור משימת מעקב">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> משימה
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#0ea5e9' }}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> משימה
                 </button>
               )}
             </div>
@@ -369,11 +420,25 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 <form onSubmit={submitActivity} className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
                   <label className="text-xs font-medium text-gray-600 dark:text-gray-300 block mb-2">תיעוד פעילות</label>
                   <div className="flex gap-2 mb-2">
-                    <select value={activityType} onChange={e => setAT(e.target.value)}
-                      className="border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
-                      {['call','whatsapp','email','meeting','note','task'].map(t =>
-                        <option key={t} value={t}>{ACTIVITY_TYPES[t].icon} {ACTIVITY_TYPES[t].label}</option>)}
-                    </select>
+                    <div className="relative flex-shrink-0">
+                      <button type="button" onClick={() => setShowTypeMenu(v => !v)}
+                        className="flex items-center gap-1.5 border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                        <Icon type={activityType} className="w-3.5 h-3.5" style={{ color: ACTIVITY_TYPES[activityType].color }} />
+                        {ACTIVITY_TYPES[activityType].label}
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><polyline points="6 9 12 15 18 9"/></svg>
+                      </button>
+                      {showTypeMenu && (
+                        <div className="absolute top-full mt-1 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 py-1 w-40">
+                          {['call','whatsapp','email','meeting','note','task'].map(t => (
+                            <button key={t} type="button" onClick={() => { setAT(t); setShowTypeMenu(false) }}
+                              className="w-full flex items-center gap-2 text-right px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+                              <Icon type={t} className="w-3.5 h-3.5" style={{ color: ACTIVITY_TYPES[t].color }} />
+                              {ACTIVITY_TYPES[t].label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <input value={activityBody} onChange={e => setAB(e.target.value)} placeholder="מה קרה?"
                       className="flex-1 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-1.5 text-sm" />
                   </div>
@@ -395,8 +460,10 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                       const meta = ACTIVITY_TYPES[a.type] ?? ACTIVITY_TYPES.note
                       return (
                         <div key={a.id} className="flex gap-3">
-                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs flex-shrink-0"
-                            style={{ backgroundColor: meta.color + '22' }}>{meta.icon}</div>
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: meta.color + '22' }}>
+                            <Icon type={a.type} className="w-3.5 h-3.5" style={{ color: meta.color }} />
+                          </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{meta.label}</span>
@@ -421,7 +488,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowInvoice(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">🧾 הפקת מסמך — {lead.name}</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2"><Icon type="note" className="w-5 h-5 text-amber-600" />הפקת מסמך — {lead.name}</h2>
               <button onClick={() => setShowInvoice(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={submitInvoice} className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
@@ -487,7 +554,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowCardcom(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">💳 שליחת עמוד תשלום — {lead.name}</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2"><Icon type="payment" className="w-5 h-5 text-purple-600" />שליחת עמוד תשלום — {lead.name}</h2>
               <button onClick={() => setShowCardcom(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={submitCardcom} className="px-6 py-4 space-y-4">
@@ -543,7 +610,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowYesh(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">🧾 Yesh Invoice — {lead.name}</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2"><Icon type="note" className="w-5 h-5 text-green-600" />Yesh Invoice — {lead.name}</h2>
               <button onClick={() => setShowYesh(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={submitYesh} className="px-6 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
@@ -596,7 +663,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
               <div className="text-left text-sm font-semibold text-gray-700">סה"כ: ₪{yeshTotal.toLocaleString('he-IL')}</div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={yeshCreateInvoice.isPending || yeshTotal <= 0}
-                  className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
                   {yeshCreateInvoice.isPending ? 'מפיק...' : 'הפק מסמך'}
                 </button>
                 <button type="button" onClick={() => setShowYesh(false)} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm dark:text-gray-300">סגור</button>
@@ -611,7 +678,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowPdf(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">✍️ חתימה דיגיטלית — {lead.name}</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2"><Icon type="signature" className="w-5 h-5 text-rose-600" />חתימה דיגיטלית — {lead.name}</h2>
               <button onClick={() => setShowPdf(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             <div className="px-6 py-4 space-y-4">
@@ -666,7 +733,7 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowTask(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">✅ משימת מעקב — {lead.name}</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2"><Icon type="task" className="w-5 h-5 text-sky-600" />משימת מעקב — {lead.name}</h2>
               <button onClick={() => setShowTask(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
             </div>
             <form onSubmit={e => { e.preventDefault(); if (taskTitle.trim()) createTask.mutate() }} className="px-6 py-4 space-y-3">
