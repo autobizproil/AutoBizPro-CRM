@@ -111,7 +111,18 @@ class FacebookLeadAdsService
         }
     }
 
-    private function upsertLead(array $leadData, ?string $formId, string $leadgenId, int $tenantId): void
+    /**
+     * Public so both the real-time webhook path (processWebhook above) and
+     * FacebookOAuthService::backfillLeads() call the same dedup/mapping logic —
+     * Graph's /{leadgenId} response and /{formId}/leads list items share the same
+     * field_data/created_time shape, so one method safely serves both callers.
+     *
+     * $silent (default false) suppresses LeadObserver's webhook dispatch and
+     * automation firing via saveQuietly() — same convention as ImportService's
+     * backdating path. Only the historical backfill passes true; the real-time
+     * webhook path must keep firing automations as it always has.
+     */
+    public function upsertLead(array $leadData, ?string $formId, string $leadgenId, int $tenantId, bool $silent = false): void
     {
         // Facebook retries webhook delivery on non-200 responses, so leadgen_id
         // is the reliable dedupe key — check it before falling back to phone.
@@ -147,7 +158,7 @@ class FacebookLeadAdsService
             if ($exists) return;
         }
 
-        Lead::create([
+        $attributes = [
             'tenant_id'     => $tenantId,
             'name'          => $name ?: 'Facebook Lead',
             'phone'         => $phone,
@@ -156,6 +167,37 @@ class FacebookLeadAdsService
             'fb_leadgen_id' => $leadgenId,
             'status'        => 'NEW_LEAD',
             'notes'         => $formId ? "Form ID: {$formId}" : null,
-        ]);
+        ];
+
+        // Graph's created_time reflects when the lead actually came in — for backfilled
+        // historical leads this can be months/years in the past, so use it as created_at
+        // rather than letting Eloquent stamp "now". Never let a bad/missing value throw.
+        $createdAt = null;
+        if (!empty($leadData['created_time'])) {
+            try {
+                $createdAt = \Carbon\Carbon::parse($leadData['created_time']);
+            } catch (\Throwable $e) {
+                $createdAt = null;
+            }
+        }
+
+        if ($silent) {
+            // saveQuietly() installs a NullDispatcher for the whole save, which
+            // suppresses not just LeadObserver::created() but also Lead::booted()'s
+            // static::saving() hook — so phone_normalized must be set explicitly
+            // here, mirroring what that hook would otherwise have done.
+            $attributes['phone_normalized'] = \App\Services\PhoneNormalizer::normalize($phone);
+            $lead = new Lead($attributes);
+            if ($createdAt) {
+                $lead->created_at = $createdAt;
+            }
+            $lead->saveQuietly();
+        } else {
+            $lead = Lead::create($attributes);
+            if ($createdAt) {
+                $lead->created_at = $createdAt;
+                $lead->saveQuietly(); // backdate only — must not re-fire the outgoing webhook
+            }
+        }
     }
 }

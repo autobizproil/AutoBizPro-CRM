@@ -15,10 +15,12 @@ use Illuminate\Support\Facades\Log;
 class FacebookOAuthService
 {
     private SettingsService $settings;
+    private FacebookLeadAdsService $leadAdsService;
 
-    public function __construct(SettingsService $settings)
+    public function __construct(SettingsService $settings, FacebookLeadAdsService $leadAdsService)
     {
         $this->settings = $settings;
+        $this->leadAdsService = $leadAdsService;
     }
 
     /**
@@ -51,7 +53,7 @@ class FacebookOAuthService
     {
         $response = Http::get('https://graph.facebook.com/v21.0/me/accounts', [
             'access_token' => $userAccessToken,
-            'fields'       => 'id,name,access_token',
+            'fields'       => 'id,name,access_token,business',
         ]);
 
         if (!$response->ok()) {
@@ -64,10 +66,13 @@ class FacebookOAuthService
             fn (array $p) => isset($p['id'], $p['name'], $p['access_token'])
         );
 
-        return array_values(array_map(
-            fn (array $p) => ['id' => $p['id'], 'name' => $p['name'], 'access_token' => $p['access_token']],
-            $pages
-        ));
+        return array_values(array_map(function (array $p) {
+            $page = ['id' => $p['id'], 'name' => $p['name'], 'access_token' => $p['access_token']];
+            if (isset($p['business']['id'])) {
+                $page['business_id'] = $p['business']['id'];
+            }
+            return $page;
+        }, $pages));
     }
 
     /**
@@ -97,6 +102,135 @@ class FacebookOAuthService
     }
 
     /**
+     * Claim a delegated management relationship on the page's owning Business (if any),
+     * granting this app's own pre-configured Business Manager (FACEBOOK_BUSINESS_ID)
+     * lead-management access without a per-customer App Review relationship — see
+     * docs/superpowers/specs/2026-08-20-facebook-delegation-lead-ads-design.md.
+     * Never throws: a failed delegation must not undo an otherwise-saved connection, and
+     * a page with no owning Business (personal page) simply has nothing to delegate.
+     */
+    private function delegatePage(string $pageId, string $pageAccessToken, string $userAccessToken, ?string $clientBusinessId): void
+    {
+        if (!$clientBusinessId) {
+            return;
+        }
+
+        $ourBusinessId = config('services.facebook.business_id');
+        if (!$ourBusinessId) {
+            Log::warning('Facebook OAuth: skipping delegation, FACEBOOK_BUSINESS_ID not configured', ['page_id' => $pageId]);
+            return;
+        }
+
+        $this->graphPostBestEffort(
+            "https://graph.facebook.com/v21.0/{$ourBusinessId}/managed_businesses",
+            ['existing_client_business_id' => $clientBusinessId, 'access_token' => $userAccessToken],
+            'managed_businesses',
+            $pageId
+        );
+
+        $this->graphPostBestEffort(
+            "https://graph.facebook.com/v21.0/{$pageId}/agencies",
+            ['business' => $ourBusinessId, 'permitted_tasks' => json_encode(['ADVERTISE', 'MANAGE_LEADS']), 'access_token' => $pageAccessToken],
+            'agencies',
+            $pageId
+        );
+    }
+
+    /**
+     * Sync of a page's lead forms and their leads, run on every connect/reconnect — safe
+     * to repeat because upsertLead()'s dedup makes it a no-op for leads already captured.
+     * Facebook's webhook only delivers leads generated after subscription, so without this,
+     * everything captured before "Connect with Facebook" was clicked would otherwise be lost.
+     * Never throws: a failed or partial backfill must not undo an otherwise-saved connection.
+     * Per-form failures don't abort the remaining forms.
+     */
+    private function backfillLeads(string $pageId, string $pageAccessToken, int $tenantId): void
+    {
+        try {
+            $response = Http::get("https://graph.facebook.com/v21.0/{$pageId}/leadgen_forms", [
+                'access_token' => $pageAccessToken,
+                'fields'       => 'id,name,status',
+                'limit'        => 50,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Facebook OAuth: leadgen_forms fetch failed', ['page_id' => $pageId, 'error' => $e->getMessage()]);
+            return;
+        }
+
+        if (!$response->ok()) {
+            Log::warning('Facebook OAuth: leadgen_forms fetch failed', ['page_id' => $pageId, 'status' => $response->status(), 'body' => $response->body()]);
+            return;
+        }
+
+        foreach ($response->json('data') ?? [] as $form) {
+            $this->backfillFormLeads($form['id'] ?? null, $pageAccessToken, $tenantId);
+        }
+    }
+
+    private function backfillFormLeads(?string $formId, string $pageAccessToken, int $tenantId): void
+    {
+        if (!$formId) {
+            return;
+        }
+
+        $params = ['access_token' => $pageAccessToken, 'fields' => 'id,created_time,field_data', 'limit' => 50];
+        $pageCount = 0;
+        $maxPages = 200;
+
+        do {
+            try {
+                $response = Http::get("https://graph.facebook.com/v21.0/{$formId}/leads", $params);
+            } catch (\Throwable $e) {
+                Log::warning('Facebook OAuth: leads fetch failed', ['form_id' => $formId, 'error' => $e->getMessage()]);
+                return;
+            }
+
+            if (!$response->ok()) {
+                Log::warning('Facebook OAuth: leads fetch failed', ['form_id' => $formId, 'status' => $response->status(), 'body' => $response->body()]);
+                return;
+            }
+
+            $rows = $response->json('data') ?? [];
+            foreach ($rows as $lead) {
+                if (!isset($lead['id'])) {
+                    continue;
+                }
+                $this->leadAdsService->upsertLead($lead, $formId, $lead['id'], $tenantId, silent: true);
+            }
+
+            // Graph can keep handing back a cursor even on the final page when data is
+            // empty — empty data, not cursor absence, is the real "no more results" signal.
+            $after = $rows === [] ? null : $response->json('paging.cursors.after');
+            $params['after'] = $after;
+            $pageCount++;
+        } while ($after && $pageCount < $maxPages);
+
+        if ($pageCount >= $maxPages) {
+            Log::warning('Facebook OAuth: leads backfill hit page cap, stopping', ['form_id' => $formId, 'max_pages' => $maxPages]);
+        }
+    }
+
+    /**
+     * POST a delegation call, logging any non-2xx response except the expected
+     * "duplicated asset" case (page already delegated — not a real failure), and
+     * never letting a connection exception escape. Mirrors subscribePage()'s
+     * response->ok() check so delegation failures are as debuggable as subscription
+     * failures already are, while still honoring the "never throws" contract.
+     */
+    private function graphPostBestEffort(string $url, array $params, string $label, string $pageId): void
+    {
+        try {
+            $response = Http::asForm()->post($url, $params);
+            $message  = $response->json('error.message', '');
+            if ((!$response->ok() || !$response->json('success')) && !str_contains($message, 'duplicated asset')) {
+                Log::warning("Facebook OAuth: {$label} call failed", ['page_id' => $pageId, 'status' => $response->status(), 'body' => $response->body()]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Facebook OAuth: {$label} call failed", ['page_id' => $pageId, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
      * Persist the chosen Page's connection details for the current tenant and
      * attempt the webhook subscription. Always saves the connection, even if the
      * subscription call fails — the caller surfaces $result['subscribed'] === false
@@ -112,6 +246,12 @@ class FacebookOAuthService
         $this->settings->set('facebook_connection_status', null); // clear any prior needs_renewal flag
 
         $subscribed = $this->subscribePage($page['id'], $page['access_token']);
+
+        if (isset($page['user_access_token'])) {
+            $this->delegatePage($page['id'], $page['access_token'], $page['user_access_token'], $page['business_id'] ?? null);
+        }
+
+        $this->backfillLeads($page['id'], $page['access_token'], $tenantId);
 
         return ['page_name' => $page['name'], 'subscribed' => $subscribed];
     }
