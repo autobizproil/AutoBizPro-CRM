@@ -50,6 +50,23 @@ class FacebookOAuthControllerTest extends TestCase
         $this->assertStringContainsString('facebook.com', $response->headers->get('Location'));
     }
 
+    public function test_redirect_requests_classic_scopes_not_config_id(): void
+    {
+        [, $user] = $this->tenantAdmin();
+
+        $response = $this->withHeader('X-Tenant', 'acme')
+            ->actingAs($user)
+            ->get('/api/integrations/facebook/oauth/redirect');
+
+        $response->assertRedirect();
+        $location = $response->headers->get('Location');
+        $this->assertStringContainsString('scope=', $location);
+        foreach (['ads_read', 'pages_show_list', 'leads_retrieval', 'pages_manage_ads', 'business_management', 'pages_read_user_content', 'pages_manage_metadata'] as $scope) {
+            $this->assertStringContainsString($scope, urldecode($location));
+        }
+        $this->assertStringNotContainsString('config_id=', $location);
+    }
+
     public function test_callback_with_single_page_redirects_to_settings_connected(): void
     {
         [$tenant] = $this->tenantAdmin();
@@ -215,5 +232,60 @@ class FacebookOAuthControllerTest extends TestCase
 
         $response->assertRedirect();
         $this->assertStringContainsString('fb_status=error', $response->headers->get('Location'));
+    }
+
+    public function test_callback_with_single_page_passes_user_token_for_delegation(): void
+    {
+        [$tenant] = $this->tenantAdmin();
+        config(['services.facebook.business_id' => 'our-biz-123']);
+
+        Socialite::shouldReceive('driver->stateless->user')->once()->andReturn($this->fakeSocialiteUser('short-lived-token'));
+        Http::fake([
+            'graph.facebook.com/*/oauth/access_token*' => Http::response(['access_token' => 'long-lived-token-xyz'], 200),
+            'graph.facebook.com/*/me/accounts*' => Http::response(['data' => [
+                ['id' => '111', 'name' => 'AutoBizPro IL', 'access_token' => 'page-token-111', 'business' => ['id' => 'client-biz-1']],
+            ]], 200),
+            'graph.facebook.com/*/subscribed_apps*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/managed_businesses*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/agencies*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/leadgen_forms*' => Http::response(['data' => []], 200),
+        ]);
+
+        $this->get('/api/integrations/facebook/oauth/callback?state=' . urlencode($this->stateFor($tenant->id)));
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'managed_businesses')
+                && $request['access_token'] === 'long-lived-token-xyz';
+        });
+    }
+
+    public function test_select_page_passes_user_token_for_delegation(): void
+    {
+        [$tenant] = $this->tenantAdmin();
+        config(['services.facebook.business_id' => 'our-biz-123']);
+
+        Http::fake([
+            'graph.facebook.com/*/subscribed_apps*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/managed_businesses*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/agencies*' => Http::response(['success' => true], 200),
+            'graph.facebook.com/*/leadgen_forms*' => Http::response(['data' => []], 200),
+        ]);
+
+        $pagesToken = Crypt::encryptString(json_encode([
+            'tenant_id' => $tenant->id,
+            'user_access_token' => 'long-lived-token-xyz',
+            'pages' => [
+                ['id' => '222', 'name' => 'Page Two', 'access_token' => 'page-token-222', 'business_id' => 'client-biz-2'],
+            ],
+            'expires_at' => now()->addMinutes(10)->timestamp,
+        ]));
+
+        $this->postJson('/api/integrations/facebook/oauth/select-page', ['pages_token' => $pagesToken, 'page_id' => '222'])
+            ->assertOk();
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'managed_businesses')
+                && $request['access_token'] === 'long-lived-token-xyz';
+        });
     }
 }
