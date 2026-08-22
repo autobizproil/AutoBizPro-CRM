@@ -171,21 +171,22 @@ class CustomFieldController extends Controller
         abort_unless($customFieldDefinition->tenant_id === app('current_tenant_id'), 403);
 
         $data = $request->validate([
-            'label'      => 'sometimes|string|max:120',
-            'field_type' => 'sometimes|in:' . implode(',', self::ALLOWED_TYPES),
-            'options'    => 'nullable|array',
-            'options.*'  => 'string|max:100',
-            'required'   => 'boolean',
-            'hidden'     => 'boolean',
+            'label'         => 'sometimes|string|max:120',
+            'field_type'    => 'sometimes|in:' . implode(',', self::ALLOWED_TYPES),
+            'options'       => 'nullable|array',
+            'options.*'     => 'string|max:100',
+            'option_colors' => 'nullable|array',
+            'required'      => 'boolean',
+            'hidden'        => 'boolean',
         ]);
 
-        // System fields: label / hidden always editable; options too, but only for
-        // the ones seeded as a real picklist (currently just מקור הגעה) — never
-        // type, and never options on a lookup field (those come from the linked
+        // System fields: label / hidden always editable; options (+ their colors) too,
+        // but only for the ones seeded as a real picklist (currently just מקור הגעה) —
+        // never type, and never options on a lookup field (those come from the linked
         // entity's own records, not a free-form list).
         if ($customFieldDefinition->is_system) {
             $allowed = ['label', 'hidden'];
-            if ($customFieldDefinition->field_type === 'select') $allowed[] = 'options';
+            if ($customFieldDefinition->field_type === 'select') { $allowed[] = 'options'; $allowed[] = 'option_colors'; }
             $data = array_intersect_key($data, array_flip($allowed));
         }
 

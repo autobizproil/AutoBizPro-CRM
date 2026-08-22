@@ -1165,8 +1165,7 @@ function LabelsTab() {
   const [createError, setCreateError] = useState('')
   const [renameId, setRenameId]     = useState(null)
   const [renameVal, setRenameVal]   = useState('')
-  const [optsId, setOptsId]         = useState(null)
-  const [optsVal, setOptsVal]       = useState('')
+  const [optsFieldId, setOptsFieldId] = useState(null)
   const [dragIdx, setDragIdx]       = useState(null)
   const [stagesOpen, setStagesOpen] = useState(false)
   const [usersOpen, setUsersOpen]   = useState(false)
@@ -1298,11 +1297,6 @@ function LabelsTab() {
     if (label && label !== f.label) updateField.mutate({ id: f.id, data: { label } })
   }
 
-  const commitOptions = (f) => {
-    setOptsId(null)
-    const options = optsVal.split('\n').map(s => s.trim()).filter(Boolean)
-    updateField.mutate({ id: f.id, data: { options } })
-  }
 
   const move = (idx, dir) => {
     const ids = fields.map(f => f.id)
@@ -1457,19 +1451,11 @@ function LabelsTab() {
                     <button onClick={() => setUsersOpen(true)}
                       className="text-[#2398c2] hover:underline">עריכת ערכים</button>
                   ) : f.field_type === 'select' ? (
-                    optsId === f.id ? (
-                      <textarea autoFocus rows={3} value={optsVal}
-                        onChange={e => setOptsVal(e.target.value)}
-                        onBlur={() => commitOptions(f)}
-                        onKeyDown={e => { if (e.key === 'Escape') setOptsId(null) }}
-                        className="border border-[#2398c2] rounded-md px-2 py-1 text-xs bg-white dark:bg-gray-700 focus:outline-none w-full resize-none" />
-                    ) : (
-                      <button disabled={!canManage}
-                        onClick={() => { setOptsId(f.id); setOptsVal((f.options ?? []).join('\n')) }}
-                        className="text-right hover:text-[#2398c2] disabled:cursor-default truncate block w-full" title="ערוך אפשרויות">
-                        {f.options?.length ? f.options.join(', ') : 'הוסף אפשרויות...'}
-                      </button>
-                    )
+                    <button disabled={!canManage}
+                      onClick={() => setOptsFieldId(f.id)}
+                      className="text-right hover:text-[#2398c2] disabled:cursor-default truncate block w-full">
+                      {f.options?.length ? f.options.join(', ') : 'הוסף אפשרויות...'}
+                    </button>
                   ) : f.field_type === 'lookup' && f.lookup_entity ? (
                     // Any new lookup field the user creates gets a link to wherever
                     // its real records actually live — nothing to "add" here (that's
@@ -1541,6 +1527,12 @@ function LabelsTab() {
           </div>
         </div>
       )}
+
+      {/* Select-field options modal */}
+      {optsFieldId && (() => {
+        const optsField = fields.find(f => f.id === optsFieldId)
+        return optsField ? <SelectOptionsEditor field={optsField} onClose={() => setOptsFieldId(null)} /> : null
+      })()}
 
       {/* Create modal */}
       {showModal && (
@@ -1777,6 +1769,88 @@ function PreferencesTab({ lang, theme, fontSize, setLang, setTheme, setFontSize,
           </div>
         </div>
       </Card>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Select-field options — colored value list matching Fireberry's picklist
+// editor exactly (dot + name + drag handle + delete per row, add button,
+// explicit שמור/בטל instead of this app's usual autosave-on-blur, since
+// that's the one place the reference design calls for a batch commit).
+// ---------------------------------------------------------------------------
+const OPTION_COLOR_PALETTE = ['#22c55e', '#3b82f6', '#ef4444', '#a855f7', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#6b7280']
+
+function SelectOptionsEditor({ field, onClose }) {
+  const qc = useQueryClient()
+  const [rows, setRows] = useState(() =>
+    (field.options ?? []).map((value, i) => ({
+      key: `${value}-${i}`,
+      value,
+      color: field.option_colors?.[value] ?? OPTION_COLOR_PALETTE[i % OPTION_COLOR_PALETTE.length],
+    }))
+  )
+  const [dragIdx, setDragIdx] = useState(null)
+
+  const save = useMutation({
+    mutationFn: () => customFieldsApi.update(field.id, {
+      options: rows.map(r => r.value.trim()).filter(Boolean),
+      option_colors: Object.fromEntries(rows.filter(r => r.value.trim()).map(r => [r.value.trim(), r.color])),
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['custom-fields'] }); onClose() },
+  })
+
+  const setRow = (key, patch) => setRows(rs => rs.map(r => r.key === key ? { ...r, ...patch } : r))
+  const removeRow = (key) => setRows(rs => rs.filter(r => r.key !== key))
+  const addRow = () => setRows(rs => [...rs, { key: `new-${Date.now()}`, value: '', color: OPTION_COLOR_PALETTE[rs.length % OPTION_COLOR_PALETTE.length] }])
+  const handleDrop = (dropIdx) => {
+    if (dragIdx === null || dragIdx === dropIdx) { setDragIdx(null); return }
+    setRows(rs => {
+      const next = [...rs]
+      const [moved] = next.splice(dragIdx, 1)
+      next.splice(dropIdx, 0, moved)
+      return next
+    })
+    setDragIdx(null)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">תיבת בחירה — {field.label}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
+        </div>
+        <div className="px-6 py-4 overflow-y-auto space-y-1.5">
+          {rows.map((r, i) => (
+            <div key={r.key}
+              draggable
+              onDragStart={() => setDragIdx(i)}
+              onDragOver={e => e.preventDefault()}
+              onDrop={() => handleDrop(i)}
+              className={`flex items-center gap-2 ${dragIdx === i ? 'opacity-30' : ''}`}>
+              <button onClick={() => removeRow(r.key)} className="text-gray-300 hover:text-red-500 text-lg leading-none flex-shrink-0" title="מחק ערך">×</button>
+              <input type="color" value={r.color} onChange={e => setRow(r.key, { color: e.target.value })}
+                className="w-6 h-6 rounded-full border-0 cursor-pointer flex-shrink-0" style={{ accentColor: r.color }} />
+              <input value={r.value} onChange={e => setRow(r.key, { value: e.target.value })}
+                placeholder="שם הערך..."
+                className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" />
+              <span className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#2398c2] select-none flex-shrink-0" title="גרור לשינוי סדר">⠿</span>
+            </div>
+          ))}
+          <button type="button" onClick={addRow}
+            className="w-full mt-2 border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-[#2398c2] hover:text-[#2398c2] rounded-lg py-1.5 text-sm">
+            + הוסף ערך
+          </button>
+        </div>
+        <div className="flex gap-2 px-6 py-4 border-t border-gray-100 dark:border-gray-700">
+          <button onClick={() => save.mutate()} disabled={save.isPending}
+            className="flex-1 bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
+            {save.isPending ? 'שומר...' : 'שמור'}
+          </button>
+          <button type="button" onClick={onClose} className="px-4 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-sm">בטל</button>
+        </div>
+      </div>
     </div>
   )
 }

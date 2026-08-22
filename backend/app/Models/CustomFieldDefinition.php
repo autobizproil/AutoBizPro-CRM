@@ -8,13 +8,14 @@ class CustomFieldDefinition extends Model
 {
     protected $fillable = [
         'tenant_id', 'entity', 'name', 'label', 'field_type', 'lookup_entity',
-        'options', 'required', 'is_system', 'hidden', 'sort_order',
+        'options', 'option_colors', 'required', 'is_system', 'hidden', 'sort_order',
     ];
 
     protected $casts = [
-        'options'   => 'array',
-        'required'  => 'boolean',
-        'is_system' => 'boolean',
-        'hidden'    => 'boolean',
+        'options'       => 'array',
+        'option_colors' => 'array',
+        'required'      => 'boolean',
+        'is_system'     => 'boolean',
+        'hidden'        => 'boolean',
     ];
 }
