@@ -1155,7 +1155,7 @@ const TYPE_ICON = {
 
 function LabelsTab() {
   const qc = useQueryClient()
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const canManage = can('users', 'can_update')
 
   const [entity, setEntity]         = useState('leads')
@@ -1168,6 +1168,7 @@ function LabelsTab() {
   const [optsVal, setOptsVal]       = useState('')
   const [dragIdx, setDragIdx]       = useState(null)
   const [stagesOpen, setStagesOpen] = useState(false)
+  const [usersOpen, setUsersOpen]   = useState(false)
 
   // Custom record types — user-defined entities beyond the fixed 4
   const [showTypeModal, setShowTypeModal] = useState(false)
@@ -1451,6 +1452,9 @@ function LabelsTab() {
                   {f.name === 'pipeline_stage_id' ? (
                     <button onClick={() => setStagesOpen(true)}
                       className="text-[#2398c2] hover:underline">עריכת ערכים</button>
+                  ) : f.name === 'assigned_to' ? (
+                    <button onClick={() => setUsersOpen(true)}
+                      className="text-[#2398c2] hover:underline">עריכת ערכים</button>
                   ) : f.field_type === 'select' ? (
                     optsId === f.id ? (
                       <textarea autoFocus rows={3} value={optsVal}
@@ -1503,6 +1507,23 @@ function LabelsTab() {
             </div>
             <div className="px-6 py-4">
               <StageValuesEditor can={can} compact />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Users modal — נציג אחראי's real "values" are the tenant's team,
+          already fully manageable in Settings > משתמשים. Reuse that tab's
+          body here instead of duplicating a user CRUD UI. */}
+      {usersOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setUsersOpen(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">עריכת ערכים — נציג אחראי</h2>
+              <button onClick={() => setUsersOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-4">
+              <UsersTab can={can} currentUser={user} />
             </div>
           </div>
         </div>
