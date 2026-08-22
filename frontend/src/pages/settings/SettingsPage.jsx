@@ -6,6 +6,7 @@ import { usersApi } from '../../api/users'
 import { integrationsApi } from '../../api/integrations'
 import { customFieldsApi, FIELD_TYPE_LABELS, ENTITIES, CREATABLE_TYPES } from '../../api/customFields'
 import { recordTypesApi, RECORD_TYPE_ICONS } from '../../api/recordTypes'
+import { pipelineApi } from '../../api/pipeline'
 import { useAuth } from '../../context/AuthContext'
 import { usePreferences } from '../../context/PreferencesContext'
 import { translations } from '../../i18n/translations'
@@ -45,6 +46,7 @@ const TABS = [
   { id: 'users',       label: 'משתמשים' },
   { id: 'permissions', label: 'הרשאות' },
   { id: 'labels',      label: 'הגדרות רשומות' },
+  { id: 'stages',      label: 'שלבים בפייפליין' },
   { id: 'preferences', label: 'העדפות' },
 ]
 
@@ -1710,6 +1712,139 @@ function PreferencesTab({ lang, theme, fontSize, setLang, setTheme, setFontSize,
 }
 
 // ---------------------------------------------------------------------------
+// Tab: שלבים בפייפליין (Pipeline stages) — self-service add/rename/recolor/
+// reorder/delete, so a tenant no longer needs a dev to touch pipeline_stages
+// directly. Reuses the ['pipeline'] query key so LeadsPage/PipelinePage/
+// LeadPanel's stage dropdowns pick up changes without a hard reload.
+// ---------------------------------------------------------------------------
+function StagesTab({ can }) {
+  const qc = useQueryClient()
+  const [newName, setNewName] = useState('')
+  const [newColor, setNewColor] = useState('#2398c2')
+  const [edit, setEdit] = useState({})
+
+  const { data: stages = [], isLoading } = useQuery({
+    queryKey: ['pipeline'],
+    queryFn: () => pipelineApi.stages().then(r => r.data.data),
+  })
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['pipeline'] })
+
+  const create = useMutation({
+    mutationFn: (data) => pipelineApi.create(data),
+    onSuccess: () => { invalidate(); setNewName(''); setNewColor('#2398c2') },
+  })
+
+  const update = useMutation({
+    mutationFn: ({ id, data }) => pipelineApi.update(id, data),
+    onSuccess: invalidate,
+  })
+
+  const remove = useMutation({
+    mutationFn: (id) => pipelineApi.remove(id),
+    onSuccess: invalidate,
+  })
+
+  const reorder = useMutation({
+    mutationFn: (items) => pipelineApi.reorder(items),
+    onSuccess: invalidate,
+  })
+
+  const canEdit = can('leads', 'can_update')
+  const canCreate = can('leads', 'can_create')
+  const canDelete = can('leads', 'can_delete')
+
+  const sorted = [...stages].sort((a, b) => a.position - b.position)
+
+  const commitName = (stage) => {
+    const value = edit[stage.id]
+    if (value === undefined || !value.trim() || value === stage.name) return
+    update.mutate({ id: stage.id, data: { name: value.trim() } })
+  }
+
+  const move = (index, dir) => {
+    const target = index + dir
+    if (target < 0 || target >= sorted.length) return
+    const a = sorted[index], b = sorted[target]
+    reorder.mutate([{ id: a.id, position: b.position }, { id: b.id, position: a.position }])
+  }
+
+  const handleDelete = (stage) => {
+    const count = stage.leads?.length ?? 0
+    const msg = count > 0
+      ? `למחוק את "${stage.name}"? ${count} לידים בשלב הזה יאבדו את השלב שלהם (יעברו ל"ללא שלב").`
+      : `למחוק את "${stage.name}"?`
+    if (window.confirm(msg)) remove.mutate(stage.id)
+  }
+
+  const addStage = () => {
+    if (!newName.trim()) return
+    create.mutate({ name: newName.trim(), color: newColor, type: 'lead', position: sorted.length + 1 })
+  }
+
+  return (
+    <div className="max-w-2xl">
+      <Card>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">שלבים בפייפליין</h3>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+          השלבים המוצגים כאן הם השלבים היחידים שיופיעו בכל מקום במערכת — בטבלת הלידים, בכרטיס ליד, ובלוח הפייפליין.
+        </p>
+
+        {isLoading && <p className="text-sm text-gray-500 dark:text-gray-400">טוען...</p>}
+
+        {!isLoading && (
+          <div className="space-y-1">
+            {sorted.map((s, i) => (
+              <div key={s.id} className="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-700/50 last:border-0">
+                <div className="flex flex-col -gap-1 flex-shrink-0">
+                  <button type="button" disabled={!canEdit || i === 0} onClick={() => move(i, -1)}
+                    className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 leading-none text-xs">▲</button>
+                  <button type="button" disabled={!canEdit || i === sorted.length - 1} onClick={() => move(i, 1)}
+                    className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 leading-none text-xs">▼</button>
+                </div>
+                <input type="color" value={s.color ?? '#2398c2'} disabled={!canEdit}
+                  onChange={e => update.mutate({ id: s.id, data: { color: e.target.value } })}
+                  className="w-7 h-7 rounded border border-gray-200 dark:border-gray-600 cursor-pointer disabled:cursor-default flex-shrink-0" />
+                <input
+                  value={edit[s.id] ?? s.name}
+                  disabled={!canEdit}
+                  onChange={e => setEdit(prev => ({ ...prev, [s.id]: e.target.value }))}
+                  onBlur={() => commitName(s)}
+                  className="flex-1 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 text-sm bg-transparent text-gray-900 dark:text-gray-100 disabled:opacity-60 focus:outline-none"
+                />
+                <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 w-16 text-left">{s.leads?.length ?? 0} לידים</span>
+                {canDelete && (
+                  <button type="button" onClick={() => handleDelete(s)}
+                    className="text-red-300 hover:text-red-600 dark:hover:text-red-400 text-lg leading-none flex-shrink-0 px-1">×</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {canCreate && (
+          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)}
+              className="w-7 h-7 rounded border border-gray-200 dark:border-gray-600 cursor-pointer flex-shrink-0" />
+            <input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addStage()}
+              placeholder="שם שלב חדש..."
+              className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            />
+            <button type="button" onClick={addStage} disabled={!newName.trim() || create.isPending}
+              className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex-shrink-0">
+              {create.isPending ? 'מוסיף...' : '+ הוסף שלב'}
+            </button>
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Root component
 // ---------------------------------------------------------------------------
 export default function SettingsPage() {
@@ -1766,6 +1901,7 @@ export default function SettingsPage() {
       {activeTab === 'users' && <UsersTab can={can} currentUser={user} />}
       {activeTab === 'permissions' && <PermissionsTab can={can} currentUser={user} />}
       {activeTab === 'labels' && <LabelsTab />}
+      {activeTab === 'stages' && <StagesTab can={can} />}
       {activeTab === 'preferences' && (
         <PreferencesTab
           lang={lang}
