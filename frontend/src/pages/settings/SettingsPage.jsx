@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import client from '../../api/client'
 import { settingsApi } from '../../api/settings'
 import { usersApi } from '../../api/users'
@@ -1853,7 +1854,22 @@ export default function SettingsPage() {
   const { theme, lang, fontSize, setTheme, setLang, setFontSize } = usePreferences()
   const tr = (key) => translations[lang]?.[key] ?? key
 
-  const [activeTab, setActiveTab] = useState('general')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = searchParams.get('tab')
+    return TABS.some(tab => tab.id === t) ? t : 'general'
+  })
+
+  // Deep-link support: other pages can navigate to /settings?tab=stages to land
+  // directly on a specific tab (e.g. the lead panel's stepper gear icon).
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t && TABS.some(tab => tab.id === t)) {
+      setActiveTab(t)
+      setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('tab'); return next }, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const { data: tenantData } = useQuery({
     queryKey: ['settings-tenant'],
