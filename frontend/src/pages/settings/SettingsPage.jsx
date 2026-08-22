@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import client from '../../api/client'
 import { settingsApi } from '../../api/settings'
 import { usersApi } from '../../api/users'
@@ -1155,6 +1155,7 @@ const TYPE_ICON = {
 
 function LabelsTab() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const { can } = useAuth()
   const canManage = can('users', 'can_update')
 
@@ -1444,7 +1445,10 @@ function LabelsTab() {
                 <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 text-xs">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</td>
                 {/* Options — inline edit for custom select fields */}
                 <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 text-xs max-w-[200px]">
-                  {f.field_type === 'select' ? (
+                  {f.name === 'pipeline_stage_id' ? (
+                    <button onClick={() => navigate('/settings?tab=stages')}
+                      className="text-[#2398c2] hover:underline">ערוך שלבים ←</button>
+                  ) : f.field_type === 'select' ? (
                     optsId === f.id ? (
                       <textarea autoFocus rows={3} value={optsVal}
                         onChange={e => setOptsVal(e.target.value)}
@@ -1861,15 +1865,17 @@ export default function SettingsPage() {
   })
 
   // Deep-link support: other pages can navigate to /settings?tab=stages to land
-  // directly on a specific tab (e.g. the lead panel's stepper gear icon).
+  // directly on a specific tab (e.g. the lead panel's stepper gear icon, or the
+  // "ערוך שלבים" link from within this same page's own הגדרות רשומות tab —
+  // that second case doesn't remount SettingsPage, so this has to watch
+  // searchParams itself rather than only running once on mount.
   useEffect(() => {
     const t = searchParams.get('tab')
     if (t && TABS.some(tab => tab.id === t)) {
       setActiveTab(t)
       setSearchParams(prev => { const next = new URLSearchParams(prev); next.delete('tab'); return next }, { replace: true })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams, setSearchParams])
 
   const { data: tenantData } = useQuery({
     queryKey: ['settings-tenant'],
