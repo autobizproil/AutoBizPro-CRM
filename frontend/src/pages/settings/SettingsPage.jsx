@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import client from '../../api/client'
 import { settingsApi } from '../../api/settings'
 import { usersApi } from '../../api/users'
@@ -1155,7 +1155,6 @@ const TYPE_ICON = {
 
 function LabelsTab() {
   const qc = useQueryClient()
-  const navigate = useNavigate()
   const { can } = useAuth()
   const canManage = can('users', 'can_update')
 
@@ -1168,6 +1167,7 @@ function LabelsTab() {
   const [optsId, setOptsId]         = useState(null)
   const [optsVal, setOptsVal]       = useState('')
   const [dragIdx, setDragIdx]       = useState(null)
+  const [stagesOpen, setStagesOpen] = useState(false)
 
   // Custom record types — user-defined entities beyond the fixed 4
   const [showTypeModal, setShowTypeModal] = useState(false)
@@ -1400,7 +1400,8 @@ function LabelsTab() {
               <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">טוען...</td></tr>
             )}
             {fields.map((f, idx) => (
-              <tr key={f.id}
+              <Fragment key={f.id}>
+              <tr
                 draggable={canManage}
                 onDragStart={() => setDragIdx(idx)}
                 onDragOver={e => { if (canManage) e.preventDefault() }}
@@ -1446,8 +1447,8 @@ function LabelsTab() {
                 {/* Options — inline edit for custom select fields */}
                 <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 text-xs max-w-[200px]">
                   {f.name === 'pipeline_stage_id' ? (
-                    <button onClick={() => navigate('/settings?tab=stages')}
-                      className="text-[#2398c2] hover:underline">ערוך שלבים ←</button>
+                    <button onClick={() => setStagesOpen(o => !o)}
+                      className="text-[#2398c2] hover:underline">{stagesOpen ? 'סגור ▲' : 'עריכת ערכים ▼'}</button>
                   ) : f.field_type === 'select' ? (
                     optsId === f.id ? (
                       <textarea autoFocus rows={3} value={optsVal}
@@ -1483,6 +1484,14 @@ function LabelsTab() {
                   )}
                 </td>
               </tr>
+              {f.name === 'pipeline_stage_id' && stagesOpen && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-3 bg-gray-50/50 dark:bg-gray-900/20">
+                    <StageValuesEditor can={can} compact />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -1717,12 +1726,15 @@ function PreferencesTab({ lang, theme, fontSize, setLang, setTheme, setFontSize,
 }
 
 // ---------------------------------------------------------------------------
-// Tab: שלבים בפייפליין (Pipeline stages) — self-service add/rename/recolor/
-// reorder/delete, so a tenant no longer needs a dev to touch pipeline_stages
-// directly. Reuses the ['pipeline'] query key so LeadsPage/PipelinePage/
+// Pipeline stage values — the actual add/rename/recolor/reorder/delete list.
+// Shared by the standalone "שלבים בפייפליין" tab AND the inline expansion
+// under סטטוס (שלב)'s row in הגדרות רשומות (user explicitly rejected a link
+// that navigates away — she wants the real values editable right there,
+// same as a plain select field's options are already inline-edited in that
+// table). Reuses the ['pipeline'] query key so LeadsPage/PipelinePage/
 // LeadPanel's stage dropdowns pick up changes without a hard reload.
 // ---------------------------------------------------------------------------
-function StagesTab({ can }) {
+function StageValuesEditor({ can, compact = false }) {
   const qc = useQueryClient()
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('#2398c2')
@@ -1788,62 +1800,77 @@ function StagesTab({ can }) {
   }
 
   return (
+    <div className={compact ? 'bg-gray-50 dark:bg-gray-900/40 rounded-lg p-3' : ''}>
+      {!compact && (
+        <>
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">שלבים בפייפליין</h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+            השלבים המוצגים כאן הם השלבים היחידים שיופיעו בכל מקום במערכת — בטבלת הלידים, בכרטיס ליד, ובלוח הפייפליין.
+          </p>
+        </>
+      )}
+
+      {isLoading && <p className="text-sm text-gray-500 dark:text-gray-400">טוען...</p>}
+
+      {!isLoading && (
+        <div className="space-y-1">
+          {sorted.map((s, i) => (
+            <div key={s.id} className="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-700/50 last:border-0">
+              <div className="flex flex-col -gap-1 flex-shrink-0">
+                <button type="button" disabled={!canEdit || i === 0} onClick={() => move(i, -1)}
+                  className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 leading-none text-xs">▲</button>
+                <button type="button" disabled={!canEdit || i === sorted.length - 1} onClick={() => move(i, 1)}
+                  className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 leading-none text-xs">▼</button>
+              </div>
+              <input type="color" value={s.color ?? '#2398c2'} disabled={!canEdit}
+                onChange={e => update.mutate({ id: s.id, data: { color: e.target.value } })}
+                className="w-7 h-7 rounded border border-gray-200 dark:border-gray-600 cursor-pointer disabled:cursor-default flex-shrink-0" />
+              <input
+                value={edit[s.id] ?? s.name}
+                disabled={!canEdit}
+                onChange={e => setEdit(prev => ({ ...prev, [s.id]: e.target.value }))}
+                onBlur={() => commitName(s)}
+                className="flex-1 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 text-sm bg-transparent text-gray-900 dark:text-gray-100 disabled:opacity-60 focus:outline-none"
+              />
+              <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 w-16 text-left">{s.leads?.length ?? 0} לידים</span>
+              {canDelete && (
+                <button type="button" onClick={() => handleDelete(s)}
+                  className="text-red-300 hover:text-red-600 dark:hover:text-red-400 text-lg leading-none flex-shrink-0 px-1">×</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {canCreate && (
+        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+          <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)}
+            className="w-7 h-7 rounded border border-gray-200 dark:border-gray-600 cursor-pointer flex-shrink-0" />
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addStage()}
+            placeholder="שם שלב חדש..."
+            className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+          />
+          <button type="button" onClick={addStage} disabled={!newName.trim() || create.isPending}
+            className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex-shrink-0">
+            {create.isPending ? 'מוסיף...' : '+ הוסף שלב'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Tab: שלבים בפייפליין (Pipeline stages)
+// ---------------------------------------------------------------------------
+function StagesTab({ can }) {
+  return (
     <div className="max-w-2xl">
       <Card>
-        <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">שלבים בפייפליין</h3>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
-          השלבים המוצגים כאן הם השלבים היחידים שיופיעו בכל מקום במערכת — בטבלת הלידים, בכרטיס ליד, ובלוח הפייפליין.
-        </p>
-
-        {isLoading && <p className="text-sm text-gray-500 dark:text-gray-400">טוען...</p>}
-
-        {!isLoading && (
-          <div className="space-y-1">
-            {sorted.map((s, i) => (
-              <div key={s.id} className="flex items-center gap-2 py-1.5 border-b border-gray-100 dark:border-gray-700/50 last:border-0">
-                <div className="flex flex-col -gap-1 flex-shrink-0">
-                  <button type="button" disabled={!canEdit || i === 0} onClick={() => move(i, -1)}
-                    className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 leading-none text-xs">▲</button>
-                  <button type="button" disabled={!canEdit || i === sorted.length - 1} onClick={() => move(i, 1)}
-                    className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-20 leading-none text-xs">▼</button>
-                </div>
-                <input type="color" value={s.color ?? '#2398c2'} disabled={!canEdit}
-                  onChange={e => update.mutate({ id: s.id, data: { color: e.target.value } })}
-                  className="w-7 h-7 rounded border border-gray-200 dark:border-gray-600 cursor-pointer disabled:cursor-default flex-shrink-0" />
-                <input
-                  value={edit[s.id] ?? s.name}
-                  disabled={!canEdit}
-                  onChange={e => setEdit(prev => ({ ...prev, [s.id]: e.target.value }))}
-                  onBlur={() => commitName(s)}
-                  className="flex-1 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 text-sm bg-transparent text-gray-900 dark:text-gray-100 disabled:opacity-60 focus:outline-none"
-                />
-                <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0 w-16 text-left">{s.leads?.length ?? 0} לידים</span>
-                {canDelete && (
-                  <button type="button" onClick={() => handleDelete(s)}
-                    className="text-red-300 hover:text-red-600 dark:hover:text-red-400 text-lg leading-none flex-shrink-0 px-1">×</button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {canCreate && (
-          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-            <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)}
-              className="w-7 h-7 rounded border border-gray-200 dark:border-gray-600 cursor-pointer flex-shrink-0" />
-            <input
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addStage()}
-              placeholder="שם שלב חדש..."
-              className="flex-1 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-            />
-            <button type="button" onClick={addStage} disabled={!newName.trim() || create.isPending}
-              className="bg-[#2398c2] hover:bg-[#1d7fa3] disabled:opacity-40 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex-shrink-0">
-              {create.isPending ? 'מוסיף...' : '+ הוסף שלב'}
-            </button>
-          </div>
-        )}
+        <StageValuesEditor can={can} />
       </Card>
     </div>
   )
