@@ -12,12 +12,19 @@ const viewToPatch = (view) => ({
 
 const EMPTY_PATCH = { search: '', dateFrom: '', dateTo: '', conditions: [], visibleColumns: null }
 
+// Which view was active persists per-entity across reloads (same pattern as the
+// dashboard boards' localStorage persistence) — otherwise a manually-picked view
+// silently reverted to "הכל" on every refresh, only a server-marked is_default
+// view survived.
+const storageKey = (entityType, entityKey) => `abp-active-view:${entityType}${entityKey ? ':' + entityKey : ''}`
+
 export default function SavedViewsBar({ layout = 'dropdown', entityType, entityKey, currentState, onApply }) {
   const [activeViewId, setActiveViewId] = useState(null)
   const [open, setOpen] = useState(false)
   const [saveModal, setSaveModal] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const barRef = useRef(null)
+  const restoredLocal = useRef(false)
 
   useEffect(() => {
     const handler = (e) => {
@@ -34,6 +41,19 @@ export default function SavedViewsBar({ layout = 'dropdown', entityType, entityK
 
   const { views, create, update, remove, setDefault } = useSavedViews(entityType, entityKey, onApplyDefault)
 
+  // Restore whatever view was active last time, overriding the server's is_default
+  // pick above if the user had explicitly chosen something else on this browser.
+  useEffect(() => {
+    if (restoredLocal.current || views.length === 0) return
+    restoredLocal.current = true
+    const savedId = Number(localStorage.getItem(storageKey(entityType, entityKey)))
+    const match = savedId && views.find(v => v.id === savedId)
+    if (match) {
+      setActiveViewId(match.id)
+      onApply(viewToPatch(match))
+    }
+  }, [views, entityType, entityKey, onApply])
+
   const activeView = views.find(v => v.id === activeViewId) ?? null
   const dirty = isViewDirty(activeView, currentState)
 
@@ -41,6 +61,8 @@ export default function SavedViewsBar({ layout = 'dropdown', entityType, entityK
     setActiveViewId(view ? view.id : null)
     onApply(view ? viewToPatch(view) : EMPTY_PATCH)
     setOpen(false)
+    if (view) localStorage.setItem(storageKey(entityType, entityKey), String(view.id))
+    else localStorage.removeItem(storageKey(entityType, entityKey))
   }
 
   const currentAsPayload = (name) => ({
@@ -55,7 +77,11 @@ export default function SavedViewsBar({ layout = 'dropdown', entityType, entityK
   const saveCurrentAsNew = () => {
     if (!nameInput.trim()) return
     create.mutate(currentAsPayload(nameInput.trim()), {
-      onSuccess: (view) => { setActiveViewId(view.id); setSaveModal(false); setNameInput('') },
+      onSuccess: (view) => {
+        setActiveViewId(view.id)
+        localStorage.setItem(storageKey(entityType, entityKey), String(view.id))
+        setSaveModal(false); setNameInput('')
+      },
     })
   }
 
