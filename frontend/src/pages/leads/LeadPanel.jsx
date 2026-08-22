@@ -156,6 +156,8 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
 
   if (!leadId) return null
 
+  const sourceOptions = cfData?.find(f => f.name === 'source')?.options ?? SOURCES.filter(Boolean)
+
   const field = (key) => edit[key] !== undefined ? edit[key] : (lead?.[key] ?? '')
   const setField = (key) => (e) => setEdit(s => ({ ...s, [key]: e.target.value }))
   const commit = (key) => {
@@ -394,14 +396,17 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                 <EditableDetail label="טלפון" value={field('phone')} onChange={setField('phone')} onBlur={() => commit('phone')} disabled={!canEdit} type="tel" />
                 <EditableDetail label="אימייל" value={field('email')} onChange={setField('email')} onBlur={() => commit('email')} disabled={!canEdit} type="email" />
                 <Detail label="מקור">
+                  {/* Options come from the real DB-backed מקור הגעה field (Settings >
+                      הגדרות רשומות — user-editable), not a hardcoded list. */}
                   <select value={field('source')} onChange={setField('source')} onBlur={() => commit('source')} disabled={!canEdit}
                     className="border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 disabled:opacity-60 w-44">
+                    <option value="" style={{ color: '#6b7280' }}>ללא מקור הגעה</option>
                     {/* Imported leads (e.g. from Fireberry) can carry a source value outside
-                        our fixed list — show it as-is instead of silently blanking it out. */}
-                    {!SOURCES.includes(field('source')) && field('source') && (
+                        the configured list — show it as-is instead of silently blanking it out. */}
+                    {!sourceOptions.includes(field('source')) && field('source') && (
                       <option value={field('source')} style={{ color: SOURCE_COLORS[field('source')] ?? '#6b7280' }}>{field('source')}</option>
                     )}
-                    {SOURCES.map(s => <option key={s} value={s} style={{ color: s ? (SOURCE_COLORS[s] ?? '#111827') : '#6b7280' }}>{s || 'ללא מקור הגעה'}</option>)}
+                    {sourceOptions.map(s => <option key={s} value={s} style={{ color: SOURCE_COLORS[s] ?? '#111827' }}>{s}</option>)}
                   </select>
                 </Detail>
                 <div>

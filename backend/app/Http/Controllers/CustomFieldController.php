@@ -13,13 +13,16 @@ class CustomFieldController extends Controller
     private const ALLOWED_TYPES    = ['text', 'textarea', 'number', 'select', 'date', 'datetime', 'checkbox', 'url', 'phone', 'email', 'lookup'];
     private const ALLOWED_ENTITIES = ['leads', 'clients', 'contacts', 'tasks'];
 
+    /** Seed defaults only — real per-tenant values live in the DB and are user-editable from here on. */
+    private const DEFAULT_LEAD_SOURCES = ['וואטסאפ', 'פייסבוק', 'קשר אישי', 'טלפון', 'חבר מביא חבר', 'דיוור ישיר', 'אינסטגרם', 'אינטרנט', 'אחר'];
+
     /** System fields per entity — seeded per tenant on first access; editable label/hidden/order, not deletable. */
     public const SYSTEM_FIELDS = [
         'leads' => [
             ['name' => 'name',              'label' => 'שם מלא',       'field_type' => 'text'],
             ['name' => 'phone',             'label' => 'טלפון',         'field_type' => 'phone'],
             ['name' => 'email',             'label' => 'דוא"ל',         'field_type' => 'email'],
-            ['name' => 'source',            'label' => 'מקור הגעה',     'field_type' => 'text'],
+            ['name' => 'source',            'label' => 'מקור הגעה',     'field_type' => 'select', 'options' => self::DEFAULT_LEAD_SOURCES],
             ['name' => 'pipeline_stage_id', 'label' => 'סטטוס (שלב)',   'field_type' => 'lookup'],
             ['name' => 'assigned_to',       'label' => 'נציג אחראי',    'field_type' => 'lookup'],
             ['name' => 'notes',             'label' => 'הערות',          'field_type' => 'textarea'],
@@ -83,6 +86,7 @@ class CustomFieldController extends Controller
                     'name'       => $f['name'],
                     'label'      => $f['label'],
                     'field_type' => $f['field_type'],
+                    'options'    => $f['options'] ?? null,
                     'is_system'  => true,
                     'sort_order' => $order,
                 ]);
@@ -175,9 +179,14 @@ class CustomFieldController extends Controller
             'hidden'     => 'boolean',
         ]);
 
-        // System fields: label / hidden / required only — never type or options
+        // System fields: label / hidden always editable; options too, but only for
+        // the ones seeded as a real picklist (currently just מקור הגעה) — never
+        // type, and never options on a lookup field (those come from the linked
+        // entity's own records, not a free-form list).
         if ($customFieldDefinition->is_system) {
-            $data = array_intersect_key($data, array_flip(['label', 'hidden']));
+            $allowed = ['label', 'hidden'];
+            if ($customFieldDefinition->field_type === 'select') $allowed[] = 'options';
+            $data = array_intersect_key($data, array_flip($allowed));
         }
 
         $customFieldDefinition->update($data);

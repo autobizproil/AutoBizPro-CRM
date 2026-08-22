@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import client from '../../api/client'
 import { settingsApi } from '../../api/settings'
 import { usersApi } from '../../api/users'
@@ -1155,6 +1155,7 @@ const TYPE_ICON = {
 
 function LabelsTab() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const { can, user } = useAuth()
   const canManage = can('users', 'can_update')
 
@@ -1463,12 +1464,24 @@ function LabelsTab() {
                         onKeyDown={e => { if (e.key === 'Escape') setOptsId(null) }}
                         className="border border-[#2398c2] rounded-md px-2 py-1 text-xs bg-white dark:bg-gray-700 focus:outline-none w-full resize-none" />
                     ) : (
-                      <button disabled={!canManage || f.is_system}
+                      <button disabled={!canManage}
                         onClick={() => { setOptsId(f.id); setOptsVal((f.options ?? []).join('\n')) }}
                         className="text-right hover:text-[#2398c2] disabled:cursor-default truncate block w-full" title="ערוך אפשרויות">
                         {f.options?.length ? f.options.join(', ') : 'הוסף אפשרויות...'}
                       </button>
                     )
+                  ) : f.field_type === 'lookup' && f.lookup_entity ? (
+                    // Any new lookup field the user creates gets a link to wherever
+                    // its real records actually live — nothing to "add" here (that's
+                    // just whatever leads/clients/contacts/tasks/records already
+                    // exist), so this navigates rather than opening an editor.
+                    <button onClick={() => navigate(
+                      ['leads', 'clients', 'contacts', 'tasks'].includes(f.lookup_entity)
+                        ? `/${f.lookup_entity}`
+                        : `/records/${f.lookup_entity}`
+                    )} className="text-[#2398c2] hover:underline">
+                      {'צפה ב' + (allEntities.find(e => e.id === f.lookup_entity)?.label ?? f.lookup_entity) + ' ←'}
+                    </button>
                   ) : '—'}
                 </td>
                 {/* Hidden toggle */}
@@ -1499,7 +1512,7 @@ function LabelsTab() {
       {/* Stage values modal — matches Fireberry's picklist-field editor: click
           the field row, get a modal with the real values, not a redirect. */}
       {stagesOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setStagesOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setStagesOpen(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">עריכת ערכים — סטטוס (שלב)</h2>
@@ -1516,7 +1529,7 @@ function LabelsTab() {
           already fully manageable in Settings > משתמשים. Reuse that tab's
           body here instead of duplicating a user CRUD UI. */}
       {usersOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setUsersOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setUsersOpen(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">עריכת ערכים — נציג אחראי</h2>
@@ -1531,7 +1544,7 @@ function LabelsTab() {
 
       {/* Create modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowModal(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
@@ -1611,7 +1624,7 @@ function LabelsTab() {
 
       {/* Create/edit record type modal */}
       {showTypeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={closeTypeModal}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={closeTypeModal}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
               <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{editingType ? 'עריכת סוג רשומה' : 'סוג רשומה חדש'}</h2>

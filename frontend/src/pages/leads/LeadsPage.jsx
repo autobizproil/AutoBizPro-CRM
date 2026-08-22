@@ -210,6 +210,7 @@ export default function LeadsPage() {
     [cfData],
   )
   const customFieldDefs = defs.filter(f => !f.is_system && !f.hidden)
+  const sourceOptions = defs.find(f => f.name === 'source')?.options ?? SOURCES.filter(Boolean)
 
   // One ordered column list from field definitions: label renames, hidden and
   // sort_order from Settings → הגדרות רשומות apply here. System and custom
@@ -392,7 +393,8 @@ export default function LeadsPage() {
         )
         case 'source': return (
           <select value={form.source} onChange={set('source')} className={MODAL_INPUT}>
-            {SOURCES.map(s => <option key={s} value={s} style={{ color: s ? (SOURCE_COLORS[s] ?? '#111827') : '#6b7280' }}>{s || `בחר ${t('source')}`}</option>)}
+            <option value="" style={{ color: '#6b7280' }}>{`בחר ${t('source')}`}</option>
+            {sourceOptions.map(s => <option key={s} value={s} style={{ color: SOURCE_COLORS[s] ?? '#111827' }}>{s}</option>)}
           </select>
         )
         case 'pipeline_stage_id': return (
@@ -509,12 +511,12 @@ export default function LeadsPage() {
               borderColor: `${SOURCE_COLORS[lead.source] ?? '#6b7280'}60`,
             } : { backgroundColor: '#f3f4f6', color: '#9ca3af', borderColor: '#e5e7eb' }}>
             <option value="" style={{ color: '#6b7280', backgroundColor: 'white' }}>ללא מקור הגעה</option>
-            {/* Imported leads can carry a source value outside our fixed list —
+            {/* Imported leads can carry a source value outside the configured list —
                 keep it selectable instead of silently losing it when the dropdown opens. */}
-            {lead.source && !SOURCES.includes(lead.source) && (
+            {lead.source && !sourceOptions.includes(lead.source) && (
               <option value={lead.source} style={{ color: SOURCE_COLORS[lead.source] ?? '#6b7280', backgroundColor: 'white' }}>{lead.source}</option>
             )}
-            {SOURCES.filter(Boolean).map(s => <option key={s} value={s} style={{ color: SOURCE_COLORS[s] ?? '#111827', backgroundColor: 'white' }}>{s}</option>)}
+            {sourceOptions.map(s => <option key={s} value={s} style={{ color: SOURCE_COLORS[s] ?? '#111827', backgroundColor: 'white' }}>{s}</option>)}
           </select>
         </td>
       )
