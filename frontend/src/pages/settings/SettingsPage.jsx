@@ -1447,8 +1447,8 @@ function LabelsTab() {
                 {/* Options — inline edit for custom select fields */}
                 <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 text-xs max-w-[200px]">
                   {f.name === 'pipeline_stage_id' ? (
-                    <button onClick={() => setStagesOpen(o => !o)}
-                      className="text-[#2398c2] hover:underline">{stagesOpen ? 'סגור ▲' : 'עריכת ערכים ▼'}</button>
+                    <button onClick={() => setStagesOpen(true)}
+                      className="text-[#2398c2] hover:underline">עריכת ערכים</button>
                   ) : f.field_type === 'select' ? (
                     optsId === f.id ? (
                       <textarea autoFocus rows={3} value={optsVal}
@@ -1484,18 +1484,27 @@ function LabelsTab() {
                   )}
                 </td>
               </tr>
-              {f.name === 'pipeline_stage_id' && stagesOpen && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-3 bg-gray-50/50 dark:bg-gray-900/20">
-                    <StageValuesEditor can={can} compact />
-                  </td>
-                </tr>
-              )}
               </Fragment>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Stage values modal — matches Fireberry's picklist-field editor: click
+          the field row, get a modal with the real values, not a redirect. */}
+      {stagesOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setStagesOpen(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">עריכת ערכים — סטטוס (שלב)</h2>
+              <button onClick={() => setStagesOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-4">
+              <StageValuesEditor can={can} compact />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create modal */}
       {showModal && (
