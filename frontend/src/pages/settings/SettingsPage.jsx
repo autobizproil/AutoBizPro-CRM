@@ -1442,19 +1442,20 @@ function LabelsTab() {
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 text-xs">{FIELD_TYPE_LABELS[f.field_type] ?? f.field_type}</td>
-                {/* Options — inline edit for custom select fields */}
+                {/* Options — a single uniform "עריכה" link everywhere an editor/destination
+                    exists; no value previews or descriptive labels cluttering the column. */}
                 <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 text-xs max-w-[200px]">
                   {f.name === 'pipeline_stage_id' ? (
                     <button onClick={() => setStagesOpen(true)}
-                      className="text-[#2398c2] hover:underline">עריכת ערכים</button>
+                      className="text-[#2398c2] hover:underline">עריכה</button>
                   ) : f.name === 'assigned_to' ? (
                     <button onClick={() => setUsersOpen(true)}
-                      className="text-[#2398c2] hover:underline">עריכת ערכים</button>
+                      className="text-[#2398c2] hover:underline">עריכה</button>
                   ) : f.field_type === 'select' ? (
                     <button disabled={!canManage}
                       onClick={() => setOptsFieldId(f.id)}
-                      className="text-right hover:text-[#2398c2] disabled:cursor-default truncate block w-full">
-                      {f.options?.length ? f.options.join(', ') : 'הוסף אפשרויות...'}
+                      className="text-[#2398c2] hover:underline disabled:cursor-default disabled:no-underline disabled:text-gray-400">
+                      עריכה
                     </button>
                   ) : f.field_type === 'lookup' && f.lookup_entity ? (
                     // Any new lookup field the user creates gets a link to wherever
@@ -1466,7 +1467,7 @@ function LabelsTab() {
                         ? `/${f.lookup_entity}`
                         : `/records/${f.lookup_entity}`
                     )} className="text-[#2398c2] hover:underline">
-                      {'צפה ב' + (allEntities.find(e => e.id === f.lookup_entity)?.label ?? f.lookup_entity) + ' ←'}
+                      עריכה
                     </button>
                   ) : '—'}
                 </td>
