@@ -8,8 +8,11 @@ import { integrationsApi, GI_DOC_TYPES } from '../../api/integrations'
 import { customFieldsApi } from '../../api/customFields'
 import { clientsApi } from '../../api/clients'
 import { tasksApi } from '../../api/tasks'
+import { leadsApi } from '../../api/leads'
+import { contactsApi } from '../../api/contacts'
 import { useToast } from '../../context/ToastContext'
 import { SOURCES, SOURCE_COLORS } from '../../lib/leadSources'
+import LookupSelect from '../reports/LookupSelect'
 
 // Small stroke-icon set — replaces the old emoji icons everywhere in this panel
 // (activity types, modal titles), which read as childish next to Fireberry's flat colored icons.
@@ -407,8 +410,11 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     className="w-full border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg px-2 py-1.5 text-sm resize-none disabled:opacity-60" placeholder="הוסף הערה..." />
                 </div>
 
-                {/* Custom fields */}
-                {(cfData?.custom ?? []).map(cf => (
+                {/* Custom fields — cfData is the flat list returned by /custom-fields
+                    (system + custom rows mixed); system ones already have their own
+                    dedicated inputs above (phone/email/source/etc), so only render
+                    the tenant's actual custom fields here. */}
+                {(cfData ?? []).filter(f => !f.is_system).map(cf => (
                   <CustomFieldInput
                     key={cf.id}
                     field={cf}
@@ -417,6 +423,15 @@ export default function LeadPanel({ leadId, stages = [], onClose, canEdit }) {
                     onChange={val => setCfValues(prev => ({ ...prev, [cf.name]: val }))}
                     onBlur={() => {
                       updateLead.mutate({ id: lead.id, data: { custom_fields: { ...(lead.custom_fields ?? {}), ...cfValues, [cf.name]: cfValues[cf.name] ?? '' } } })
+                    }}
+                    onImmediateCommit={val => {
+                      // checkbox/lookup select-and-save in one synchronous step — calling the
+                      // plain onChange+onBlur pair back to back would read cfValues from this
+                      // render's stale closure (React hasn't flushed the onChange state update
+                      // yet), so the save would ship the *previous* value. Commit the real one
+                      // explicitly instead of relying on state that hasn't settled.
+                      setCfValues(prev => ({ ...prev, [cf.name]: val }))
+                      updateLead.mutate({ id: lead.id, data: { custom_fields: { ...(lead.custom_fields ?? {}), ...cfValues, [cf.name]: val } } })
                     }}
                   />
                 ))}
@@ -802,7 +817,7 @@ function EditableDetail({ label, value, onChange, onBlur, disabled, type = 'text
   )
 }
 
-function CustomFieldInput({ field, value, onChange, onBlur, disabled }) {
+function CustomFieldInput({ field, value, onChange, onBlur, onImmediateCommit, disabled }) {
   const INPUT_CLS = 'text-sm text-gray-800 dark:text-gray-200 text-left border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60 bg-transparent'
 
   return (
@@ -816,8 +831,11 @@ function CustomFieldInput({ field, value, onChange, onBlur, disabled }) {
         </select>
       ) : field.field_type === 'checkbox' ? (
         <input type="checkbox" checked={!!value} disabled={disabled}
-          onChange={e => { onChange(e.target.checked); onBlur() }}
+          onChange={e => onImmediateCommit(e.target.checked)}
           className="rounded border-gray-300 accent-[#2398c2]" />
+      ) : field.field_type === 'lookup' ? (
+        <LookupFieldInput lookupEntity={field.lookup_entity} value={value} disabled={disabled}
+          onChange={onImmediateCommit} />
       ) : field.field_type === 'textarea' ? (
         <textarea value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur} disabled={disabled} rows={2}
           className="text-sm text-gray-800 dark:text-gray-200 border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 resize-none focus:outline-none disabled:opacity-60 bg-transparent"
@@ -835,4 +853,43 @@ function CustomFieldInput({ field, value, onChange, onBlur, disabled }) {
       )}
     </div>
   )
+}
+
+// Value picker for a custom field of type "lookup" — fetches the target
+// entity's records and reuses the same searchable LookupSelect the widget
+// builder already uses for user/stage pickers. Custom record types (tenant-
+// defined, via RecordType) aren't wired here yet — no reliable single
+// "display field" to key off across arbitrary tenant schemas — so those
+// fall back to a plain numeric ID input rather than guessing wrong.
+const LOOKUP_ENTITY_CONFIG = {
+  leads:    { api: leadsApi,    nameField: 'name' },
+  clients:  { api: clientsApi,  nameField: 'name' },
+  contacts: { api: contactsApi, nameField: 'name' },
+  tasks:    { api: tasksApi,    nameField: 'title' },
+}
+
+function LookupFieldInput({ lookupEntity, value, onChange, disabled }) {
+  const config = LOOKUP_ENTITY_CONFIG[lookupEntity]
+
+  const { data: options = [] } = useQuery({
+    queryKey: ['lookup-options', lookupEntity],
+    // Response shape varies by entity: leads/tasks return a plain array,
+    // clients/contacts return a Laravel paginator (array lives under .data).
+    queryFn: () => config.api.list().then(r => {
+      const raw = r.data.data
+      const list = Array.isArray(raw) ? raw : (raw?.data ?? [])
+      return list.map(r2 => ({ id: r2.id, name: r2[config.nameField] }))
+    }),
+    enabled: !!config,
+  })
+
+  if (!config) {
+    return (
+      <input type="number" value={value} disabled={disabled} placeholder="מזהה רשומה (#ID)"
+        onChange={e => onChange(e.target.value)}
+        className="text-sm text-gray-800 dark:text-gray-200 text-left border border-transparent hover:border-gray-200 dark:hover:border-gray-600 focus:border-[#2398c2]/50 rounded px-2 py-1 w-44 focus:outline-none disabled:opacity-60 bg-transparent" />
+    )
+  }
+
+  return <LookupSelect options={options} value={value} onChange={onChange} disabled={disabled} />
 }

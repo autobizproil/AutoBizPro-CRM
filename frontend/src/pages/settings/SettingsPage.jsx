@@ -1160,7 +1160,7 @@ function LabelsTab() {
 
   const [entity, setEntity]         = useState('leads')
   const [showModal, setShowModal]   = useState(false)
-  const [draft, setDraft]           = useState({ label: '', field_type: 'text', options: '', required: false })
+  const [draft, setDraft]           = useState({ label: '', field_type: 'text', options: '', required: false, lookup_entity: '' })
   const [createError, setCreateError] = useState('')
   const [renameId, setRenameId]     = useState(null)
   const [renameVal, setRenameVal]   = useState('')
@@ -1268,7 +1268,7 @@ function LabelsTab() {
   })
 
   function resetDraft() {
-    setDraft({ label: '', field_type: 'text', options: '', required: false })
+    setDraft({ label: '', field_type: 'text', options: '', required: false, lookup_entity: '' })
     setCreateError('')
   }
 
@@ -1283,8 +1283,10 @@ function LabelsTab() {
       field_type: draft.field_type,
       required:   draft.required,
       ...(draft.field_type === 'select' ? { options: parsedOptions } : {}),
+      ...(draft.field_type === 'lookup' ? { lookup_entity: draft.lookup_entity } : {}),
     }
     if (!payload.label) return
+    if (draft.field_type === 'lookup' && !draft.lookup_entity) return
     createField.mutate(payload)
   }
 
@@ -1555,6 +1557,17 @@ function LabelsTab() {
                   {parsedOptions.length > 0 && (
                     <p className="text-xs text-gray-400 mt-1">{parsedOptions.length} אפשרויות</p>
                   )}
+                </div>
+              )}
+              {draft.field_type === 'lookup' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">מקושר לישות <span className="text-red-500">*</span></label>
+                  <select required value={draft.lookup_entity} onChange={e => setDraft(d => ({ ...d, lookup_entity: e.target.value }))}
+                    className={INPUT}>
+                    <option value="">בחר...</option>
+                    {ENTITIES.map(en => <option key={en.id} value={en.id}>{en.label}</option>)}
+                    {recordTypes.map(rt => <option key={rt.slug} value={rt.slug}>{rt.label}</option>)}
+                  </select>
                 </div>
               )}
               <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-none">

@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 
 class CustomFieldController extends Controller
 {
-    private const ALLOWED_TYPES    = ['text', 'textarea', 'number', 'select', 'date', 'datetime', 'checkbox', 'url', 'phone', 'email'];
+    private const ALLOWED_TYPES    = ['text', 'textarea', 'number', 'select', 'date', 'datetime', 'checkbox', 'url', 'phone', 'email', 'lookup'];
     private const ALLOWED_ENTITIES = ['leads', 'clients', 'contacts', 'tasks'];
 
     /** System fields per entity — seeded per tenant on first access; editable label/hidden/order, not deletable. */
@@ -107,18 +107,32 @@ class CustomFieldController extends Controller
         return response()->json(['success' => true, 'data' => $fields]);
     }
 
+    private function isValidLookupTarget(int $tenantId, ?string $target): bool
+    {
+        if (! $target) return false;
+        if (in_array($target, self::ALLOWED_ENTITIES, true)) return true;
+        return RecordType::where('tenant_id', $tenantId)->where('slug', $target)->exists();
+    }
+
     public function store(Request $request): JsonResponse
     {
         $tenantId = app('current_tenant_id');
         $entity   = $this->entityOr404($request);
 
         $data = $request->validate([
-            'label'      => 'required|string|max:120',
-            'field_type' => 'required|in:' . implode(',', self::ALLOWED_TYPES),
-            'options'    => 'nullable|array',
-            'options.*'  => 'string|max:100',
-            'required'   => 'boolean',
+            'label'         => 'required|string|max:120',
+            'field_type'    => 'required|in:' . implode(',', self::ALLOWED_TYPES),
+            'options'       => 'nullable|array',
+            'options.*'     => 'string|max:100',
+            'required'      => 'boolean',
+            'lookup_entity' => 'required_if:field_type,lookup|nullable|string',
+        ], [
+            'lookup_entity.required_if' => 'יש לבחור לאיזו ישות השדה מקשר',
         ]);
+
+        if ($data['field_type'] === 'lookup' && ! $this->isValidLookupTarget($tenantId, $data['lookup_entity'] ?? null)) {
+            abort(422, 'ישות היעד של השדה אינה חוקית');
+        }
 
         // Machine name from label; fallback for Hebrew/non-ASCII labels
         $slugged = Str::slug(str_replace(['/', '\\', '"', "'"], '_', $data['label']), '_');
@@ -134,14 +148,15 @@ class CustomFieldController extends Controller
         $maxOrder = CustomFieldDefinition::where('tenant_id', $tenantId)->where('entity', $entity)->max('sort_order') ?? -1;
 
         $field = CustomFieldDefinition::create([
-            'tenant_id'  => $tenantId,
-            'entity'     => $entity,
-            'name'       => $name,
-            'label'      => $data['label'],
-            'field_type' => $data['field_type'],
-            'options'    => $data['options'] ?? null,
-            'required'   => $data['required'] ?? false,
-            'sort_order' => $maxOrder + 1,
+            'tenant_id'     => $tenantId,
+            'entity'        => $entity,
+            'name'          => $name,
+            'label'         => $data['label'],
+            'field_type'    => $data['field_type'],
+            'lookup_entity' => $data['field_type'] === 'lookup' ? $data['lookup_entity'] : null,
+            'options'       => $data['options'] ?? null,
+            'required'      => $data['required'] ?? false,
+            'sort_order'    => $maxOrder + 1,
         ]);
 
         return response()->json(['success' => true, 'data' => $field], 201);

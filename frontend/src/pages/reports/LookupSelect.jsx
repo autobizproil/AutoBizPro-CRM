@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 
 // Searchable single-select, mirroring Fireberry's magnifier lookup input.
-export default function LookupSelect({ options, value, onChange, placeholder = 'בחר...' }) {
+export default function LookupSelect({ options, value, onChange, placeholder = 'בחר...', disabled = false }) {
   const [open, setOpen]     = useState(false)
   const [search, setSearch] = useState('')
   const boxRef              = useRef(null)
@@ -23,8 +23,9 @@ export default function LookupSelect({ options, value, onChange, placeholder = '
     <div className="relative flex-1 min-w-0" ref={boxRef}>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between gap-1 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+        className="w-full flex items-center justify-between gap-1 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 disabled:opacity-60 disabled:cursor-default"
       >
         <span className="truncate">{selected?.name ?? placeholder}</span>
         <span className="text-gray-400 flex-shrink-0">🔍</span>

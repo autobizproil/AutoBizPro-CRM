@@ -29,5 +29,4 @@ export const FIELD_TYPE_LABELS = {
   lookup:   'קישור לרשומה',
 }
 
-// Types the user can pick when creating a custom field (lookup is system-only)
-export const CREATABLE_TYPES = ['text', 'textarea', 'number', 'select', 'date', 'datetime', 'checkbox', 'url', 'phone', 'email']
+export const CREATABLE_TYPES = ['text', 'textarea', 'number', 'select', 'date', 'datetime', 'checkbox', 'url', 'phone', 'email', 'lookup']
